@@ -8,7 +8,7 @@ type GameStore = {
   kills: number; score: number; combo: number; dash: number; enemies: number; fps: number;
   weapons: Record<WeaponId, number>; choices: Upgrade[]; profile: Profile; earned: number; runId: number;
   shield: number; maxShield: number; surge: number; sector: number; bossPhase: number; peakCombo: number; elites: number; caches: number;
-  overdrive: number; salvage: number; rerolls: number; upgradeSource: 'level' | 'salvage'; announcement: string; announcementDetail: string; announcementTime: number;
+  overdrive: number; repair: number; salvage: number; rerolls: number; upgradeSource: 'level' | 'salvage'; announcement: string; announcementDetail: string; announcementTime: number;
   setPhase: (phase: Phase) => void; start: () => void; hydrate: () => void;
   saveRun: (score: number, kills: number, won: boolean, bonus?: number) => void;
   purchase: (id: keyof Profile['upgrades']) => void;
@@ -18,7 +18,7 @@ export const useGame = create<GameStore>((set, get) => ({
   phase: 'menu', difficulty: 'standard', loadout: 'pulse', sound: true, quality: 'high',
   time: 0, hp: 100, maxHp: 100, xp: 0, nextXp: 12, level: 1, kills: 0, score: 0, combo: 1, dash: 0,
   enemies: 0, fps: 60, weapons: { pulse: 1, glaive: 0, cryo: 0, tesla: 0 }, choices: [], profile: EMPTY_PROFILE, earned: 0, runId: 0,
-  shield: 40, maxShield: 40, surge: 100, sector: 0, bossPhase: 0, peakCombo: 1, elites: 0, caches: 0, overdrive: 0, salvage: 0, rerolls: 2,
+  shield: 40, maxShield: 40, surge: 100, sector: 0, bossPhase: 0, peakCombo: 1, elites: 0, caches: 0, overdrive: 0, repair: 0, salvage: 0, rerolls: 2,
   upgradeSource: 'level', announcement: '', announcementDetail: '', announcementTime: 0,
   setPhase: phase => {
     const current = get().phase;

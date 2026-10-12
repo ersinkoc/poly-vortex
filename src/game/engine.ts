@@ -28,7 +28,7 @@ export class GameEngine {
   enemies: Entity[] = []; bolts: Bolt[] = []; particles: Particle[] = []; gems: Gem[] = []; arcs: Arc[] = []; vortices: Vortex[] = [];
   shockwaves: Shockwave[] = []; damageTexts: DamageText[] = []; hazards: Hazard[] = []; supplies: Supply[] = []; caches: Cache[] = [];
   shield = 40; maxShield = 40; surge = 100; sector = 0; bossPhase = 0; peakCombo = 1; eliteKills = 0; salvage = 0; rerolls = 2;
-  criticalChance = 0.05; piercing = 0; overdriveTime = 0; shieldDelay = 0;
+  criticalChance = 0.05; piercing = 0; overdriveTime = 0; repairTime = 0; shieldDelay = 0;
   announcement = ''; announcementDetail = ''; announcementTime = 0;
   weapons: Record<WeaponId, number> = { pulse: 1, glaive: 0, cryo: 0, tesla: 0 };
   time = 0; xp = 0; nextXp = 12; level = 1; score = 0; kills = 0; combo = 1; streak = 0;
@@ -36,7 +36,7 @@ export class GameEngine {
   damage = 1; speed = 1; magnet = 1; haste = 1; bossSpawned = false;
   private uid = 0; private spawnTimer = 0; private shotTimer = 0; private cryoTimer = 2; private teslaTimer = 1;
   private hudTimer = 0; private comboTimer = 0; private seed: number; private overdrive = false;
-  private hazardTimer = 37; private supplyTimer = 18;
+  private hazardTimer = 37; private supplyTimer = 18; private repairTimer = 12;
   constructor(seed = Date.now()) { this.seed = seed >>> 0; }
   random() { this.seed = (Math.imul(1664525, this.seed) + 1013904223) >>> 0; return this.seed / 4294967296; }
   reset() {
@@ -45,7 +45,7 @@ export class GameEngine {
     this.enemies = []; this.bolts = []; this.particles = []; this.gems = []; this.arcs = []; this.vortices = [];
     this.shockwaves = []; this.damageTexts = []; this.hazards = []; this.supplies = []; this.caches = [];
     this.shield = 40; this.maxShield = 40; this.surge = 100; this.sector = 0; this.bossPhase = 0; this.peakCombo = 1; this.eliteKills = 0; this.salvage = 0; this.rerolls = 2;
-    this.criticalChance = 0.05; this.piercing = 0; this.overdriveTime = 0; this.shieldDelay = 0; this.hazardTimer = 37; this.supplyTimer = 18;
+    this.criticalChance = 0.05; this.piercing = 0; this.overdriveTime = 0; this.repairTime = 0; this.shieldDelay = 0; this.hazardTimer = 37; this.supplyTimer = 18; this.repairTimer = 12;
     this.announcement = ''; this.announcementDetail = ''; this.announcementTime = 0;
     this.weapons = { pulse: 0, glaive: 0, cryo: 0, tesla: 0 }; this.weapons[s.loadout] = 1;
     // Every core has a basic pulse cannon, even with a specialized starting module.
@@ -100,10 +100,14 @@ export class GameEngine {
   }
   collectSupply(supply: Supply) {
     if (supply.age >= 45) return;
-    if (supply.type === 'repair') { this.player.hp = Math.min(this.player.maxHp, this.player.hp + 28); this.shield = Math.min(this.maxShield, this.shield + 15); }
+    if (supply.type === 'repair') {
+      this.player.hp = Math.min(this.player.maxHp, this.player.hp + 28); this.shield = Math.min(this.maxShield, this.shield + 15); this.repairTime = 8;
+      this.announce('FIELD REPAIR ACTIVE', '+28 integrity · +15 shield · 4 integrity/sec for 8 seconds.');
+      this.burst(supply.x, supply.z, '#ff5768', 20);
+    }
     if (supply.type === 'magnet') { for (const gem of this.gems) { this.xp += gem.value; gem.value = 0; } }
     if (supply.type === 'overdrive') this.overdriveTime = 9;
-    this.wave(supply.x, supply.z, 3, supply.type === 'repair' ? '#90ffa9' : supply.type === 'magnet' ? '#68eee4' : '#ffbf68');
+    this.wave(supply.x, supply.z, 3, supply.type === 'repair' ? '#ff5768' : supply.type === 'magnet' ? '#68eee4' : '#ffbf68');
     supply.age = 100; audio.salvage();
   }
   collectCache(cache: Cache) {
@@ -188,13 +192,14 @@ export class GameEngine {
   publish() {
     useGame.setState({
       time: this.time, hp: this.player.hp, maxHp: this.player.maxHp, xp: this.xp, nextXp: this.nextXp, level: this.level, score: this.score, kills: this.kills, combo: this.combo, dash: this.player.dashCooldown, enemies: this.enemies.length, weapons: { ...this.weapons },
-      shield: this.shield, maxShield: this.maxShield, surge: this.surge, sector: this.sector, bossPhase: this.bossPhase, peakCombo: this.peakCombo, elites: this.eliteKills, caches: this.caches.length, salvage: this.salvage, rerolls: this.rerolls, overdrive: this.overdriveTime, announcement: this.announcement, announcementDetail: this.announcementDetail, announcementTime: this.announcementTime,
+      shield: this.shield, maxShield: this.maxShield, surge: this.surge, sector: this.sector, bossPhase: this.bossPhase, peakCombo: this.peakCombo, elites: this.eliteKills, caches: this.caches.length, salvage: this.salvage, rerolls: this.rerolls, overdrive: this.overdriveTime, repair: this.repairTime, announcement: this.announcement, announcementDetail: this.announcementDetail, announcementTime: this.announcementTime,
     });
   }
   tick(dt: number) {
     if (useGame.getState().phase !== 'playing') return;
     if (this.hitStop > 0) { this.hitStop -= dt; return; }
     this.time += dt; const p = this.player;
+    p.hp = Math.min(p.maxHp, p.hp + Math.min(dt, this.repairTime) * 4); this.repairTime = Math.max(0, this.repairTime - dt);
     this.announcementTime = Math.max(0, this.announcementTime - dt); this.overdriveTime = Math.max(0, this.overdriveTime - dt);
     this.shieldDelay -= dt; if (this.shieldDelay <= 0) this.shield = Math.min(this.maxShield, this.shield + dt * 7);
     this.surge = Math.min(100, this.surge + dt * 0.8);
@@ -203,6 +208,11 @@ export class GameEngine {
     this.hazardTimer -= dt;
     if (this.hazardTimer <= 0) { this.hazardTimer = this.sector >= 3 ? 6 : 11; this.addHazard(p.x + p.vx * 0.55, p.z + p.vz * 0.55); }
     this.supplyTimer -= dt;
+    this.repairTimer -= dt;
+    if (this.repairTimer <= 0 && this.supplies.length < LIMITS.supplies) {
+      this.repairTimer = 20 + this.random() * 8; const a = this.random() * Math.PI * 2;
+      this.supplies.push({ x: p.x + Math.sin(a) * 6, z: p.z + Math.cos(a) * 6, type: 'repair', age: 0 });
+    }
     if (this.supplyTimer <= 0 && this.supplies.length < LIMITS.supplies) {
       this.supplyTimer = 22; const a = this.random() * Math.PI * 2;
       this.supplies.push({ x: p.x + Math.sin(a) * 8, z: p.z + Math.cos(a) * 8, type: this.sector % 2 ? 'overdrive' : 'magnet', age: 0 });

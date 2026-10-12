@@ -48,7 +48,8 @@ Collect cyan XP prisms. Choose randomized common, rare, or overclocked upgrades.
 - Regenerating Aegis shields; four seconds without taking a hit starts recovery.
 - **Q / on-screen Surge:** an EMP that damages and pushes back nearby enemies, clears nearby hostile projectiles, and grants brief invulnerability. Charge rebuilds from combat and time; its own kills cannot refill it.
 - Gold-marked elite variants carry rare salvage. Collect their crates for 20 extra run credits, a small repair, and a guaranteed rare-or-better module choice.
-- Repair, prism-magnet, and temporary overdrive supply drops.
+- White first-aid cases with red crosses spawn nearby at 12 seconds, then every 20–28 seconds, as well as through combat drops. Collect for +28 integrity, +15 shields, and 8 seconds of fast repair (+4 integrity/second). Red plus signs on the radar and hovering beacons mark their location. Additional kits refresh the repair duration; integrity never exceeds its maximum.
+- Prism-magnet and temporary overdrive supply drops.
 - Critical-targeting, shield-capacity, and piercing-round upgrades; two card rerolls per deployment (**R**).
 - A three-phase Sentinel with radial, spiral, and targeted barrages plus telegraphed strikes.
 - Instanced shockwaves, shield impacts, floating damage numbers, critical indicators, tactical radar, sector transmissions, and overdrive status.

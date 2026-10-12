@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { engine, LIMITS } from '@/game/engine';
 import { useGame } from '@/game/store';
+import FirstAidSupplies from './first-aid-supplies';
 
 const transform = new THREE.Object3D(), tint = new THREE.Color(), right = new THREE.Vector3();
 const damageVertex = `attribute float aGlyph; attribute vec3 aTint; varying vec2 vUv; varying vec3 vTint; varying float vGlyph;
@@ -79,12 +80,16 @@ function Battlefield() {
       if (crateEdges.current) { crateEdges.current.count = crates.current.count; crateEdges.current.instanceMatrix.needsUpdate = true; }
     }
     if (supplies.current && icons.current) {
+      let count = 0;
       engine.supplies.forEach((s, i) => {
-        transform.position.set(s.x, 0.65 + Math.sin(clock.elapsedTime * 3 + i) * 0.12, s.z); transform.rotation.set(0, clock.elapsedTime * 0.7, 0); transform.scale.setScalar(0.38); transform.updateMatrix(); supplies.current!.setMatrixAt(i, transform.matrix);
-        transform.scale.set(0.65, 0.025, 0.65); transform.position.y = 0.06; transform.rotation.set(-Math.PI / 2, 0, 0); transform.updateMatrix(); icons.current!.setMatrixAt(i, transform.matrix);
-        tint.set(s.type === 'repair' ? '#81ffad' : s.type === 'magnet' ? '#71eedd' : '#ffbd70').multiplyScalar(2); supplies.current!.setColorAt(i, tint); icons.current!.setColorAt(i, tint);
+        tint.set(s.type === 'repair' ? '#ff4259' : s.type === 'magnet' ? '#71eedd' : '#ffbd70').multiplyScalar(2);
+        if (s.type !== 'repair') {
+          transform.position.set(s.x, 0.65 + Math.sin(clock.elapsedTime * 3 + i) * 0.12, s.z); transform.rotation.set(0, clock.elapsedTime * 0.7, 0); transform.scale.setScalar(0.38); transform.updateMatrix(); supplies.current!.setMatrixAt(count, transform.matrix); supplies.current!.setColorAt(count++, tint);
+        }
+        transform.position.set(s.x, 0.06, s.z); transform.scale.setScalar(s.type === 'repair' ? 0.9 : 0.65); transform.rotation.set(-Math.PI / 2, 0, 0); transform.updateMatrix(); icons.current!.setMatrixAt(i, transform.matrix); icons.current!.setColorAt(i, tint);
       });
-      for (const mesh of [supplies.current, icons.current]) { mesh.count = active ? engine.supplies.length : 0; mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; }
+      supplies.current.count = active ? count : 0; icons.current.count = active ? engine.supplies.length : 0;
+      for (const mesh of [supplies.current, icons.current]) { mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; }
     }
     if (shield.current) {
       shield.current.position.set(engine.player.x, 0.85, engine.player.z); shield.current.visible = active && engine.shield > 0;
@@ -104,4 +109,4 @@ function Battlefield() {
   </>;
 }
 
-export default function CombatEffects() { return <><Battlefield /><DamageNumbers /></>; }
+export default function CombatEffects() { return <><Battlefield /><FirstAidSupplies /><DamageNumbers /></>; }
