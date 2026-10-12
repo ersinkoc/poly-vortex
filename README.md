@@ -45,7 +45,13 @@ The custom domain is `poly-vortex.oxog.dev`, configured in `public/CNAME` and Gi
 
 Collect cyan XP prisms. A compact side reel automatically installs one randomized common, rare, or overclocked upgrade without pausing combat. Mix pulse lasers, escort drones, cryo-singularities, and Tesla arcs. At three minutes the Vortex Sentinel arrives. Classic extracts immediately on its defeat; Expedition opens a service and extraction window, then continues into another front. Standard and Overdrive difficulties are available. Every run awards core credits, saved in browser local storage, for permanent armor, damage, and speed upgrades. There are no accounts or server dependencies.
 
-## Destructible escorts � 1.18
+## Compact mobile cockpit — 1.19
+
+Phones and narrow windows use a separate minimal HUD. Core hull, shield, elapsed time and XP remain visible; a left movement joystick and four 52px combat buttons provide dash, rockets, ground charges and EMP. The rocket rack and a short lock indicator remain readable without the full launcher card. Objective/supply markers retain direction and distance, active missions or service show a small tappable chip, and automatic upgrades appear as a compact notification without pausing combat.
+
+Tap **TACTICAL** to open a scrollable overview containing the radar, encounter, field operation, expedition/service, targeting mode, installed modules, individual drone hull, rover bay, score, salvage and rocket manual. Opening it explicitly pauses simulation, including enemy fire and planted charge fuses; closing it resumes only the pause it initiated. The native modal traps focus, makes underlying controls inert and returns focus to the opener. Escape and the close/resume button dismiss it. Ready extraction remains available from the paused service overview. Crossing back into desktop layout closes the sheet safely and restores the full HUD. Safe-area offsets, portrait/landscape layouts, reduced-motion behavior and touch targets are included. No profile or gameplay balance changes are required.
+
+## Destructible escorts — 1.18
 
 Each installed escort has 40 hull, independent of core armor and shield. Hostile projectiles use swept three-dimensional collision against its flight volume: low rounds pass underneath, elevated rounds can hit it, and one round hits at most one escort. Orbiter and Sentinel volleys can replace one existing round with a straight shot aimed at a visible escort within 12m, no more than once per four seconds per hostile. These shots aim at the drone's position when fired, respect cover and can be evaded through movement. Goliath cadence is unchanged.
 

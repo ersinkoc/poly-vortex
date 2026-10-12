@@ -3,6 +3,7 @@ import './globals.css';
 import './expedition.css';
 import './charges.css';
 import './rovers.css';
+import './mobile-hud.css';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://poly-vortex.oxog.dev'),

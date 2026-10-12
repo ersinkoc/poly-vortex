@@ -6,7 +6,9 @@ import { ArrowDown, ArrowRight, ArrowUpRight, Bomb, Check, ChevronRight, CircleD
 import ChargeControl from './charge-control';
 import RoverReadout from './rover-readout';
 import DroneStatus from './drone-status';
-import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
+import MobileHUD from './mobile-hud';
+import { useCompactHUD } from './use-compact-hud';
+import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { audio } from '@/game/audio';
 import { engine } from '@/game/engine';
 import ExpeditionHUD from './expedition-hud';
@@ -55,7 +57,7 @@ function Menu({ open, start }: { open: (panel: Panel) => void; start: () => void
     </header>
     <main className="menu-main">
       <div className="hero-copy">
-        <motion.div className="eyebrow" initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}><span className="tiny-cross">+</span> A GEOMETRIC ROGUELITE <span className="version">V.21</span></motion.div>
+        <motion.div className="eyebrow" initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}><span className="tiny-cross">+</span> A GEOMETRIC ROGUELITE <span className="version">V.22</span></motion.div>
         <motion.h1 initial={{ y: 18, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.18, duration: 0.6 }}>SHAPE<br />THE <span className="title-star">✳</span><br /><span>CHAOS.</span></motion.h1>
         <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.28 }}>
           <p className="hero-description">One core. Infinite chaos.<br />Outlast the swarm. Evolve your arsenal.<br /><span>Break the protocol.</span></p>
@@ -78,7 +80,7 @@ function Menu({ open, start }: { open: (panel: Panel) => void; start: () => void
       </div>
       <div className="deployment-bar"><span><CircleDot size={14} /> READY FOR DEPLOYMENT</span><button onClick={() => open('settings')}>MODE <strong>{difficulty === 'standard' ? 'STANDARD' : 'OVERDRIVE'}</strong><ChevronRight size={13} /></button><button onClick={() => open('armory')}>LOADOUT <strong>{WEAPONS[loadout].name.toUpperCase()}</strong><ChevronRight size={13} /></button><button onClick={() => open('core')}>CORE CREDITS <strong>{number(profile.credits)}</strong><ArrowUpRight size={13} /></button></div>
     </main>
-    <footer className="footer"><span>DESIGNED TO BE OUTNUMBERED.</span><span className="footer-center"><i /> ALL SYSTEMS PROCEDURAL</span><button onClick={() => open('records')}>PERSONAL BEST <strong>{number(profile.best).padStart(6, '0')}</strong><Trophy size={13} /></button><span className="build-number">BUILD 021 / 2026</span></footer>
+    <footer className="footer"><span>DESIGNED TO BE OUTNUMBERED.</span><span className="footer-center"><i /> ALL SYSTEMS PROCEDURAL</span><button onClick={() => open('records')}>PERSONAL BEST <strong>{number(profile.best).padStart(6, '0')}</strong><Trophy size={13} /></button><span className="build-number">BUILD 022 / 2026</span></footer>
   </motion.div>;
 }
 
@@ -180,17 +182,17 @@ function HUD({ open }: { open: (panel: Panel) => void }) {
   </div>;
 }
 
-function TouchControls() {
+function TouchControls({ showDash = true }: { showDash?: boolean }) {
   const base = useRef<HTMLDivElement>(null), [stick, setStick] = useState({ x: 0, y: 0 });
   const move = (e: React.PointerEvent) => {
-    const rect = base.current?.getBoundingClientRect(); if (!rect) return;
+    const rect = base.current?.getBoundingClientRect(); if (!rect || useGame.getState().phase !== 'playing') return;
     const dx = e.clientX - rect.left - rect.width / 2, dy = e.clientY - rect.top - rect.height / 2, d = Math.max(35, Math.hypot(dx, dy));
     setStick({ x: dx / d * 35, y: dy / d * 35 }); engine.input.moveX = dx / d; engine.input.moveZ = dy / d; engine.input.aiming = false;
   };
   const stop = () => { setStick({ x: 0, y: 0 }); engine.input.moveX = 0; engine.input.moveZ = 0; };
   const phase = useGame(s => s.phase);
   useEffect(() => { if (phase !== 'playing') stop(); }, [phase]);
-  return <div className="touch-controls"><div className="joystick" ref={base} onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); move(e); }} onPointerMove={e => { if (e.currentTarget.hasPointerCapture(e.pointerId)) move(e); }} onPointerUp={stop} onPointerCancel={stop} role="button" aria-label="Touch movement joystick" tabIndex={0}><span style={{ transform: `translate(${stick.x}px, ${stick.y}px)` }}><Crosshair size={20} /></span></div><button className="touch-dash" onPointerDown={() => { engine.input.dash = true; }} aria-label="Phase shift"><Wind size={26} /><span>DASH</span></button></div>;
+  return <div className="touch-controls"><div className="joystick" ref={base} onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); move(e); }} onPointerMove={e => { if (e.currentTarget.hasPointerCapture(e.pointerId)) move(e); }} onPointerUp={stop} onPointerCancel={stop} role="button" aria-label="Touch movement joystick" tabIndex={0}><span style={{ transform: `translate(${stick.x}px, ${stick.y}px)` }}><Crosshair size={20} /></span></div>{showDash && <button className="touch-dash" onPointerDown={() => { engine.input.dash = true; }} aria-label="Phase shift"><Wind size={26} /><span>DASH</span></button>}</div>;
 }
 
 function PauseOverlay({ open }: { open: (p: Panel) => void }) {
@@ -207,6 +209,22 @@ export default function GameShell() {
   const phase = useGame(s => s.phase), sound = useGame(s => s.sound);
   const reducedEffects = useGame(s => s.reducedEffects);
   const [panel, setPanel] = useState<Panel>(null);
+  const compact = useCompactHUD(), [intelOpen, setIntelOpen] = useState(false), intelPaused = useRef(false);
+  const closeIntel = useCallback(() => {
+    setIntelOpen(false);
+    if (intelPaused.current && useGame.getState().phase === 'paused') useGame.getState().setPhase('playing');
+    intelPaused.current = false;
+  }, []);
+  const openIntel = () => {
+    const s = useGame.getState(); if (s.phase !== 'playing' && s.phase !== 'paused') return;
+    intelPaused.current = s.phase === 'playing';
+    if (intelPaused.current) s.setPhase('paused');
+    engine.input.keys.clear(); engine.input.moveX = 0; engine.input.moveZ = 0; engine.input.aiming = false;
+    setIntelOpen(true);
+  };
+  useEffect(() => { if (!compact && intelOpen) closeIntel(); }, [compact, intelOpen, closeIntel]);
+  useEffect(() => { if (phase !== 'paused' && intelOpen) { setIntelOpen(false); intelPaused.current = false; } }, [phase, intelOpen]);
+  const intelHelp = () => { setIntelOpen(false); intelPaused.current = false; setPanel('ordnance'); };
   const closePanel = useRef(() => setPanel(null));
   useEffect(() => { useGame.getState().hydrate(); return () => audio.stopMusic(); }, []);
   useEffect(() => { audio.setEnabled(sound); }, [sound]);
@@ -214,7 +232,7 @@ export default function GameShell() {
   const start = () => { setPanel(null); void audio.unlock().catch(() => { useGame.setState({ sound: false }); }); useGame.getState().start(); };
   return <MotionConfig reducedMotion={reducedEffects ? 'always' : 'user'}><div className={`app-shell ${phase === 'menu' ? 'is-menu' : 'is-game'} ${reducedEffects ? 'reduced-effects' : ''}`}>
     <div className="arena-canvas"><ArenaBoundary><Arena /></ArenaBoundary></div>
-    <AnimatePresence mode="wait">{phase === 'menu' ? <Menu key="menu" open={setPanel} start={start} /> : <motion.div key="game" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="game-interface"><HUD open={setPanel} /><AnimatePresence>{phase === 'paused' && <PauseOverlay key="pause" open={setPanel} />}{(phase === 'dead' || phase === 'won') && <ResultOverlay key="result" start={start} open={setPanel} />}</AnimatePresence></motion.div>}</AnimatePresence>
+    <AnimatePresence mode="wait">{phase === 'menu' ? <Menu key="menu" open={setPanel} start={start} /> : <motion.div key="game" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="game-interface">{compact ? <MobileHUD intelOpen={intelOpen} onIntelOpen={openIntel} onIntelClose={closeIntel} onHelp={intelHelp} movement={<TouchControls showDash={false} />} /> : <HUD open={setPanel} />}<AnimatePresence>{phase === 'paused' && !intelOpen && <PauseOverlay key="pause" open={setPanel} />}{(phase === 'dead' || phase === 'won') && <ResultOverlay key="result" start={start} open={setPanel} />}</AnimatePresence></motion.div>}</AnimatePresence>
     <AnimatePresence>{panel && <Modal key={panel} panel={panel} close={closePanel.current} />}</AnimatePresence>
   </div></MotionConfig>;
 }
