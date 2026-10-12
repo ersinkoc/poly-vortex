@@ -44,6 +44,12 @@ The custom domain is `poly-vortex.oxog.dev`, configured in `public/CNAME` and Gi
 
 Collect cyan XP prisms. A compact side reel automatically installs one randomized common, rare, or overclocked upgrade without pausing combat. Mix pulse lasers, orbital glaives, cryo-singularities, and Tesla arcs. At three minutes the Vortex Sentinel arrives; destroy it to extract. Standard and Overdrive difficulties are available. Every run awards core credits, saved in browser local storage, for permanent armor, damage, and speed upgrades. There are no accounts or server dependencies.
 
+## Directional honeycomb shield — 1.9
+
+The Aegis field is invisible at rest, including while recharging. An absorbed hit reveals only a small cap of cyan hexagonal cells at the incoming attack direction, with a local pulse and contact sparks. The rest of the surface remains fully transparent. Each patch fades over 0.7 seconds of simulation time; pause freezes it, and restart clears it. Projectile velocity determines the incoming side even when the projectile crosses the core between frames. Enemy contacts and hazard centers also supply their attack direction. The patch is stored relative to the core and follows its rotation. The last absorbed charge briefly turns the struck cells amber before disappearing; bare-hull damage and phase invulnerability do not generate new shield patches.
+
+The former full-sphere shield glow, whole-core shield-hit flash, and blue shield shockwave are removed. One procedural mesh renders up to eight bounded impact patches, with no downloaded texture and no extra gameplay randomness. Reduced effects lowers patch brightness. Shield absorption, recovery delay, and capacity upgrades retain their existing rules.
+
 ## Visible hull damage — 1.8
 
 The Poly-Core now shows actual lost integrity: expanding scorch patches, fractured panels and canopy, soot, and rougher, less reflective damaged surfaces. Shield-only hits retain the blue shield response; damage that reaches the hull produces orange sparks and a brief hot impact. Below 60% integrity, smoke rises from damaged wing sections and trails behind the moving ship. Below 35%, exposed wiring glows and sparks, signal lights weaken, and failing thrusters turn orange and flicker. Damage is normalized against maximum integrity, including permanent armor and Nanite upgrades. Repairs reduce the wear immediately; existing smoke dissipates naturally. Pause freezes impact and smoke simulation, and new deployments clear the effects. Menu previews always show a healthy core.

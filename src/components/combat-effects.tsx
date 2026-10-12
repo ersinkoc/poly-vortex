@@ -7,6 +7,7 @@ import { engine, LIMITS } from '@/game/engine';
 import { useGame } from '@/game/store';
 import FirstAidSupplies from './first-aid-supplies';
 import Ordnance from './ordnance';
+import ImpactShield from './impact-shield';
 
 const transform = new THREE.Object3D(), tint = new THREE.Color(), right = new THREE.Vector3();
 const damageVertex = `attribute float aGlyph; attribute vec3 aTint; varying vec2 vUv; varying vec3 vTint; varying float vGlyph;
@@ -54,7 +55,7 @@ function DamageNumbers() {
 function Battlefield() {
   const waves = useRef<THREE.InstancedMesh>(null), flashes = useRef<THREE.InstancedMesh>(null), danger = useRef<THREE.InstancedMesh>(null), elite = useRef<THREE.InstancedMesh>(null);
   const crateEdges = useRef<THREE.InstancedMesh>(null);
-  const crates = useRef<THREE.InstancedMesh>(null), supplies = useRef<THREE.InstancedMesh>(null), icons = useRef<THREE.InstancedMesh>(null), shield = useRef<THREE.Mesh>(null);
+  const crates = useRef<THREE.InstancedMesh>(null), supplies = useRef<THREE.InstancedMesh>(null), icons = useRef<THREE.InstancedMesh>(null);
   useFrame(({ clock }) => {
     const active = useGame.getState().phase !== 'menu';
     if (waves.current) {
@@ -92,10 +93,6 @@ function Battlefield() {
       supplies.current.count = active ? count : 0; icons.current.count = active ? engine.supplies.length : 0;
       for (const mesh of [supplies.current, icons.current]) { mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; }
     }
-    if (shield.current) {
-      shield.current.position.set(engine.player.x, 0.85, engine.player.z); shield.current.visible = active && engine.shield > 0;
-      const material = shield.current.material as THREE.MeshBasicMaterial; material.opacity = Math.min(0.18, 0.018 + engine.hitFlash * 0.4 + (engine.surge < 5 ? 0.1 : 0));
-    }
   });
   return <>
     <instancedMesh ref={waves} args={[undefined, undefined, LIMITS.shockwaves]} frustumCulled={false}><torusGeometry args={[1, 0.023, 4, 64]} /><meshBasicMaterial transparent opacity={0.8} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} /></instancedMesh>
@@ -106,8 +103,7 @@ function Battlefield() {
     <instancedMesh ref={crateEdges} args={[undefined, undefined, LIMITS.caches]} frustumCulled={false}><boxGeometry args={[1.03, 0.83, 1.03]} /><meshBasicMaterial color={[2.4, 1.6, 0.4]} wireframe toneMapped={false} /></instancedMesh>
     <instancedMesh ref={supplies} args={[undefined, undefined, LIMITS.supplies]} frustumCulled={false}><octahedronGeometry args={[1]} /><meshBasicMaterial toneMapped={false} /></instancedMesh>
     <instancedMesh ref={icons} args={[undefined, undefined, LIMITS.supplies]} frustumCulled={false}><ringGeometry args={[0.7, 1, 24]} /><meshBasicMaterial toneMapped={false} side={THREE.DoubleSide} /></instancedMesh>
-    <mesh ref={shield} scale={[1.5, 0.65, 1.7]}><sphereGeometry args={[1, 16, 12]} /><meshBasicMaterial color="#77d6ff" transparent depthWrite={false} blending={THREE.AdditiveBlending} /></mesh>
   </>;
 }
 
-export default function CombatEffects() { return <><Battlefield /><FirstAidSupplies /><Ordnance /><DamageNumbers /></>; }
+export default function CombatEffects() { return <><Battlefield /><ImpactShield /><FirstAidSupplies /><Ordnance /><DamageNumbers /></>; }

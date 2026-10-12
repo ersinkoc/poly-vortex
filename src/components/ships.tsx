@@ -34,7 +34,7 @@ function PlayerShip({ asset, shadow }: { asset: ActorAsset & { damage: ReturnTyp
     flame.color.copy(idleFlame).lerp(failingFlame, heat * 0.65).multiplyScalar(((p.dashTime > 0 ? 6 : 2.4) + shimmer + Math.hypot(p.vx, p.vz) * 0.08) * flicker);
     (asset.materials.signal as THREE.MeshStandardMaterial).emissiveIntensity = 3.1 * (1 - damage * 0.6) * flicker;
     const armor = asset.materials.armor as THREE.MeshPhysicalMaterial;
-    armor.emissive.set(p.invulnerable > 0 && !menu ? '#83c6e1' : '#000000'); armor.emissiveIntensity = 0.16;
+    armor.emissive.set(p.dashTime > 0 && !menu ? '#83c6e1' : '#000000'); armor.emissiveIntensity = 0.16;
     if (footprint.current) { footprint.current.position.set(p.x, terrainHeight(p.x, p.z) + 0.035, p.z); footprint.current.rotation.set(-Math.PI / 2, 0, -(menu ? clock.elapsedTime * 0.1 + 0.7 : p.angle)); footprint.current.scale.set(menu ? 5.5 : 2.4, menu ? 7 : 3, 1); }
     if (light.current) { light.current.position.set(p.x, 1.8, p.z); light.current.color.copy(idleFlame).lerp(failingFlame, heat); light.current.intensity = 9 + (state.reducedEffects ? 0 : p.hullHit * 10); }
   });

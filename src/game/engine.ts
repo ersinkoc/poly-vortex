@@ -10,6 +10,7 @@ import { inspectLauncher, LAUNCHER_COPY, ROCKET_RULES } from './launcher';
 import { VISUAL_LIMITS, type Blast, type Scorch } from './visuals';
 import { RewardReel } from './reward-reel';
 import { previewUpgrade } from './upgrade-preview';
+import { shieldContact, shieldImpact, SHIELD_IMPACT, type HitSource, type ShieldHit } from './shield-impact';
 import type { Arc, Bolt, Cache, DamageText, Entity, Gem, Hazard, Input, Particle, Rocket, Shockwave, Supply, Upgrade, UpgradeId, Vortex, WeaponId } from './types';
 
 export const LIMITS = { enemies: 280, bolts: 500, rockets: 16, particles: 1000, gems: 400, shockwaves: 40, damageTexts: 40, hazards: 12, supplies: 10, caches: 8 };
@@ -32,6 +33,7 @@ const defs: Record<UpgradeId, [string, string]> = {
 };
 
 export class GameEngine {
+  shieldHits: ShieldHit[] = [];
   readonly rewards: RewardReel;
   blasts: Blast[] = []; scorches: Scorch[] = []; private visualId = 0;
   director = new EncounterDirector();
@@ -61,6 +63,7 @@ export class GameEngine {
   }
   random() { this.seed = (Math.imul(1664525, this.seed) + 1013904223) >>> 0; return this.seed / 4294967296; }
   reset() {
+    this.shieldHits = [];
     this.rewards.reset(); this.publishRewards();
     this.blasts = []; this.scorches = []; this.visualId = 0;
     this.director.reset();
@@ -233,15 +236,18 @@ export class GameEngine {
     }
     if (enemy.kind === 3) { this.publish(); useGame.getState().saveRun(this.score, this.kills, true, this.salvage); }
   }
-  hurt(amount: number) {
+  hurt(amount: number, source?: HitSource) {
     if (this.player.invulnerable > 0 || useGame.getState().phase !== 'playing') return;
     const absorbed = Math.min(this.shield, amount); this.shield -= absorbed; this.shieldDelay = 4;
+    const impact = absorbed > 0 ? shieldImpact(this.player, source, absorbed, this.shield === 0) : null;
+    if (impact) { if (this.shieldHits.length >= SHIELD_IMPACT.capacity) this.shieldHits.shift(); this.shieldHits.push(impact); }
     const hullLoss = amount - absorbed;
     this.player.hp = Math.max(0, this.player.hp - hullLoss); this.player.invulnerable = 0.85;
     if (hullLoss > 0) this.player.hullHit = 0.65;
     this.streak = 0; this.combo = 1; this.hitFlash = 0.6; this.trauma = 0.7; this.hitStop = 0.05;
-    this.burst(this.player.x, this.player.z, hullLoss > 0 ? '#ffb16b' : '#72dfff', 20); hullLoss > 0 ? audio.hit() : audio.shield();
-    this.wave(this.player.x, this.player.z, 2, hullLoss > 0 ? '#ff7150' : '#72dfff', 0.35);
+    const point = hullLoss > 0 || !impact ? this.player : shieldContact(this.player, impact);
+    this.burst(point.x, point.z, hullLoss > 0 ? '#ffb16b' : '#72dfff', 20); hullLoss > 0 ? audio.hit() : audio.shield();
+    if (hullLoss > 0) this.wave(this.player.x, this.player.z, 2, '#ff7150', 0.35);
     if (this.player.hp === 0) { this.publish(); useGame.getState().saveRun(this.score, this.kills, false, this.salvage); }
   }
   createChoices(salvage = false): Upgrade[] {
@@ -377,7 +383,7 @@ export class GameEngine {
       for (const v of this.vortices) { const vd = distance(e, v); if (vd < v.radius && vd > 0.1) { vx += (v.x - e.x) / vd * 5; vz += (v.z - e.z) / vd * 5; this.hitEnemy(e, dt * (12 + this.weapons.cryo * 7) * this.damage); } }
       e.x += vx * dt; e.z += vz * dt;
       clearTerrainPosition(e, e.radius);
-      if (d < e.radius + 0.6) this.hurt([10, 14, 24, 35][e.kind]);
+      if (d < e.radius + 0.6) this.hurt([10, 14, 24, 35][e.kind], e);
       if (e.kind === 3) {
         const stage = e.hp / e.maxHp > 0.66 ? 1 : e.hp / e.maxHp > 0.33 ? 2 : 3;
         if (stage !== this.bossPhase) {
@@ -487,7 +493,7 @@ export class GameEngine {
       if (impact) { b.x = impact.x; b.z = impact.z; b.age = 10; this.burst(b.x, b.z, '#e0d2ad', 3); continue; }
       if (!b.enemy && friendlyInLine({ x: oldX, z: oldZ }, b, friendlies)) { b.age = 10; this.burst(b.x, b.z, '#89eadd', 3); continue; }
       if (b.traveled > (b.range ?? Infinity)) { b.age = 10; continue; }
-      if (b.enemy) { if (distance(b, p) < 0.7) { this.hurt(b.damage); b.age = 10; } }
+      if (b.enemy) { if (distance(b, p) < 0.7) { this.hurt(b.damage, b); b.age = 10; } }
       else for (const e of this.enemies) if (e.hp > 0 && !b.hits?.includes(e.id) && distance(b, e) < e.radius + 0.25) {
         const critical = this.random() < this.criticalChance; this.hitEnemy(e, b.damage * (critical ? 2 : 1), critical); (b.hits ??= []).push(e.id);
         if ((b.pierce ?? 0) <= 0) b.age = 10; else { b.pierce!--; b.target = 0; }
@@ -504,7 +510,7 @@ export class GameEngine {
     this.gems = this.gems.filter(g => g.value > 0 && g.age < 60);
     for (const h of this.hazards) {
       h.age += dt;
-      if (!h.detonated && h.age >= h.delay) { h.detonated = true; this.blast(h.x, h.z, h.radius * 0.7, '#ff6b9c', true); this.wave(h.x, h.z, h.radius * 1.5, '#ff658d'); this.burst(h.x, h.z, '#ff6488', 35); if (distance(h, p) < h.radius) this.hurt(24); }
+      if (!h.detonated && h.age >= h.delay) { h.detonated = true; this.blast(h.x, h.z, h.radius * 0.7, '#ff6b9c', true); this.wave(h.x, h.z, h.radius * 1.5, '#ff658d'); this.burst(h.x, h.z, '#ff6488', 35); if (distance(h, p) < h.radius) this.hurt(24, h); }
     }
     this.hazards = this.hazards.filter(h => h.age < h.delay + h.duration);
     for (const s of this.supplies) { s.age += dt; if (distance(s, p) < 1.1) this.collectSupply(s); }
@@ -530,6 +536,7 @@ export class GameEngine {
     for (const v of this.vortices) v.life -= dt; this.vortices = this.vortices.filter(v => v.life > 0);
     for (const w of this.shockwaves) w.life -= dt; this.shockwaves = this.shockwaves.filter(w => w.life > 0);
     for (const d of this.damageTexts) d.life -= dt; this.damageTexts = this.damageTexts.filter(d => d.life > 0);
+    for (const hit of this.shieldHits) hit.age += dt; this.shieldHits = this.shieldHits.filter(hit => hit.age < SHIELD_IMPACT.life);
     for (const b of this.blasts) b.age += dt; this.blasts = this.blasts.filter(b => b.age < 2.4);
     for (const s of this.scorches) s.age += dt; this.scorches = this.scorches.filter(s => s.age < 22);
     audio.combo = this.combo;
