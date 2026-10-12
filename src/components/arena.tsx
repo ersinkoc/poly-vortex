@@ -14,6 +14,7 @@ import CombatEffects from './combat-effects';
 import Terrain from './terrain';
 import MissionActors from './mission-actors';
 import { TargetMarker } from './target-lock';
+import { navigationSignals } from '@/game/navigation';
 
 const dummy = new THREE.Object3D();
 const color = new THREE.Color();
@@ -116,6 +117,7 @@ function SceneController() {
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []);
   const pointer = useMemo(() => new THREE.Vector2(), []);
   const pointerInside = useRef(false);
+  const navigationPoint = useMemo(() => new THREE.Vector3(), []), navigationTimer = useRef(0);
   const accumulator = useRef(0), frames = useRef({ count: 0, time: 0 });
   const runId = useGame(s => s.runId), phase = useGame(s => s.phase);
   useEffect(() => { if (runId) { engine.reset(); pointerInside.current = false; } }, [runId]);
@@ -133,6 +135,7 @@ function SceneController() {
       engine.input.keys.add(e.code); if (e.code === 'Space') engine.input.dash = true;
       if (e.code === 'KeyQ' && !e.repeat) engine.input.surge = true;
       if (e.code === 'KeyE' && !e.repeat) engine.input.rocket = true;
+      if (e.code === 'KeyF' && !e.repeat) { useGame.setState({ aimMode: s.aimMode === 'assisted' ? 'precision' : 'assisted' }); engine.targetId = 0; engine.publish(); }
     };
     const up = (e: KeyboardEvent) => engine.input.keys.delete(e.code);
     const blur = () => { engine.input.keys.clear(); if (useGame.getState().phase === 'playing') useGame.getState().setPhase('paused'); };
@@ -168,9 +171,23 @@ function SceneController() {
     const px = menu ? 0 : engine.player.x, pz = menu ? 0 : engine.player.z;
     target.set(px + (menu ? 12 : 0), menu ? 18 : 28, pz + (menu ? 17 : 18));
     camera.position.lerp(target, 1 - Math.exp(-4 * Math.min(delta, 0.1)));
-    const shake = engine.trauma ** 2 * 0.4;
+    const shake = s.reducedEffects ? 0 : engine.trauma ** 2 * 0.4;
     camera.position.x += Math.sin(state.clock.elapsedTime * 91) * shake; camera.position.z += Math.cos(state.clock.elapsedTime * 77) * shake;
     camera.lookAt(px, 0, pz);
+    navigationTimer.current += delta;
+    if (s.phase === 'playing' && navigationTimer.current >= 0.1) {
+      navigationTimer.current = 0; camera.updateMatrixWorld();
+      const { width, height } = state.size;
+      const navigation = navigationSignals(engine.player, engine.missions.mission, engine.supplies, engine.rocketAmmo).map(signal => {
+        navigationPoint.set(signal.x, 1.8, signal.z).project(camera);
+        const sign = navigationPoint.z > 1 ? -1 : 1;
+        const x = navigationPoint.x * sign * width / 2, y = -navigationPoint.y * sign * height / 2;
+        const maxX = Math.max(12, width / 2 - 82), maxY = Math.max(12, height / 2 - (width <= 600 ? 320 : 210));
+        const scale = Math.max(1, Math.abs(x) / maxX, Math.abs(y) / maxY);
+        return { ...signal, screenX: width / 2 + x / scale, screenY: height / 2 + y / scale, edge: scale > 1, angle: Math.atan2(x, -y) * 180 / Math.PI };
+      });
+      useGame.setState({ navigation });
+    }
   });
   return null;
 }
@@ -178,7 +195,7 @@ function SceneController() {
 function PostFX() {
   const quality = useGame(s => s.quality);
   const offset = useMemo(() => new THREE.Vector2(0.0003, 0.0003), []);
-  useFrame(() => { const v = 0.0003 + engine.hitFlash * 0.009; offset.set(v, v); });
+  useFrame(() => { const v = useGame.getState().reducedEffects ? 0 : 0.0003 + engine.hitFlash * 0.009; offset.set(v, v); });
   return <EffectComposer multisampling={quality === 'high' ? 4 : 0}>
     <Bloom intensity={0.9} luminanceThreshold={0.75} luminanceSmoothing={0.5} mipmapBlur />
     <ChromaticAberration offset={offset} radialModulation modulationOffset={0.2} />

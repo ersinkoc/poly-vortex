@@ -1,13 +1,14 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { ArrowDown, ArrowRight, ArrowUpRight, Check, ChevronRight, CircleDot, Cpu, Crosshair, Disc3, Expand, Hexagon, Keyboard, Layers3, MousePointer2, Orbit, Pause, Play, Radio, Rocket, RotateCcw, Shield, SlidersHorizontal, Snowflake, Sparkles, Trophy, Volume2, VolumeX, Wind, X, Zap } from 'lucide-react';
 import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
 import { audio } from '@/game/audio';
 import { engine, RUN_DURATION } from '@/game/engine';
 import { useGame } from '@/game/store';
 import { ACHIEVEMENTS } from '@/game/progression';
+import { previewUpgrade } from '@/game/upgrade-preview';
 import TacticalHUD from './tactical-hud';
 import { WEAPONS, type Profile, type Upgrade, type WeaponId } from '@/game/types';
 
@@ -48,7 +49,7 @@ function Menu({ open, start }: { open: (panel: Panel) => void; start: () => void
     </header>
     <main className="menu-main">
       <div className="hero-copy">
-        <motion.div className="eyebrow" initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}><span className="tiny-cross">+</span> A GEOMETRIC ROGUELITE <span className="version">V.06</span></motion.div>
+        <motion.div className="eyebrow" initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}><span className="tiny-cross">+</span> A GEOMETRIC ROGUELITE <span className="version">V.07</span></motion.div>
         <motion.h1 initial={{ y: 18, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.18, duration: 0.6 }}>SHAPE<br />THE <span className="title-star">✳</span><br /><span>CHAOS.</span></motion.h1>
         <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.28 }}>
           <p className="hero-description">One core. Infinite chaos.<br />Outlast the swarm. Evolve your arsenal.<br /><span>Break the protocol.</span></p>
@@ -70,11 +71,12 @@ function Menu({ open, start }: { open: (panel: Panel) => void; start: () => void
       </div>
       <div className="deployment-bar"><span><CircleDot size={14} /> READY FOR DEPLOYMENT</span><button onClick={() => open('settings')}>MODE <strong>{difficulty === 'standard' ? 'STANDARD' : 'OVERDRIVE'}</strong><ChevronRight size={13} /></button><button onClick={() => open('armory')}>LOADOUT <strong>{WEAPONS[loadout].name.toUpperCase()}</strong><ChevronRight size={13} /></button><button onClick={() => open('core')}>CORE CREDITS <strong>{number(profile.credits)}</strong><ArrowUpRight size={13} /></button></div>
     </main>
-    <footer className="footer"><span>DESIGNED TO BE OUTNUMBERED.</span><span className="footer-center"><i /> ALL SYSTEMS PROCEDURAL</span><button onClick={() => open('records')}>PERSONAL BEST <strong>{number(profile.best).padStart(6, '0')}</strong><Trophy size={13} /></button><span className="build-number">BUILD 006 / 2026</span></footer>
+    <footer className="footer"><span>DESIGNED TO BE OUTNUMBERED.</span><span className="footer-center"><i /> ALL SYSTEMS PROCEDURAL</span><button onClick={() => open('records')}>PERSONAL BEST <strong>{number(profile.best).padStart(6, '0')}</strong><Trophy size={13} /></button><span className="build-number">BUILD 007 / 2026</span></footer>
   </motion.div>;
 }
 
 function PanelContent({ panel }: { panel: Exclude<Panel, null> }) {
+  const aimMode = useGame(s => s.aimMode), reducedEffects = useGame(s => s.reducedEffects);
   const profile = useGame(s => s.profile), sound = useGame(s => s.sound), quality = useGame(s => s.quality), difficulty = useGame(s => s.difficulty), loadout = useGame(s => s.loadout);
   if (panel === 'records') return <>
     <p className="panel-intro">Every deployment leaves a signal. Your flight record is saved with your core.</p>
@@ -85,6 +87,7 @@ function PanelContent({ panel }: { panel: Exclude<Panel, null> }) {
     <p className="panel-intro">Weapons fire at a clear, locked hostile. Move the mouse to aim: targets outside your aiming cone are ignored. Keep moving and collect prisms.</p>
     <div className="control-row"><span><Keyboard /> MOVEMENT</span><div className="keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><em>or arrow keys</em></div></div>
     <div className="control-row"><span><MousePointer2 /> AIM DIRECTION</span><div className="keys"><kbd>MOUSE</kbd></div></div>
+    <div className="control-row"><span><Crosshair /> TARGETING MODE</span><div className="keys"><kbd>F</kbd><em>assisted / precision</em></div></div>
     <div className="control-row"><span><Wind /> PHASE SHIFT</span><div className="keys"><kbd>SPACE</kbd><em>or right-click</em></div></div>
     <div className="control-row"><span><Zap /> VORTEX SURGE</span><div className="keys"><kbd>Q</kbd><em>EMP / clear bullets</em></div></div>
     <div className="control-row"><span><Rocket /> HELLION ROCKET</span><div className="keys"><kbd>E</kbd><em>6 rounds / ammo crates refill 3</em></div></div>
@@ -105,6 +108,8 @@ function PanelContent({ panel }: { panel: Exclude<Panel, null> }) {
   </>;
   if (panel === 'settings') return <>
     <p className="panel-intro">Tune your connection to the vortex.</p>
+    <div className="setting-row"><div><h3>Targeting control</h3><p>{aimMode === 'precision' ? 'Only fire in your mouse aim cone. No automatic fallback.' : 'Mouse aim takes priority. Track automatically when the cursor leaves.'} Press F during flight.</p></div><div className="segmented"><button className={aimMode === 'assisted' ? 'active' : ''} onClick={() => useGame.setState({ aimMode: 'assisted' })}>ASSISTED</button><button className={aimMode === 'precision' ? 'active' : ''} onClick={() => useGame.setState({ aimMode: 'precision' })}>PRECISION</button></div></div>
+    <div className="setting-row"><div><h3>Reduced effects</h3><p>Disable camera shake, hit distortion and interface motion. Combat warnings remain visible.</p></div><Toggle label="Reduced effects" active={reducedEffects} onClick={() => useGame.setState({ reducedEffects: !reducedEffects })} /></div>
     <div className="setting-row"><div><h3>Procedural audio</h3><p>Synth bassline, laser pulses, and reactive effects.</p></div><Toggle label="Procedural audio" active={sound} onClick={() => { useGame.setState({ sound: !sound }); void audio.unlock().catch(() => undefined); }} /></div>
     <div className="setting-row"><div><h3>Render quality</h3><p>{quality === 'high' ? 'Enhanced resolution and multisampled effects.' : 'Reduced resolution. Optimized for lighter hardware.'}</p></div><div className="segmented"><button className={quality === 'high' ? 'active' : ''} onClick={() => useGame.setState({ quality: 'high' })}>HIGH</button><button className={quality === 'performance' ? 'active' : ''} onClick={() => useGame.setState({ quality: 'performance' })}>PERFORMANCE</button></div></div>
     <div className="setting-label">DEPLOYMENT DIFFICULTY</div>
@@ -172,11 +177,16 @@ function TouchControls() {
   return <div className="touch-controls"><div className="joystick" ref={base} onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); move(e); }} onPointerMove={e => { if (e.currentTarget.hasPointerCapture(e.pointerId)) move(e); }} onPointerUp={stop} onPointerCancel={stop} role="button" aria-label="Touch movement joystick" tabIndex={0}><span style={{ transform: `translate(${stick.x}px, ${stick.y}px)` }}><Crosshair size={20} /></span></div><button className="touch-dash" onPointerDown={() => { engine.input.dash = true; }} aria-label="Phase shift"><Wind size={26} /><span>DASH</span></button></div>;
 }
 
+function UpgradePreview({ upgrade }: { upgrade: Upgrade }) {
+  const rows = previewUpgrade({ ...engine, hp: engine.player.hp, maxHp: engine.player.maxHp }, upgrade);
+  return <div className="upgrade-stat-preview"><small>PERSISTENT BUILD / AFTER INSTALL</small>{rows.map(row => <div key={row.label}><span>{row.label}</span><strong>{row.before}<ArrowRight size={10} /><b>{row.after}</b></strong></div>)}</div>;
+}
+
 function UpgradeOverlay() {
   const choices = useGame(s => s.choices), level = useGame(s => s.level), source = useGame(s => s.upgradeSource), rerolls = useGame(s => s.rerolls);
   useEffect(() => { const key = (e: KeyboardEvent) => { const i = Number(e.key) - 1; if (i >= 0 && i < 3 && choices[i]) engine.applyUpgrade(choices[i]); else if (e.code === 'KeyR') engine.reroll(); }; window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key); }, [choices]);
   const select = (u: Upgrade) => engine.applyUpgrade(u);
-  return <motion.div className="game-overlay upgrade-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} role="dialog" aria-modal="true" aria-labelledby="upgrade-title"><div className="upgrade-heading"><span className="eyebrow"><Sparkles size={15} /> {source === 'salvage' ? 'RARE SALVAGE / +20 CR' : `CORE LEVEL ${level}`}</span><h2 id="upgrade-title">EVOLVE YOUR <em>ARSENAL.</em></h2><p>{source === 'salvage' ? 'Elite wreckage. Rare modules. Choose your reward.' : 'The swarm can wait. Choose your next advantage.'}</p></div><div className="upgrade-cards">{choices.map((u, i) => { const Icon = u.id in weaponIcons ? weaponIcons[u.id as WeaponId] : u.id === 'repair' || u.id === 'shield' ? Shield : u.id === 'critical' ? Crosshair : u.id === 'pierce' ? ArrowRight : u.id === 'speed' ? Wind : u.id === 'magnet' ? Orbit : Cpu; return <motion.button initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }} className={`upgrade-card rarity-${u.rarity.toLowerCase()}`} key={u.id} onClick={() => select(u)}><div className="upgrade-card-top"><span>{u.rarity}</span><kbd>{i + 1}</kbd></div><span className="upgrade-icon"><Icon size={42} strokeWidth={1.3} /></span><h3>{u.title}</h3><p>{u.description}</p><div className="upgrade-power">POWER +{u.power}<span>INSTALL MODULE <ArrowUpRight size={15} /></span></div></motion.button>; })}</div><div className="upgrade-tools"><span className="upgrade-hint">SELECT A MODULE OR PRESS 1 / 2 / 3</span><button className="reroll-button" disabled={rerolls <= 0} onClick={() => engine.reroll()}><RotateCcw size={13} /> REROLL <kbd>R</kbd><strong>{rerolls}</strong></button></div></motion.div>;
+  return <motion.div className="game-overlay upgrade-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} role="dialog" aria-modal="true" aria-labelledby="upgrade-title"><div className="upgrade-heading"><span className="eyebrow"><Sparkles size={15} /> {source === 'salvage' ? 'RARE SALVAGE / +20 CR' : `CORE LEVEL ${level}`}</span><h2 id="upgrade-title">EVOLVE YOUR <em>ARSENAL.</em></h2><p>{source === 'salvage' ? 'Elite wreckage. Rare modules. Choose your reward.' : 'The swarm can wait. Choose your next advantage.'}</p></div><div className="upgrade-cards">{choices.map((u, i) => { const Icon = u.id in weaponIcons ? weaponIcons[u.id as WeaponId] : u.id === 'repair' || u.id === 'shield' ? Shield : u.id === 'critical' ? Crosshair : u.id === 'pierce' ? ArrowRight : u.id === 'speed' ? Wind : u.id === 'magnet' ? Orbit : Cpu; return <motion.button initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }} className={`upgrade-card rarity-${u.rarity.toLowerCase()}`} key={u.id} onClick={() => select(u)}><div className="upgrade-card-top"><span>{u.rarity}</span><kbd>{i + 1}</kbd></div><span className="upgrade-icon"><Icon size={42} strokeWidth={1.3} /></span><h3>{u.title}</h3><p>{u.description}</p><UpgradePreview upgrade={u} /><div className="upgrade-power">POWER +{u.power}<span>INSTALL MODULE <ArrowUpRight size={15} /></span></div></motion.button>; })}</div><div className="upgrade-tools"><span className="upgrade-hint">SELECT A MODULE OR PRESS 1 / 2 / 3</span><button className="reroll-button" disabled={rerolls <= 0} onClick={() => engine.reroll()}><RotateCcw size={13} /> REROLL <kbd>R</kbd><strong>{rerolls}</strong></button></div></motion.div>;
 }
 
 function PauseOverlay({ open }: { open: (p: Panel) => void }) {
@@ -190,15 +200,16 @@ function ResultOverlay({ start, open }: { start: () => void; open: (p: Panel) =>
 
 export default function GameShell() {
   const phase = useGame(s => s.phase), sound = useGame(s => s.sound);
+  const reducedEffects = useGame(s => s.reducedEffects);
   const [panel, setPanel] = useState<Panel>(null);
   const closePanel = useRef(() => setPanel(null));
   useEffect(() => { useGame.getState().hydrate(); return () => audio.stopMusic(); }, []);
   useEffect(() => { audio.setEnabled(sound); }, [sound]);
   useEffect(() => { if (phase === 'playing') audio.startMusic(); else audio.stopMusic(); }, [phase]);
   const start = () => { setPanel(null); void audio.unlock().catch(() => { useGame.setState({ sound: false }); }); useGame.getState().start(); };
-  return <div className={`app-shell ${phase === 'menu' ? 'is-menu' : 'is-game'}`}>
+  return <MotionConfig reducedMotion={reducedEffects ? 'always' : 'user'}><div className={`app-shell ${phase === 'menu' ? 'is-menu' : 'is-game'} ${reducedEffects ? 'reduced-effects' : ''}`}>
     <div className="arena-canvas"><ArenaBoundary><Arena /></ArenaBoundary></div>
     <AnimatePresence mode="wait">{phase === 'menu' ? <Menu key="menu" open={setPanel} start={start} /> : <motion.div key="game" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="game-interface"><HUD /><AnimatePresence>{phase === 'upgrade' && <UpgradeOverlay key="upgrade" />}{phase === 'paused' && <PauseOverlay key="pause" open={setPanel} />}{(phase === 'dead' || phase === 'won') && <ResultOverlay key="result" start={start} open={setPanel} />}</AnimatePresence></motion.div>}</AnimatePresence>
     <AnimatePresence>{panel && <Modal key={panel} panel={panel} close={closePanel.current} />}</AnimatePresence>
-  </div>;
+  </div></MotionConfig>;
 }

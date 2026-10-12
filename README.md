@@ -35,6 +35,7 @@ The custom domain is `poly-vortex.oxog.dev`, configured in `public/CNAME` and Gi
 
 - **WASD / arrows:** Move with smooth inertia.
 - **Mouse:** Aim your ship and dash direction. Weapons target automatically.
+- **F / targeting button:** Switch Assisted targeting and Precision targeting. Precision requires the cursor in the arena and never falls back to an automatic target.
 - **Space / right-click:** Phase shift. A brief invulnerable dash with a three-second base cooldown.
 - **E / rocket button:** Fire one Hellion rocket at a clear, aligned hostile. Six rounds per deployment; blue ammo crates refill up to three rounds and 20 EMP charge.
 - **Escape:** Pause or resume. Changing tabs or losing focus also pauses the game.
@@ -43,7 +44,18 @@ The custom domain is `poly-vortex.oxog.dev`, configured in `public/CNAME` and Gi
 
 Collect cyan XP prisms. Choose randomized common, rare, or overclocked upgrades. Mix pulse lasers, orbital glaives, cryo-singularities, and Tesla arcs. At three minutes the Vortex Sentinel arrives; destroy it to extract. Standard and Overdrive difficulties are available. Every run awards core credits, saved in browser local storage, for permanent armor, damage, and speed upgrades. There are no accounts or server dependencies.
 
-## Protocol expansion
+## Experience update — 1.4
+
+- An encounter director alternates insertion, buildup, assault, and eight-second recovery windows. Nearby threats and integrity/shield loss can bring recovery forward, with a cooldown preventing endless relief. Remaining threats keep fighting; their health and damage do not change. Completing an operation also pauses reinforcements briefly. The Sentinel always arrives at three minutes and bypasses adaptive recovery.
+- The encounter HUD shows the current phase, remaining time, and wave number. Contextual flight hints explain movement, Precision targeting, empty rocket racks, and critical integrity.
+- Projected amber mission, red repair, and blue ammo signals follow their world positions. Off-screen signals become directional arrows. Only the closest unfinished objective and needed live supplies are shown, capped at three markers.
+- Upgrade cards compare your current build with the actual post-install values: module level, bolt damage, blades, chain targets, speed, reach, dash cooldown, shield capacity, critical chance, penetration, and repair. Rarity power and upgrade caps are reflected in those previews.
+- Assisted mode retains mouse-priority targeting and keyboard/touch automatic tracking. Precision mode holds weapons when mouse aim is unavailable. Both retain cover, alignment, range, and pilot protection rules. Rockets remain manual and finite.
+- Reduced effects disables camera shake, hit chromatic distortion, and interface movement. It follows the system reduced-motion preference by default and can be overridden in Settings. Warnings, weapons, and combat continue to work. Targeting and effects preferences persist alongside existing settings without replacing flight records.
+
+The pacing design is informed by [Valve's AI Systems of Left 4 Dead](https://cdn.akamai.steamstatic.com/apps/valve/2009/ai_systems_of_l4d_mike_booth.pdf). Objective guidance and optional camera motion draw on Microsoft's [XAG 109](https://learn.microsoft.com/en-us/xbox/accessibility/xbox-accessibility-guidelines/109) and [XAG 117](https://learn.microsoft.com/en-us/xbox/accessibility/xbox-accessibility-guidelines/117). These are design references, not accessibility certification.
+
+## Combat systems
 
 - Five escalating sectors with distinct grid colors and timed ion-strike warnings.
 - Regenerating Aegis shields; four seconds without taking a hit starts recovery.

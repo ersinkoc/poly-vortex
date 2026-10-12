@@ -5,6 +5,7 @@ import { MissionDirector } from './missions';
 import { clearTerrainPosition, terrainImpact } from './terrain';
 import { angleDifference, friendlyInLine, PULSE_RANGE, selectTarget, turnTowards } from './targeting';
 import { ROCKET_CAPACITY, SUPPLY_RULES, supplyLifetime } from './supplies';
+import { EncounterDirector } from './director';
 import type { Arc, Bolt, Cache, DamageText, Entity, Gem, Hazard, Input, Particle, Rocket, Shockwave, Supply, Upgrade, UpgradeId, Vortex, WeaponId } from './types';
 
 export const LIMITS = { enemies: 280, bolts: 500, rockets: 16, particles: 1000, gems: 400, shockwaves: 40, damageTexts: 40, hazards: 12, supplies: 10, caches: 8 };
@@ -27,6 +28,7 @@ const defs: Record<UpgradeId, [string, string]> = {
 };
 
 export class GameEngine {
+  director = new EncounterDirector();
   missions = new MissionDirector();
   targetId = 0;
   rockets: Rocket[] = []; rocketAmmo = ROCKET_CAPACITY; rocketCooldown = 0;
@@ -48,6 +50,8 @@ export class GameEngine {
   constructor(seed = Date.now()) { this.seed = seed >>> 0; }
   random() { this.seed = (Math.imul(1664525, this.seed) + 1013904223) >>> 0; return this.seed / 4294967296; }
   reset() {
+    this.director.reset();
+    useGame.setState({ navigation: [] });
     this.missions.reset();
     this.targetId = 0;
     this.rockets = []; this.rocketAmmo = ROCKET_CAPACITY; this.rocketCooldown = 0; this.ammoTimer = SUPPLY_RULES.ammo.first;
@@ -119,7 +123,7 @@ export class GameEngine {
   fireRocket() {
     if (useGame.getState().phase !== 'playing' || this.rocketAmmo <= 0 || this.rocketCooldown > 0 || this.rockets.length >= LIMITS.rockets) return false;
     const allies = this.missions.mission?.kind === 'rescue' && this.missions.mission.status === 'active' ? this.missions.mission.targets.filter(t => !t.done) : [];
-    const target = selectTarget(this.enemies, this.player, this.input, this.targetId, allies); if (!target) return false;
+    const target = selectTarget(this.enemies, this.player, this.input, this.targetId, allies, PULSE_RANGE, useGame.getState().aimMode); if (!target) return false;
     const p = this.player, angle = Math.atan2(target.x - p.x, target.z - p.z);
     if (Math.abs(angleDifference(angle, p.angle)) > 0.5) return false;
     const lead = Math.min(0.9, Math.max(0.1, distance(target, p) - target.radius - 0.2));
@@ -237,6 +241,7 @@ export class GameEngine {
   publish() {
     const target = this.enemies.find(e => e.id === this.targetId && e.hp > 0);
     useGame.setState({
+      encounter: this.director.phase, encounterRemaining: this.director.remaining, encounterRound: this.director.round, combatPressure: this.director.stress,
       rocketAmmo: this.rocketAmmo, rocketCapacity: ROCKET_CAPACITY, rocketCooldown: this.rocketCooldown, rocketReady: !!target && Math.abs(angleDifference(Math.atan2(target.x - this.player.x, target.z - this.player.z), this.player.angle)) <= 0.5,
       targeting: this.input.aiming ? 'aim' : 'auto', target: target ? { id: target.id, kind: target.kind, distance: distance(target, this.player), hp: target.hp, maxHp: target.maxHp } : null,
       time: this.time, hp: this.player.hp, maxHp: this.player.maxHp, xp: this.xp, nextXp: this.nextXp, level: this.level, score: this.score, kills: this.kills, combo: this.combo, dash: this.player.dashCooldown, enemies: this.enemies.length, weapons: { ...this.weapons },
@@ -248,6 +253,9 @@ export class GameEngine {
     if (useGame.getState().phase !== 'playing') return;
     if (this.hitStop > 0) { this.hitStop -= dt; return; }
     this.time += dt; const p = this.player;
+    const nearby = this.enemies.reduce((count, e) => count + (e.hp > 0 && distance(e, p) < 7 ? e.kind >= 2 ? 3 : 1 : 0), 0);
+    const pressure = Math.min(1, nearby / 18 * 0.6 + (1 - p.hp / p.maxHp) * 0.4 + (1 - this.shield / this.maxShield) * 0.2);
+    this.director.tick(dt, pressure, this.time >= RUN_DURATION);
     this.rocketCooldown = Math.max(0, this.rocketCooldown - dt);
     p.hp = Math.min(p.maxHp, p.hp + Math.min(dt, this.repairTime) * 4); this.repairTime = Math.max(0, this.repairTime - dt);
     this.announcementTime = Math.max(0, this.announcementTime - dt); this.overdriveTime = Math.max(0, this.overdriveTime - dt);
@@ -256,7 +264,7 @@ export class GameEngine {
     const nextSector = sectorAt(this.time);
     if (nextSector !== this.sector) { this.sector = nextSector; const zone = SECTORS[this.sector]; this.announce(zone.event, zone.description); audio.tone(240, 0.4, 'triangle', 0.2, 480); }
     this.hazardTimer -= dt;
-    if (this.hazardTimer <= 0) { this.hazardTimer = this.sector >= 3 ? 6 : 11; this.addHazard(p.x + p.vx * 0.55, p.z + p.vz * 0.55); }
+    if (this.hazardTimer <= 0 && this.director.phase !== 'recovery') { this.hazardTimer = this.sector >= 3 ? 6 : 11; this.addHazard(p.x + p.vx * 0.55, p.z + p.vz * 0.55); }
     this.supplyTimer -= dt;
     this.repairTimer -= dt;
     if (this.repairTimer <= 0) {
@@ -294,9 +302,9 @@ export class GameEngine {
     p.x += p.vx * dt; p.z += p.vz * dt;
     clearTerrainPosition(p, 0.7);
     this.spawnTimer -= dt;
-    if (this.spawnTimer <= 0) {
+    if (this.spawnTimer <= 0 && this.director.spawnRate > 0) {
       const pressure = 1 + this.time / 45;
-      this.spawnTimer = Math.max(0.09, 0.75 / pressure) / (this.overdrive ? 1.4 : 1);
+      this.spawnTimer = Math.max(0.09, 0.75 / pressure) / (this.overdrive ? 1.4 : 1) / this.director.spawnRate;
       const r = this.random(); this.spawn(this.time > 35 && r > 0.91 ? 2 : this.time > 14 && r > 0.72 ? 1 : 0, undefined, undefined, this.time > 25 && this.uid % (this.sector >= 2 ? 8 : 12) === 0);
     }
     if (this.time >= RUN_DURATION && !this.bossSpawned) { this.bossSpawned = true; this.spawn(3, p.x, p.z - 18); audio.explosion(); }
@@ -351,7 +359,7 @@ export class GameEngine {
     }
     if (useGame.getState().phase !== 'playing') return;
     const friendlies = this.missions.mission?.kind === 'rescue' && this.missions.mission.status === 'active' ? this.missions.mission.targets.filter(t => !t.done) : [];
-    const primary = selectTarget(this.enemies, p, this.input, this.targetId, friendlies); this.targetId = primary?.id ?? 0;
+    const primary = selectTarget(this.enemies, p, this.input, this.targetId, friendlies, PULSE_RANGE, useGame.getState().aimMode); this.targetId = primary?.id ?? 0;
     if (primary && !this.input.aiming) p.angle = turnTowards(p.angle, Math.atan2(primary.x - p.x, primary.z - p.z), dt * 6);
     const facingTarget = primary && Math.abs(angleDifference(Math.atan2(primary.x - p.x, primary.z - p.z), p.angle)) < (this.input.aiming ? 0.5 : 0.25);
     this.shotTimer -= dt;
@@ -451,6 +459,7 @@ export class GameEngine {
       if (event === 'started') this.announce(mission.title, mission.description);
       if (event === 'rescued') { this.wave(p.x, p.z, 4, '#ffd797'); this.burst(p.x, p.z, '#ffe4a6', 18); audio.salvage(); }
       if (event === 'complete') {
+        this.director.recover();
         this.salvage += mission.reward; this.score += 1500; this.surge = Math.min(100, this.surge + 25); this.player.hp = Math.min(this.player.maxHp, this.player.hp + 15);
         this.announce('MISSION COMPLETE', `+${mission.reward} credits · +15 integrity · +25 EMP charge.`); this.wave(p.x, p.z, 6, '#82ffc5'); audio.salvage(); this.publish();
       }

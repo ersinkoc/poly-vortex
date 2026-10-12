@@ -10,7 +10,8 @@ export function friendlyInLine(a: Position, b: Position, friendlies: readonly Po
   const dx = b.x - a.x, dz = b.z - a.z, length2 = dx * dx + dz * dz; if (length2 < 1e-8) return false;
   return friendlies.some(f => { const t = ((f.x - a.x) * dx + (f.z - a.z) * dz) / length2; return t > 0 && t < 1 && Math.hypot(a.x + t * dx - f.x, a.z + t * dz - f.z) < 0.75; });
 }
-export function selectTarget(enemies: readonly Entity[], player: Position, input: Input, lockedId: number, friendlies: readonly Position[] = [], range = PULSE_RANGE) {
+export function selectTarget(enemies: readonly Entity[], player: Position, input: Input, lockedId: number, friendlies: readonly Position[] = [], range = PULSE_RANGE, mode: 'assisted' | 'precision' = 'assisted') {
+  if (mode === 'precision' && !input.aiming) return undefined;
   const ax = input.aimX - player.x, az = input.aimZ - player.z, aimAngle = Math.atan2(ax, az);
   if (input.aiming && ax * ax + az * az < 0.5) return undefined;
   const score = (e: Entity) => {
