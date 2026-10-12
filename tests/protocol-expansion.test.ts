@@ -8,7 +8,7 @@ import { sectorAt } from '../src/game/progression';
 let game: GameEngine;
 beforeEach(() => {
   audio.enabled = false;
-  useGame.setState({ phase: 'playing', maxHp: 100, loadout: 'pulse', difficulty: 'standard', profile: structuredClone(EMPTY_PROFILE), choices: [], peakCombo: 1, level: 1 });
+  useGame.setState({ phase: 'playing', maxHp: 100, loadout: 'pulse', difficulty: 'standard', profile: structuredClone(EMPTY_PROFILE), peakCombo: 1, level: 1 });
   game = new GameEngine(101); game.reset();
 });
 
@@ -25,23 +25,23 @@ describe('expanded protocol combat', () => {
     expect(game.activateSurge()).toBe(true); expect(game.kills).toBe(1); expect(game.surge).toBe(0); expect(game.bolts).toHaveLength(1); expect(game.shockwaves.length).toBeGreaterThan(0);
     expect(game.activateSurge()).toBe(false);
   });
-  test('paused and upgrading cores cannot discharge', () => {
-    useGame.setState({ phase: 'upgrade' }); expect(game.activateSurge()).toBe(false); expect(game.surge).toBe(100);
+  test('paused and ended cores cannot discharge', () => {
+    useGame.setState({ phase: 'dead' }); expect(game.activateSurge()).toBe(false); expect(game.surge).toBe(100);
     useGame.setState({ phase: 'paused' }); expect(game.activateSurge()).toBe(false);
   });
   test('elite death drops rare salvage and rewards exactly once', () => {
     game.spawn(0, 0, 5, true); const elite = game.enemies[0]; expect(elite.hp).toBeGreaterThan(16);
     game.hitEnemy(elite, 1000); game.hitEnemy(elite, 1000); expect(game.eliteKills).toBe(1); expect(game.caches).toHaveLength(1);
-    game.collectCache(game.caches[0]); expect(game.salvage).toBe(20); expect(useGame.getState().upgradeSource).toBe('salvage'); expect(useGame.getState().phase).toBe('upgrade');
-    expect(useGame.getState().choices.every(c => c.rarity !== 'COMMON')).toBe(true);
+    game.collectCache(game.caches[0]); expect(game.salvage).toBe(20); expect(game.rewards.active?.source).toBe('salvage'); expect(useGame.getState().phase).toBe('playing');
+    expect(game.rewards.active!.choices.every(c => c.rarity !== 'COMMON')).toBe(true);
   });
-  test('cache cannot be collected twice while the reward selection is open', () => {
+  test('cache cannot be collected twice while the automatic reel runs', () => {
     const cache = { x: 0, z: 0, age: 0 }; game.collectCache(cache); game.collectCache(cache); expect(game.salvage).toBe(20);
-    game.applyUpgrade(useGame.getState().choices[0]); game.collectCache(cache); expect(game.salvage).toBe(20); expect(game.player.invulnerable).toBeGreaterThanOrEqual(1);
+    game.rewards.tick(1.7); game.collectCache(cache); expect(game.salvage).toBe(20); expect(game.player.invulnerable).toBeGreaterThanOrEqual(1);
   });
-  test('rerolls are limited and reject stale card objects', () => {
-    game.xp = 12; game.checkLevel(); const stale = useGame.getState().choices[0]; expect(game.reroll()).toBe(true);
-    game.applyUpgrade(stale); expect(useGame.getState().phase).toBe('upgrade'); expect(game.reroll()).toBe(true); expect(game.reroll()).toBe(false); expect(game.rerolls).toBe(0);
+  test('consecutive caches queue one automatic award each without pausing', () => {
+    game.collectCache({ x: 0, z: 0, age: 0 }); game.collectCache({ x: 0, z: 0, age: 0 });
+    expect(game.salvage).toBe(40); expect(game.rewards.queued).toBe(1); expect(useGame.getState().rewardQueued).toBe(1); expect(useGame.getState().phase).toBe('playing');
   });
   test('hazards warn before impact and detonate once', () => {
     game.player.invulnerable = 0; game.addHazard(0, 0, 3, 0.2);
@@ -74,12 +74,12 @@ describe('expanded protocol combat', () => {
     for (let i = 0; i < 100; i++) { game.wave(0, 0, 5, '#fff'); game.addHazard(0, 0); }
     expect(game.shockwaves).toHaveLength(LIMITS.shockwaves); expect(game.hazards).toHaveLength(LIMITS.hazards);
   });
-  test('a restart clears hazards, salvage, buffs, rerolls, and surge inputs', () => {
-    game.addHazard(0, 0); game.overdriveTime = 8; game.salvage = 100; game.rerolls = 0; game.input.surge = true; game.reset();
-    expect(game.hazards).toHaveLength(0); expect(game.salvage).toBe(0); expect(game.overdriveTime).toBe(0); expect(game.rerolls).toBe(2); expect(game.input.surge).toBe(false);
+  test('a restart clears hazards, salvage, buffs, queued rewards, and surge inputs', () => {
+    game.addHazard(0, 0); game.overdriveTime = 8; game.salvage = 100; game.rewards.enqueue('salvage', 1); game.input.surge = true; game.reset();
+    expect(game.hazards).toHaveLength(0); expect(game.salvage).toBe(0); expect(game.overdriveTime).toBe(0); expect(game.rewards.active).toBeNull(); expect(game.rewards.queued).toBe(0); expect(game.input.surge).toBe(false);
   });
-  test('pause cannot bypass pending upgrade choices', () => {
-    game.xp = 12; game.checkLevel(); useGame.getState().setPhase('paused'); expect(useGame.getState().phase).toBe('upgrade');
+  test('pause suspends the automatic reward reel', () => {
+    game.xp = 12; game.checkLevel(); useGame.getState().setPhase('paused'); game.tick(2); expect(useGame.getState().phase).toBe('paused'); expect(game.rewards.active?.elapsed).toBe(0); expect(game.rewards.active?.installed).toBe(false);
   });
 });
 

@@ -7,7 +7,7 @@ import { audio } from '../src/game/audio';
 let game: GameEngine;
 beforeEach(() => {
   audio.enabled = false;
-  useGame.setState({ phase: 'playing', maxHp: 100, loadout: 'pulse', difficulty: 'standard', profile: structuredClone(EMPTY_PROFILE), choices: [], earned: 0 });
+  useGame.setState({ phase: 'playing', maxHp: 100, loadout: 'pulse', difficulty: 'standard', profile: structuredClone(EMPTY_PROFILE), earned: 0 });
   game = new GameEngine(42); game.reset();
 });
 
@@ -71,20 +71,20 @@ describe('run lifecycle and progression', () => {
     useGame.setState({ phase: 'paused' }); game.input.keys.add('KeyD'); game.player.invulnerable = 0;
     game.tick(1); game.hurt(100); expect(game.time).toBe(0); expect(game.player.x).toBe(0); expect(game.player.hp).toBe(100);
   });
-  test('XP pauses combat and offers three unique upgrades', () => {
-    game.xp = game.nextXp; game.checkLevel(); const s = useGame.getState();
-    expect(s.phase).toBe('upgrade'); expect(s.choices).toHaveLength(3); expect(new Set(s.choices.map(c => c.id)).size).toBe(3);
-    const elapsed = game.time; game.tick(1); expect(game.time).toBe(elapsed);
-    game.applyUpgrade(s.choices[0]); expect(useGame.getState().phase).toBe('playing'); expect(game.level).toBe(2);
+  test('XP starts an automatic reel while combat and movement continue', () => {
+    game.xp = game.nextXp; game.checkLevel(); const roll = game.rewards.active!;
+    expect(useGame.getState().phase).toBe('playing'); expect(roll.choices).toHaveLength(3); expect(new Set(roll.choices.map(c => c.id)).size).toBe(3);
+    game.input.keys.add('KeyD'); game.tick(0.1); expect(game.time).toBeGreaterThan(0); expect(game.player.x).toBeGreaterThan(0);
+    expect(roll.installed).toBe(false); expect(game.level).toBe(2);
   });
-  test('invalid upgrade selection leaves the game and choices unchanged', () => {
-    game.xp = 12; game.checkLevel(); const choices = useGame.getState().choices;
-    game.applyUpgrade({ id: 'damage', title: 'Fake', description: '', rarity: 'COMMON', power: 100 });
-    expect(game.damage).toBe(1); expect(useGame.getState().choices).toBe(choices); expect(useGame.getState().phase).toBe('upgrade');
+  test('the reel does not install a module before its spin finishes', () => {
+    game.xp = 12; game.checkLevel(); const roll = game.rewards.active!;
+    game.tick(0.1); expect(roll.installed).toBe(false); expect(useGame.getState().reward?.installed).toBe(false); expect(useGame.getState().phase).toBe('playing');
   });
-  test('multiple levels worth of XP chain choices without discarding XP', () => {
-    game.xp = 100; game.checkLevel(); const first = useGame.getState().choices[0]; game.applyUpgrade(first);
-    expect(game.level).toBe(3); expect(useGame.getState().phase).toBe('upgrade'); expect(game.xp).toBeGreaterThan(0);
+  test('multiple levels worth of XP queue all rewards without discarding XP', () => {
+    game.xp = 100; game.checkLevel();
+    expect(game.level).toBe(4); expect(game.xp).toBe(18); expect(game.rewards.queued).toBe(2); expect(useGame.getState().phase).toBe('playing');
+    expect(game.rewards.active?.level).toBe(2);
   });
   test('taking damage resets combo and a lethal hit ends a run exactly once', () => {
     game.player.invulnerable = 0; game.combo = 5; game.streak = 48; game.hurt(10); expect(game.combo).toBe(1);

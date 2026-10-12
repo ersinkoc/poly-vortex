@@ -39,17 +39,20 @@ The custom domain is `poly-vortex.oxog.dev`, configured in `public/CNAME` and Gi
 - **Space / right-click:** Phase shift. A brief invulnerable dash with a three-second base cooldown.
 - **E / rocket button:** Fire one Hellion rocket at a clear, aligned hostile. Six rounds per deployment; blue ammo crates refill up to three rounds and 20 EMP charge.
 - **Escape:** Pause or resume. Changing tabs or losing focus also pauses the game.
-- **1 / 2 / 3:** Pick a level-up module.
+- **Module reel:** XP and elite salvage install upgrades automatically; keep moving.
 - **Touch:** Use the on-screen movement joystick and dash button.
 
-Collect cyan XP prisms. Choose randomized common, rare, or overclocked upgrades. Mix pulse lasers, orbital glaives, cryo-singularities, and Tesla arcs. At three minutes the Vortex Sentinel arrives; destroy it to extract. Standard and Overdrive difficulties are available. Every run awards core credits, saved in browser local storage, for permanent armor, damage, and speed upgrades. There are no accounts or server dependencies.
+Collect cyan XP prisms. A compact side reel automatically installs one randomized common, rare, or overclocked upgrade without pausing combat. Mix pulse lasers, orbital glaives, cryo-singularities, and Tesla arcs. At three minutes the Vortex Sentinel arrives; destroy it to extract. Standard and Overdrive difficulties are available. Every run awards core credits, saved in browser local storage, for permanent armor, damage, and speed upgrades. There are no accounts or server dependencies.
+
+## Automatic upgrades — 1.7
+
+XP levels and elite caches feed one FIFO reward reel. Each 1.7-second spin installs exactly one of three random candidates, shows the installed result and actual stat changes for 1.35 seconds, then resolves the next reward. Multiple crates and several levels of XP queue without discarding rewards or interrupting movement, weapons, missions, or rocket intent. Candidates are generated from the latest build so maxed modules are excluded. Pause freezes the reel; ended runs stop installation and restart clears the queue. Reduced effects keeps the symbol stationary during decoding. There are no choice dialogs, selection keys, or card rerolls.
 
 ## Experience update — 1.4
 
 - An encounter director alternates insertion, buildup, assault, and eight-second recovery windows. Nearby threats and integrity/shield loss can bring recovery forward, with a cooldown preventing endless relief. Remaining threats keep fighting; their health and damage do not change. Completing an operation also pauses reinforcements briefly. The Sentinel always arrives at three minutes and bypasses adaptive recovery.
 - The encounter HUD shows the current phase, remaining time, and wave number. Contextual flight hints explain movement, Precision targeting, empty rocket racks, and critical integrity.
 - Projected amber mission, red repair, and blue ammo signals follow their world positions. Off-screen signals become directional arrows. Only the closest unfinished objective and needed live supplies are shown, capped at three markers.
-- Upgrade cards compare your current build with the actual post-install values: module level, bolt damage, blades, chain targets, speed, reach, dash cooldown, shield capacity, critical chance, penetration, and repair. Rarity power and upgrade caps are reflected in those previews.
 - Assisted mode retains mouse-priority targeting and keyboard/touch automatic tracking. Precision mode holds weapons when mouse aim is unavailable. Both retain cover, alignment, range, and pilot protection rules. Rockets remain manual and finite.
 - Reduced effects disables camera shake, hit chromatic distortion, and interface movement. It follows the system reduced-motion preference by default and can be overridden in Settings. Warnings, weapons, and combat continue to work. Targeting and effects preferences persist alongside existing settings without replacing flight records.
 
@@ -73,7 +76,7 @@ The pacing design is informed by [Valve's AI Systems of Left 4 Dead](https://cdn
 - Gold-marked elite variants carry rare salvage. Collect their crates for 20 extra run credits, a small repair, and a guaranteed rare-or-better module choice.
 - White first-aid cases with red crosses first spawn at 30 seconds, then at 55–75-second intervals. Only one can remain on the field, it expires after 35 seconds, and routine kills no longer drop medical kits. Collect for +28 integrity, +15 shields, and 8 seconds of fast repair (+4 integrity/second). Red plus signs on the radar and hovering beacons mark their location. Additional kits refresh the repair duration; integrity never exceeds its maximum.
 - Prism-magnet and temporary overdrive supply drops are also spaced out: timed drops every 40 seconds after the first at 24 seconds, combat drops no more than once per 25 seconds.
-- Critical-targeting, shield-capacity, and piercing-round upgrades; two card rerolls per deployment (**R**).
+- Critical-targeting, shield-capacity, and piercing-round upgrades installed by the automatic module reel.
 - A three-phase Sentinel with radial, spiral, and targeted barrages plus telegraphed strikes.
 - Instanced shockwaves, shield impacts, floating damage numbers, critical indicators, tactical radar, sector transmissions, and overdrive status.
 - Persistent flight records and seven achievements. Legacy saves retain credits and upgrades; known victories and deployment counts unlock the corresponding records. Audio, quality, difficulty, and starting loadout preferences are also saved locally.
@@ -84,7 +87,7 @@ The pacing design is informed by [Valve's AI Systems of Left 4 Dead](https://cdn
 
 The rocket panel now states **E / tap to fire**, shows the locked enemy and distance, the six-round rack, alignment/cycling progress, and an actionable explanation for missing aim, range, cover, protected pilots, empty ammunition or a full flight pool. HUD readiness and actual launch checks share one inspection function, so a stale laser lock cannot falsely mark a blocked rocket shot ready.
 
-Pressing E or tapping while the ship turns queues one launch for at most 0.85 seconds. The intent belongs to that exact hostile; target loss, a blocked lane, timeout, pause or upgrade cancels it without spending ammunition. Commands never transfer to another enemy and repeated presses cannot extend the queue. Ready launches remain immediate with a 0.75-second cycle. A launch flare, **ROCKET AWAY** feedback and the changing rack count confirm the shot. Reload notices show the actual capped round count or an EMP-only recharge.
+Pressing E or tapping while the ship turns queues one launch for at most 0.85 seconds. The intent belongs to that exact hostile; target loss, a blocked lane, timeout, pause or an ended run cancels it without spending ammunition. Automatic upgrade rolls keep the launch active. Commands never transfer to another enemy and repeated presses cannot extend the queue. Ready launches remain immediate with a 0.75-second cycle. A launch flare, **ROCKET AWAY** feedback and the changing rack count confirm the shot. Reload notices show the actual capped round count or an EMP-only recharge.
 
 Manual rocket intent runs before automatic Pulse/Cryo/Tesla attacks, so a Tesla kill in the same frame cannot silently discard the command. A missile already in flight remembers its target's last position. If another weapon kills that hostile, it airbursts at that position instead of wandering past the fight; surviving nearby hostiles still receive covered, distance-based blast damage. Terrain collision and pilot protection retain priority.
 

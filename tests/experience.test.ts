@@ -12,7 +12,7 @@ const storage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
 const media = Object.getOwnPropertyDescriptor(globalThis, 'matchMedia');
 beforeEach(() => {
   audio.enabled = false;
-  useGame.setState({ phase: 'playing', maxHp: 100, loadout: 'pulse', difficulty: 'standard', aimMode: 'assisted', reducedEffects: false, profile: structuredClone(EMPTY_PROFILE), choices: [] });
+  useGame.setState({ phase: 'playing', maxHp: 100, loadout: 'pulse', difficulty: 'standard', aimMode: 'assisted', reducedEffects: false, profile: structuredClone(EMPTY_PROFILE) });
   game = new GameEngine(342); game.reset(); game.player.invulnerable = 100;
 });
 afterEach(() => {
@@ -61,15 +61,15 @@ test('upgrade previews show actual clamped module levels and blade counts', () =
   game.weapons.glaive = 5;
   const rows = previewUpgrade({ ...game, ...game.player }, u);
   expect(rows[0].after).toBe('LV 6'); expect(rows[1].after).toBe('7');
-  useGame.setState({ phase: 'upgrade', choices: [u] }); game.applyUpgrade(u); expect(game.weapons.glaive).toBe(6);
+  game.rewards.reset(); game.createChoices = () => [u]; game.rewards.enqueue('level', 2); game.rewards.tick(1.7); expect(game.weapons.glaive).toBe(6);
 });
 test('previewed repair and critical chance match actual capped installation', () => {
   game.player.hp = 99; game.criticalChance = 0.73;
   const u: Upgrade = { id: 'repair', power: 2, rarity: 'RARE', title: '', description: '' };
   const rows = previewUpgrade({ ...game, ...game.player }, u); expect(rows[1].after).toBe('120 HP');
-  useGame.setState({ phase: 'upgrade', choices: [u] }); game.applyUpgrade(u); expect(game.player.hp).toBe(120);
+  game.rewards.reset(); game.createChoices = () => [u]; game.rewards.enqueue('level', 2); game.rewards.tick(1.7); expect(game.player.hp).toBe(120);
   u.id = 'critical'; const critical = previewUpgrade({ ...game, ...game.player }, u); expect(critical[0].after).toBe('75%');
-  useGame.setState({ phase: 'upgrade', choices: [u] }); game.applyUpgrade(u); expect(game.criticalChance).toBe(0.75);
+  game.rewards.reset(); game.createChoices = () => [u]; game.rewards.enqueue('level', 2); game.rewards.tick(1.7); expect(game.criticalChance).toBe(0.75);
 });
 test('navigation prioritizes an unfinished pilot and only needed live supplies', () => {
   game.missions.tick(8, game.player, 0, () => 0.5);

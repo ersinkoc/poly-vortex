@@ -1,5 +1,5 @@
 export type WeaponId = 'pulse' | 'glaive' | 'cryo' | 'tesla';
-export type Phase = 'menu' | 'playing' | 'paused' | 'upgrade' | 'dead' | 'won';
+export type Phase = 'menu' | 'playing' | 'paused' | 'dead' | 'won';
 export type Difficulty = 'standard' | 'overdrive';
 export type UpgradeId = WeaponId | 'damage' | 'speed' | 'magnet' | 'repair' | 'haste' | 'shield' | 'critical' | 'pierce';
 export type Upgrade = { id: UpgradeId; title: string; description: string; rarity: 'COMMON' | 'RARE' | 'OVERCLOCKED'; power: number };

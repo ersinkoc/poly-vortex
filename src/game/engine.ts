@@ -8,6 +8,8 @@ import { ROCKET_CAPACITY, SUPPLY_RULES, supplyLifetime } from './supplies';
 import { EncounterDirector } from './director';
 import { inspectLauncher, LAUNCHER_COPY, ROCKET_RULES } from './launcher';
 import { VISUAL_LIMITS, type Blast, type Scorch } from './visuals';
+import { RewardReel } from './reward-reel';
+import { previewUpgrade } from './upgrade-preview';
 import type { Arc, Bolt, Cache, DamageText, Entity, Gem, Hazard, Input, Particle, Rocket, Shockwave, Supply, Upgrade, UpgradeId, Vortex, WeaponId } from './types';
 
 export const LIMITS = { enemies: 280, bolts: 500, rockets: 16, particles: 1000, gems: 400, shockwaves: 40, damageTexts: 40, hazards: 12, supplies: 10, caches: 8 };
@@ -30,6 +32,7 @@ const defs: Record<UpgradeId, [string, string]> = {
 };
 
 export class GameEngine {
+  readonly rewards: RewardReel;
   blasts: Blast[] = []; scorches: Scorch[] = []; private visualId = 0;
   director = new EncounterDirector();
   missions = new MissionDirector();
@@ -41,7 +44,7 @@ export class GameEngine {
   input: Input = { keys: new Set(), aimX: 0, aimZ: -8, aiming: false, dash: false, surge: false, rocket: false, moveX: 0, moveZ: 0 };
   enemies: Entity[] = []; bolts: Bolt[] = []; particles: Particle[] = []; gems: Gem[] = []; arcs: Arc[] = []; vortices: Vortex[] = [];
   shockwaves: Shockwave[] = []; damageTexts: DamageText[] = []; hazards: Hazard[] = []; supplies: Supply[] = []; caches: Cache[] = [];
-  shield = 40; maxShield = 40; surge = 100; sector = 0; bossPhase = 0; peakCombo = 1; eliteKills = 0; salvage = 0; rerolls = 2;
+  shield = 40; maxShield = 40; surge = 100; sector = 0; bossPhase = 0; peakCombo = 1; eliteKills = 0; salvage = 0;
   criticalChance = 0.05; piercing = 0; overdriveTime = 0; repairTime = 0; shieldDelay = 0;
   announcement = ''; announcementDetail = ''; announcementTime = 0;
   weapons: Record<WeaponId, number> = { pulse: 1, glaive: 0, cryo: 0, tesla: 0 };
@@ -52,9 +55,13 @@ export class GameEngine {
   private hudTimer = 0; private comboTimer = 0; private seed: number; private overdrive = false;
   private hazardTimer = 37; private supplyTimer = 24; private repairTimer = SUPPLY_RULES.repair.first as number; private ammoTimer = SUPPLY_RULES.ammo.first as number;
   private lastCombatSupply = -25;
-  constructor(seed = Date.now()) { this.seed = seed >>> 0; }
+  constructor(seed = Date.now()) {
+    this.seed = seed >>> 0;
+    this.rewards = new RewardReel(source => this.createChoices(source === 'salvage'), () => this.random(), choice => this.installUpgrade(choice));
+  }
   random() { this.seed = (Math.imul(1664525, this.seed) + 1013904223) >>> 0; return this.seed / 4294967296; }
   reset() {
+    this.rewards.reset(); this.publishRewards();
     this.blasts = []; this.scorches = []; this.visualId = 0;
     this.director.reset();
     useGame.setState({ navigation: [] });
@@ -67,7 +74,7 @@ export class GameEngine {
     this.player = { x: 0, z: 0, vx: 0, vz: 0, angle: 0, hp: s.maxHp, maxHp: s.maxHp, invulnerable: 1.5, dashTime: 0, dashCooldown: 0 };
     this.enemies = []; this.bolts = []; this.particles = []; this.gems = []; this.arcs = []; this.vortices = [];
     this.shockwaves = []; this.damageTexts = []; this.hazards = []; this.supplies = []; this.caches = [];
-    this.shield = 40; this.maxShield = 40; this.surge = 100; this.sector = 0; this.bossPhase = 0; this.peakCombo = 1; this.eliteKills = 0; this.salvage = 0; this.rerolls = 2;
+    this.shield = 40; this.maxShield = 40; this.surge = 100; this.sector = 0; this.bossPhase = 0; this.peakCombo = 1; this.eliteKills = 0; this.salvage = 0;
     this.criticalChance = 0.05; this.piercing = 0; this.overdriveTime = 0; this.repairTime = 0; this.shieldDelay = 0; this.hazardTimer = 37; this.supplyTimer = 24; this.repairTimer = SUPPLY_RULES.repair.first;
     this.announcement = ''; this.announcementDetail = ''; this.announcementTime = 0;
     this.weapons = { pulse: 0, glaive: 0, cryo: 0, tesla: 0 }; this.weapons[s.loadout] = 1;
@@ -195,11 +202,7 @@ export class GameEngine {
     cache.age = 100; this.salvage += 20; this.player.hp = Math.min(this.player.maxHp, this.player.hp + 10);
     this.player.invulnerable = Math.max(this.player.invulnerable, 1);
     this.wave(cache.x, cache.z, 4, '#ffd073'); audio.salvage();
-    useGame.setState({ phase: 'upgrade', upgradeSource: 'salvage', choices: this.createChoices(true) }); this.publish();
-  }
-  reroll() {
-    const s = useGame.getState(); if (s.phase !== 'upgrade' || this.rerolls <= 0) return false;
-    this.rerolls--; useGame.setState({ choices: this.createChoices(s.upgradeSource === 'salvage'), rerolls: this.rerolls }); return true;
+    this.rewards.enqueue('salvage', this.level); this.publishRewards(); this.publish();
   }
   burst(x: number, z: number, color: string, count = 14) {
     for (let i = 0; i < count && this.particles.length < LIMITS.particles; i++) {
@@ -249,9 +252,8 @@ export class GameEngine {
     }
     return picks;
   }
-  applyUpgrade(choice: Upgrade) {
-    const state = useGame.getState();
-    if (state.phase !== 'upgrade' || !state.choices.includes(choice)) return;
+  private installUpgrade(choice: Upgrade) {
+    const changes = previewUpgrade({ ...this, hp: this.player.hp, maxHp: this.player.maxHp }, choice);
     const { id, power } = choice;
     if (id in this.weapons) this.weapons[id as WeaponId] = Math.min(6, this.weapons[id as WeaponId] + power);
     else if (id === 'damage') this.damage += 0.2 * power;
@@ -262,14 +264,18 @@ export class GameEngine {
     else if (id === 'critical') this.criticalChance = Math.min(0.75, this.criticalChance + 0.07 * power);
     else if (id === 'pierce') this.piercing = Math.min(6, this.piercing + power);
     else if (id === 'repair') { this.player.maxHp += 10 * power; this.player.hp = Math.min(this.player.maxHp, this.player.hp + 35 * power); }
-    useGame.setState({ phase: 'playing', choices: [] }); this.checkLevel(); this.publish();
+    audio.level(); return changes;
   }
   checkLevel() {
     if (this.xp < this.nextXp || useGame.getState().phase !== 'playing') return;
-    this.xp -= this.nextXp; this.level++; this.nextXp = Math.round(12 + Math.pow(this.level, 1.45) * 6);
-    this.player.invulnerable = 1; audio.level();
-    useGame.setState({ phase: 'upgrade', upgradeSource: 'level', choices: this.createChoices() }); this.publish();
+    while (this.xp >= this.nextXp) {
+      this.xp -= this.nextXp; this.level++; this.nextXp = Math.round(12 + Math.pow(this.level, 1.45) * 6);
+      this.rewards.enqueue('level', this.level);
+    }
+    this.player.invulnerable = Math.max(this.player.invulnerable, 1);
+    this.publishRewards(); this.publish();
   }
+  private publishRewards() { useGame.setState({ reward: this.rewards.snapshot(), rewardQueued: this.rewards.queued }); }
   publish() {
     const target = this.enemies.find(e => e.id === this.targetId && e.hp > 0);
     const lock = this.launcherLock();
@@ -280,7 +286,7 @@ export class GameEngine {
       rocketAmmo: this.rocketAmmo, rocketCapacity: ROCKET_CAPACITY, rocketCooldown: this.rocketCooldown, rocketReady: lock.status === 'ready',
       targeting: this.input.aiming ? 'aim' : 'auto', target: target ? { id: target.id, kind: target.kind, distance: distance(target, this.player), hp: target.hp, maxHp: target.maxHp } : null,
       time: this.time, hp: this.player.hp, maxHp: this.player.maxHp, xp: this.xp, nextXp: this.nextXp, level: this.level, score: this.score, kills: this.kills, combo: this.combo, dash: this.player.dashCooldown, enemies: this.enemies.length, weapons: { ...this.weapons },
-      shield: this.shield, maxShield: this.maxShield, surge: this.surge, sector: this.sector, bossPhase: this.bossPhase, peakCombo: this.peakCombo, elites: this.eliteKills, caches: this.caches.length, salvage: this.salvage, rerolls: this.rerolls, overdrive: this.overdriveTime, repair: this.repairTime, announcement: this.announcement, announcementDetail: this.announcementDetail, announcementTime: this.announcementTime,
+      shield: this.shield, maxShield: this.maxShield, surge: this.surge, sector: this.sector, bossPhase: this.bossPhase, peakCombo: this.peakCombo, elites: this.eliteKills, caches: this.caches.length, salvage: this.salvage, overdrive: this.overdriveTime, repair: this.repairTime, announcement: this.announcement, announcementDetail: this.announcementDetail, announcementTime: this.announcementTime,
       mission: this.missions.snapshot(), missionsCompleted: this.missions.completed, rescued: this.missions.rescued,
     });
   }
@@ -503,6 +509,7 @@ export class GameEngine {
     for (const c of this.caches) { c.age += dt; if (distance(c, p) < 1.2) this.collectCache(c); }
     this.caches = this.caches.filter(c => c.age < 90);
     this.checkLevel();
+    if (useGame.getState().phase === 'playing' && this.rewards.tick(dt)) { this.publishRewards(); this.publish(); }
     if (useGame.getState().phase === 'playing') for (const event of this.missions.tick(dt, p, this.kills, () => this.random())) {
       const mission = this.missions.mission!;
       if (event === 'started') this.announce(mission.title, mission.description);

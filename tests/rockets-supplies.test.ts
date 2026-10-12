@@ -8,7 +8,7 @@ import { terrainHeight, terrainProp } from '../src/game/terrain';
 
 let game: GameEngine;
 beforeEach(() => {
-  audio.enabled = false; useGame.setState({ phase: 'playing', maxHp: 100, loadout: 'pulse', difficulty: 'standard', profile: structuredClone(EMPTY_PROFILE), choices: [] });
+  audio.enabled = false; useGame.setState({ phase: 'playing', maxHp: 100, loadout: 'pulse', difficulty: 'standard', profile: structuredClone(EMPTY_PROFILE) });
   game = new GameEngine(88); game.reset(); game.player.invulnerable = 100;
 });
 const target = () => { game.spawn(2, 0, 8); const enemy = game.enemies.at(-1)!; enemy.hp = enemy.maxHp = 10000; return enemy; };

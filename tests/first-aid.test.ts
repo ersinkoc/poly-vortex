@@ -7,7 +7,7 @@ import { EMPTY_PROFILE } from '../src/game/types';
 let game: GameEngine;
 beforeEach(() => {
   audio.enabled = false;
-  useGame.setState({ phase: 'playing', maxHp: 100, loadout: 'pulse', difficulty: 'standard', profile: structuredClone(EMPTY_PROFILE), choices: [] });
+  useGame.setState({ phase: 'playing', maxHp: 100, loadout: 'pulse', difficulty: 'standard', profile: structuredClone(EMPTY_PROFILE) });
   game = new GameEngine(101); game.reset();
 });
 const advance = (seconds: number) => {

@@ -8,10 +8,10 @@ import { audio } from '@/game/audio';
 import { engine, RUN_DURATION } from '@/game/engine';
 import { useGame } from '@/game/store';
 import { ACHIEVEMENTS } from '@/game/progression';
-import { previewUpgrade } from '@/game/upgrade-preview';
+import RewardSlot from './reward-slot';
 import TacticalHUD from './tactical-hud';
 import RocketGuide from './rocket-guide';
-import { WEAPONS, type Profile, type Upgrade, type WeaponId } from '@/game/types';
+import { WEAPONS, type Profile, type WeaponId } from '@/game/types';
 
 const Arena = dynamic(() => import('./arena'), { ssr: false, loading: () => <div className="arena-loading"><Hexagon size={32} /><span>INITIALIZING THE VORTEX</span><i /></div> });
 type Panel = 'protocol' | 'controls' | 'armory' | 'settings' | 'core' | 'records' | 'ordnance' | null;
@@ -50,7 +50,7 @@ function Menu({ open, start }: { open: (panel: Panel) => void; start: () => void
     </header>
     <main className="menu-main">
       <div className="hero-copy">
-        <motion.div className="eyebrow" initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}><span className="tiny-cross">+</span> A GEOMETRIC ROGUELITE <span className="version">V.09</span></motion.div>
+        <motion.div className="eyebrow" initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}><span className="tiny-cross">+</span> A GEOMETRIC ROGUELITE <span className="version">V.10</span></motion.div>
         <motion.h1 initial={{ y: 18, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.18, duration: 0.6 }}>SHAPE<br />THE <span className="title-star">✳</span><br /><span>CHAOS.</span></motion.h1>
         <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.28 }}>
           <p className="hero-description">One core. Infinite chaos.<br />Outlast the swarm. Evolve your arsenal.<br /><span>Break the protocol.</span></p>
@@ -72,7 +72,7 @@ function Menu({ open, start }: { open: (panel: Panel) => void; start: () => void
       </div>
       <div className="deployment-bar"><span><CircleDot size={14} /> READY FOR DEPLOYMENT</span><button onClick={() => open('settings')}>MODE <strong>{difficulty === 'standard' ? 'STANDARD' : 'OVERDRIVE'}</strong><ChevronRight size={13} /></button><button onClick={() => open('armory')}>LOADOUT <strong>{WEAPONS[loadout].name.toUpperCase()}</strong><ChevronRight size={13} /></button><button onClick={() => open('core')}>CORE CREDITS <strong>{number(profile.credits)}</strong><ArrowUpRight size={13} /></button></div>
     </main>
-    <footer className="footer"><span>DESIGNED TO BE OUTNUMBERED.</span><span className="footer-center"><i /> ALL SYSTEMS PROCEDURAL</span><button onClick={() => open('records')}>PERSONAL BEST <strong>{number(profile.best).padStart(6, '0')}</strong><Trophy size={13} /></button><span className="build-number">BUILD 009 / 2026</span></footer>
+    <footer className="footer"><span>DESIGNED TO BE OUTNUMBERED.</span><span className="footer-center"><i /> ALL SYSTEMS PROCEDURAL</span><button onClick={() => open('records')}>PERSONAL BEST <strong>{number(profile.best).padStart(6, '0')}</strong><Trophy size={13} /></button><span className="build-number">BUILD 010 / 2026</span></footer>
   </motion.div>;
 }
 
@@ -94,12 +94,12 @@ function PanelContent({ panel }: { panel: Exclude<Panel, null> }) {
     <div className="control-row"><span><Zap /> VORTEX SURGE</span><div className="keys"><kbd>Q</kbd><em>EMP / clear bullets</em></div></div>
     <div className="control-row"><span><Rocket /> HELLION ROCKET</span><div className="keys"><kbd>E</kbd><em>6 rounds / ammo crates refill 3</em></div></div>
     <div className="control-row"><span><Pause /> PAUSE</span><div className="keys"><kbd>ESC</kbd></div></div>
-    <div className="control-row"><span><Layers3 /> CHOOSE UPGRADE</span><div className="keys"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd></div></div>
+    <div className="control-row"><span><Layers3 /> MODULE REEL</span><div className="keys"><em>Automatic / keep moving</em></div></div>
     <div className="tip"><Sparkles size={18} /><p><strong>A little advice</strong>Dash through danger: phase shift makes you briefly invulnerable. Collect cyan prisms to level up. Gold elites drop rare salvage. Mouse aim focuses the pulse salvo on one hostile. Rocks stop bullets, and pilots in the firing line hold friendly fire. Q discharges your EMP, and blue shields regenerate after four seconds without a hit. Amber signals mark stranded pilots: stay in their perimeter for 1.5 seconds to extract. Follow the field-operation arrow for timed missions. E fires a limited rocket at your locked target. Blue crates refill up to three rockets and 20 EMP charge. Red first-aid cases are rare. Touch controls appear on mobile.</p></div>
   </>;
   if (panel === 'protocol') return <>
     <p className="panel-intro">You are the last stable core in a collapsing geometric system. The protocol wants you erased. Rewrite it.</p>
-    {[['01', 'Survive the swarm', 'Move through an infinite arena as chasers, orbiters, and heavy goliaths close in. Your core tracks one visible hostile. Mouse aim chooses your firing lane.'], ['02', 'Evolve in real time', 'Collect XP prisms. Choose one of three randomized upgrades. Stack rare and overclocked modules into devastating builds.'], ['03', 'Bring them home', 'Rescue stranded pilots, restore communication relays, and break enemy blockades. Complete timed operations for bonus credits, repairs, and EMP charge.'], ['04', 'Break the protocol', 'Survive three minutes to awaken the Vortex Sentinel. Destroy it to extract. Every run earns credits for permanent core upgrades.']].map(([n, title, copy]) => <div className="brief-step" key={n}><span>{n}</span><div><h3>{title}</h3><p>{copy}</p></div></div>)}
+    {[['01', 'Survive the swarm', 'Move through an infinite arena as chasers, orbiters, and heavy goliaths close in. Your core tracks one visible hostile. Mouse aim chooses your firing lane.'], ['02', 'Evolve in real time', 'Collect XP prisms. The side reel automatically installs one randomized upgrade. Keep moving while rewards queue. Stack rare and overclocked modules into devastating builds.'], ['03', 'Bring them home', 'Rescue stranded pilots, restore communication relays, and break enemy blockades. Complete timed operations for bonus credits, repairs, and EMP charge.'], ['04', 'Break the protocol', 'Survive three minutes to awaken the Vortex Sentinel. Destroy it to extract. Every run earns credits for permanent core upgrades.']].map(([n, title, copy]) => <div className="brief-step" key={n}><span>{n}</span><div><h3>{title}</h3><p>{copy}</p></div></div>)}
     <div className="protocol-bottom"><Hexagon size={20} /><span>ONE CORE. ONE CHANCE. <strong>MAKE IT COUNT.</strong></span></div>
   </>;
   if (panel === 'armory') return <>
@@ -162,7 +162,7 @@ function HUD({ open }: { open: (panel: Panel) => void }) {
     {s.combo >= 2 && <div className="combo"><strong>×{Math.floor(s.combo)}</strong><span>CHAIN MULTIPLIER</span></div>}
     <div className="hud-bottom"><div className="weapon-slots">{(Object.keys(WEAPONS) as WeaponId[]).map(id => { const Icon = weaponIcons[id], lv = s.weapons[id]; return <div key={id} className={`weapon-slot ${lv ? 'equipped' : ''}`} style={{ '--weapon-color': WEAPONS[id].color } as React.CSSProperties} title={`${WEAPONS[id].name} · ${lv ? `Level ${lv}` : 'Not equipped'}`}><Icon size={23} /><span>{lv ? `LV ${lv}` : '—'}</span></div>; })}<div className={`dash-slot ${s.dash <= 0 ? 'ready' : ''}`}><Wind size={22} /><div><span>PHASE SHIFT</span><strong>{s.dash <= 0 ? 'READY' : `${s.dash.toFixed(1)}s`}</strong></div><kbd>SPACE</kbd></div></div><div className="hud-performance"><span><i /> SECTOR_{String(s.sector + 1).padStart(2, '0')}</span><small>{s.enemies} HOSTILES <span>/</span> {s.fps} FPS</small></div></div>
     <div className="xp-container"><span>LV. {s.level}</span><div className="xp-bar"><i style={{ width: `${Math.min(100, s.xp / s.nextXp * 100)}%` }} /></div><small>{Math.floor(s.xp)} / {s.nextXp} XP</small></div>
-    <TacticalHUD onOrdnanceHelp={() => { if (useGame.getState().phase === 'playing') useGame.getState().setPhase('paused'); open('ordnance'); }} /><TouchControls />
+    <RewardSlot /><TacticalHUD onOrdnanceHelp={() => { if (useGame.getState().phase === 'playing') useGame.getState().setPhase('paused'); open('ordnance'); }} /><TouchControls />
   </div>;
 }
 
@@ -177,18 +177,6 @@ function TouchControls() {
   const phase = useGame(s => s.phase);
   useEffect(() => { if (phase !== 'playing') stop(); }, [phase]);
   return <div className="touch-controls"><div className="joystick" ref={base} onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); move(e); }} onPointerMove={e => { if (e.currentTarget.hasPointerCapture(e.pointerId)) move(e); }} onPointerUp={stop} onPointerCancel={stop} role="button" aria-label="Touch movement joystick" tabIndex={0}><span style={{ transform: `translate(${stick.x}px, ${stick.y}px)` }}><Crosshair size={20} /></span></div><button className="touch-dash" onPointerDown={() => { engine.input.dash = true; }} aria-label="Phase shift"><Wind size={26} /><span>DASH</span></button></div>;
-}
-
-function UpgradePreview({ upgrade }: { upgrade: Upgrade }) {
-  const rows = previewUpgrade({ ...engine, hp: engine.player.hp, maxHp: engine.player.maxHp }, upgrade);
-  return <div className="upgrade-stat-preview"><small>PERSISTENT BUILD / AFTER INSTALL</small>{rows.map(row => <div key={row.label}><span>{row.label}</span><strong>{row.before}<ArrowRight size={10} /><b>{row.after}</b></strong></div>)}</div>;
-}
-
-function UpgradeOverlay() {
-  const choices = useGame(s => s.choices), level = useGame(s => s.level), source = useGame(s => s.upgradeSource), rerolls = useGame(s => s.rerolls);
-  useEffect(() => { const key = (e: KeyboardEvent) => { const i = Number(e.key) - 1; if (i >= 0 && i < 3 && choices[i]) engine.applyUpgrade(choices[i]); else if (e.code === 'KeyR') engine.reroll(); }; window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key); }, [choices]);
-  const select = (u: Upgrade) => engine.applyUpgrade(u);
-  return <motion.div className="game-overlay upgrade-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} role="dialog" aria-modal="true" aria-labelledby="upgrade-title"><div className="upgrade-heading"><span className="eyebrow"><Sparkles size={15} /> {source === 'salvage' ? 'RARE SALVAGE / +20 CR' : `CORE LEVEL ${level}`}</span><h2 id="upgrade-title">EVOLVE YOUR <em>ARSENAL.</em></h2><p>{source === 'salvage' ? 'Elite wreckage. Rare modules. Choose your reward.' : 'The swarm can wait. Choose your next advantage.'}</p></div><div className="upgrade-cards">{choices.map((u, i) => { const Icon = u.id in weaponIcons ? weaponIcons[u.id as WeaponId] : u.id === 'repair' || u.id === 'shield' ? Shield : u.id === 'critical' ? Crosshair : u.id === 'pierce' ? ArrowRight : u.id === 'speed' ? Wind : u.id === 'magnet' ? Orbit : Cpu; return <motion.button initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }} className={`upgrade-card rarity-${u.rarity.toLowerCase()}`} key={u.id} onClick={() => select(u)}><div className="upgrade-card-top"><span>{u.rarity}</span><kbd>{i + 1}</kbd></div><span className="upgrade-icon"><Icon size={42} strokeWidth={1.3} /></span><h3>{u.title}</h3><p>{u.description}</p><UpgradePreview upgrade={u} /><div className="upgrade-power">POWER +{u.power}<span>INSTALL MODULE <ArrowUpRight size={15} /></span></div></motion.button>; })}</div><div className="upgrade-tools"><span className="upgrade-hint">SELECT A MODULE OR PRESS 1 / 2 / 3</span><button className="reroll-button" disabled={rerolls <= 0} onClick={() => engine.reroll()}><RotateCcw size={13} /> REROLL <kbd>R</kbd><strong>{rerolls}</strong></button></div></motion.div>;
 }
 
 function PauseOverlay({ open }: { open: (p: Panel) => void }) {
@@ -211,7 +199,7 @@ export default function GameShell() {
   const start = () => { setPanel(null); void audio.unlock().catch(() => { useGame.setState({ sound: false }); }); useGame.getState().start(); };
   return <MotionConfig reducedMotion={reducedEffects ? 'always' : 'user'}><div className={`app-shell ${phase === 'menu' ? 'is-menu' : 'is-game'} ${reducedEffects ? 'reduced-effects' : ''}`}>
     <div className="arena-canvas"><ArenaBoundary><Arena /></ArenaBoundary></div>
-    <AnimatePresence mode="wait">{phase === 'menu' ? <Menu key="menu" open={setPanel} start={start} /> : <motion.div key="game" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="game-interface"><HUD open={setPanel} /><AnimatePresence>{phase === 'upgrade' && <UpgradeOverlay key="upgrade" />}{phase === 'paused' && <PauseOverlay key="pause" open={setPanel} />}{(phase === 'dead' || phase === 'won') && <ResultOverlay key="result" start={start} open={setPanel} />}</AnimatePresence></motion.div>}</AnimatePresence>
+    <AnimatePresence mode="wait">{phase === 'menu' ? <Menu key="menu" open={setPanel} start={start} /> : <motion.div key="game" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="game-interface"><HUD open={setPanel} /><AnimatePresence>{phase === 'paused' && <PauseOverlay key="pause" open={setPanel} />}{(phase === 'dead' || phase === 'won') && <ResultOverlay key="result" start={start} open={setPanel} />}</AnimatePresence></motion.div>}</AnimatePresence>
     <AnimatePresence>{panel && <Modal key={panel} panel={panel} close={closePanel.current} />}</AnimatePresence>
   </div></MotionConfig>;
 }

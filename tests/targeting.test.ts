@@ -8,7 +8,7 @@ import { selectTarget } from '../src/game/targeting';
 
 let game: GameEngine;
 beforeEach(() => {
-  audio.enabled = false; useGame.setState({ phase: 'playing', maxHp: 100, loadout: 'pulse', difficulty: 'standard', profile: structuredClone(EMPTY_PROFILE), choices: [] });
+  audio.enabled = false; useGame.setState({ phase: 'playing', maxHp: 100, loadout: 'pulse', difficulty: 'standard', profile: structuredClone(EMPTY_PROFILE) });
   game = new GameEngine(77); game.reset(); game.player.invulnerable = 100;
 });
 // Fill the pool with inactive entities so timed spawning cannot affect the fixture.

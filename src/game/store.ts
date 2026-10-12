@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { EMPTY_PROFILE, type Difficulty, type Phase, type Profile, type Upgrade, type WeaponId } from './types';
+import { EMPTY_PROFILE, type Difficulty, type Phase, type Profile, type WeaponId } from './types';
+import type { RewardRoll } from './reward-reel';
 import { ACHIEVEMENTS } from './progression';
 import type { Mission } from './missions';
 import { ROCKET_CAPACITY } from './supplies';
@@ -19,9 +20,9 @@ type GameStore = {
   phase: Phase; difficulty: Difficulty; loadout: WeaponId; sound: boolean; quality: 'high' | 'performance';
   time: number; hp: number; maxHp: number; xp: number; nextXp: number; level: number;
   kills: number; score: number; combo: number; dash: number; enemies: number; fps: number;
-  weapons: Record<WeaponId, number>; choices: Upgrade[]; profile: Profile; earned: number; runId: number;
+  weapons: Record<WeaponId, number>; reward: RewardRoll | null; rewardQueued: number; profile: Profile; earned: number; runId: number;
   shield: number; maxShield: number; surge: number; sector: number; bossPhase: number; peakCombo: number; elites: number; caches: number;
-  overdrive: number; repair: number; salvage: number; rerolls: number; upgradeSource: 'level' | 'salvage'; announcement: string; announcementDetail: string; announcementTime: number;
+  overdrive: number; repair: number; salvage: number; announcement: string; announcementDetail: string; announcementTime: number;
   setPhase: (phase: Phase) => void; start: () => void; hydrate: () => void;
   saveRun: (score: number, kills: number, won: boolean, bonus?: number) => void;
   purchase: (id: keyof Profile['upgrades']) => void;
@@ -37,15 +38,15 @@ export const useGame = create<GameStore>((set, get) => ({
   mission: null, missionsCompleted: 0, rescued: 0,
   phase: 'menu', difficulty: 'standard', loadout: 'pulse', sound: true, quality: 'high',
   time: 0, hp: 100, maxHp: 100, xp: 0, nextXp: 12, level: 1, kills: 0, score: 0, combo: 1, dash: 0,
-  enemies: 0, fps: 60, weapons: { pulse: 1, glaive: 0, cryo: 0, tesla: 0 }, choices: [], profile: EMPTY_PROFILE, earned: 0, runId: 0,
-  shield: 40, maxShield: 40, surge: 100, sector: 0, bossPhase: 0, peakCombo: 1, elites: 0, caches: 0, overdrive: 0, repair: 0, salvage: 0, rerolls: 2,
-  upgradeSource: 'level', announcement: '', announcementDetail: '', announcementTime: 0,
+  enemies: 0, fps: 60, weapons: { pulse: 1, glaive: 0, cryo: 0, tesla: 0 }, reward: null, rewardQueued: 0, profile: EMPTY_PROFILE, earned: 0, runId: 0,
+  shield: 40, maxShield: 40, surge: 100, sector: 0, bossPhase: 0, peakCombo: 1, elites: 0, caches: 0, overdrive: 0, repair: 0, salvage: 0,
+  announcement: '', announcementDetail: '', announcementTime: 0,
   setPhase: phase => {
     const current = get().phase;
     if (phase === 'paused' && current !== 'playing' || phase === 'playing' && current !== 'paused') return;
     set({ phase });
   },
-  start: () => set(s => ({ phase: 'playing', runId: s.runId + 1, time: 0, earned: 0, choices: [], hp: 100 + s.profile.upgrades.armor * 15, maxHp: 100 + s.profile.upgrades.armor * 15 })),
+  start: () => set(s => ({ phase: 'playing', runId: s.runId + 1, time: 0, earned: 0, reward: null, rewardQueued: 0, hp: 100 + s.profile.upgrades.armor * 15, maxHp: 100 + s.profile.upgrades.armor * 15 })),
   hydrate: () => {
     const prefersCalm = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
     try {

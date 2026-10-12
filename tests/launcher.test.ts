@@ -6,7 +6,7 @@ import { EMPTY_PROFILE } from '../src/game/types';
 
 let game: GameEngine;
 beforeEach(() => {
-  audio.enabled = false; useGame.setState({ phase: 'playing', maxHp: 100, aimMode: 'assisted', loadout: 'pulse', profile: structuredClone(EMPTY_PROFILE), choices: [] });
+  audio.enabled = false; useGame.setState({ phase: 'playing', maxHp: 100, aimMode: 'assisted', loadout: 'pulse', profile: structuredClone(EMPTY_PROFILE) });
   game = new GameEngine(854); game.reset(); game.player.invulnerable = 100;
 });
 afterEach(() => useGame.setState({ aimMode: 'assisted' }));
@@ -26,8 +26,8 @@ test('queued intent never transfers to a replacement hostile', () => {
   const e = hostile(); game.player.angle = 1; game.requestRocket(); e.hp = 0; hostile(1, 8); game.tick(1 / 60);
   expect(game.rocketAmmo).toBe(6); expect(game.rocketPending).toBe(0); expect(game.rocketNotice).toContain('SHOT CANCELLED');
 });
-test('pause, upgrade and restart cancel pending intent without a late launch', () => {
-  for (const phase of ['paused', 'upgrade'] as const) {
+test('pause, ended runs and restart cancel pending intent without a late launch', () => {
+  for (const phase of ['paused', 'dead'] as const) {
     useGame.setState({ phase: 'playing' }); game.reset(); hostile(); game.player.angle = 1; game.requestRocket();
     useGame.setState({ phase }); game.tick(1); expect(game.rocketPending).toBe(0); expect(game.rocketAmmo).toBe(6);
     useGame.setState({ phase: 'playing' }); for (let i = 0; i < 10; i++) game.tick(1 / 60); expect(game.rocketAmmo).toBe(6);
