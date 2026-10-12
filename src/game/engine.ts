@@ -40,7 +40,7 @@ export class GameEngine {
   rockets: Rocket[] = []; rocketAmmo = ROCKET_CAPACITY; rocketCooldown = 0;
   rocketPending = 0; private pendingRocketTarget = 0;
   rocketNotice = ''; rocketNoticeKind: 'success' | 'warning' = 'success'; rocketNoticeTime = 0;
-  player = { x: 0, z: 0, vx: 0, vz: 0, angle: 0, hp: 100, maxHp: 100, invulnerable: 0, dashTime: 0, dashCooldown: 0 };
+  player = { x: 0, z: 0, vx: 0, vz: 0, angle: 0, hp: 100, maxHp: 100, hullHit: 0, invulnerable: 0, dashTime: 0, dashCooldown: 0 };
   input: Input = { keys: new Set(), aimX: 0, aimZ: -8, aiming: false, dash: false, surge: false, rocket: false, moveX: 0, moveZ: 0 };
   enemies: Entity[] = []; bolts: Bolt[] = []; particles: Particle[] = []; gems: Gem[] = []; arcs: Arc[] = []; vortices: Vortex[] = [];
   shockwaves: Shockwave[] = []; damageTexts: DamageText[] = []; hazards: Hazard[] = []; supplies: Supply[] = []; caches: Cache[] = [];
@@ -71,7 +71,7 @@ export class GameEngine {
     this.rocketPending = 0; this.pendingRocketTarget = 0; this.rocketNotice = ''; this.rocketNoticeTime = 0; this.rocketNoticeKind = 'success';
     this.lastCombatSupply = -25;
     const s = useGame.getState();
-    this.player = { x: 0, z: 0, vx: 0, vz: 0, angle: 0, hp: s.maxHp, maxHp: s.maxHp, invulnerable: 1.5, dashTime: 0, dashCooldown: 0 };
+    this.player = { x: 0, z: 0, vx: 0, vz: 0, angle: 0, hp: s.maxHp, maxHp: s.maxHp, hullHit: 0, invulnerable: 1.5, dashTime: 0, dashCooldown: 0 };
     this.enemies = []; this.bolts = []; this.particles = []; this.gems = []; this.arcs = []; this.vortices = [];
     this.shockwaves = []; this.damageTexts = []; this.hazards = []; this.supplies = []; this.caches = [];
     this.shield = 40; this.maxShield = 40; this.surge = 100; this.sector = 0; this.bossPhase = 0; this.peakCombo = 1; this.eliteKills = 0; this.salvage = 0;
@@ -236,10 +236,12 @@ export class GameEngine {
   hurt(amount: number) {
     if (this.player.invulnerable > 0 || useGame.getState().phase !== 'playing') return;
     const absorbed = Math.min(this.shield, amount); this.shield -= absorbed; this.shieldDelay = 4;
-    this.player.hp = Math.max(0, this.player.hp - (amount - absorbed)); this.player.invulnerable = 0.85;
+    const hullLoss = amount - absorbed;
+    this.player.hp = Math.max(0, this.player.hp - hullLoss); this.player.invulnerable = 0.85;
+    if (hullLoss > 0) this.player.hullHit = 0.65;
     this.streak = 0; this.combo = 1; this.hitFlash = 0.6; this.trauma = 0.7; this.hitStop = 0.05;
-    this.burst(this.player.x, this.player.z, absorbed ? '#72dfff' : '#ff526f', 20); absorbed ? audio.shield() : audio.hit();
-    this.wave(this.player.x, this.player.z, 2, absorbed ? '#72dfff' : '#ff526f', 0.35);
+    this.burst(this.player.x, this.player.z, hullLoss > 0 ? '#ffb16b' : '#72dfff', 20); hullLoss > 0 ? audio.hit() : audio.shield();
+    this.wave(this.player.x, this.player.z, 2, hullLoss > 0 ? '#ff7150' : '#72dfff', 0.35);
     if (this.player.hp === 0) { this.publish(); useGame.getState().saveRun(this.score, this.kills, false, this.salvage); }
   }
   createChoices(salvage = false): Upgrade[] {
@@ -322,6 +324,7 @@ export class GameEngine {
     if (this.input.surge) this.activateSurge(); this.input.surge = false;
     if (useGame.getState().phase !== 'playing') return;
     p.invulnerable = Math.max(0, p.invulnerable - dt); p.dashTime = Math.max(0, p.dashTime - dt); p.dashCooldown = Math.max(0, p.dashCooldown - dt);
+    p.hullHit = Math.max(0, p.hullHit - dt * 2);
     this.trauma = Math.max(0, this.trauma - dt * 1.8); this.hitFlash = Math.max(0, this.hitFlash - dt * 2);
     this.comboTimer -= dt; if (this.comboTimer <= 0) { this.combo = Math.max(1, this.combo - dt * 2); this.streak = 0; }
     const k = this.input.keys;
