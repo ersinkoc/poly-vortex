@@ -4,6 +4,7 @@ import { ACHIEVEMENTS } from './progression';
 import type { Mission } from './missions';
 
 type GameStore = {
+  targeting: 'aim' | 'auto'; target: { id: number; kind: 0 | 1 | 2 | 3; distance: number; hp: number; maxHp: number } | null;
   mission: Mission | null; missionsCompleted: number; rescued: number;
   phase: Phase; difficulty: Difficulty; loadout: WeaponId; sound: boolean; quality: 'high' | 'performance';
   time: number; hp: number; maxHp: number; xp: number; nextXp: number; level: number;
@@ -17,6 +18,7 @@ type GameStore = {
 };
 const save = (profile: Profile) => { try { localStorage.setItem('poly-vortex-profile-v1', JSON.stringify(profile)); } catch { /* Storage can be unavailable in private browsing. */ } };
 export const useGame = create<GameStore>((set, get) => ({
+  targeting: 'auto', target: null,
   mission: null, missionsCompleted: 0, rescued: 0,
   phase: 'menu', difficulty: 'standard', loadout: 'pulse', sound: true, quality: 'high',
   time: 0, hp: 100, maxHp: 100, xp: 0, nextXp: 12, level: 1, kills: 0, score: 0, combo: 1, dash: 0,

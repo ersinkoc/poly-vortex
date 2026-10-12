@@ -13,6 +13,7 @@ import ShipLighting from './ship-lighting';
 import CombatEffects from './combat-effects';
 import Terrain from './terrain';
 import MissionActors from './mission-actors';
+import { TargetMarker } from './target-lock';
 
 const dummy = new THREE.Object3D();
 const color = new THREE.Color();
@@ -114,9 +115,10 @@ function SceneController() {
   const target = useMemo(() => new THREE.Vector3(), []), aim = useMemo(() => new THREE.Vector3(), []);
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []);
   const pointer = useMemo(() => new THREE.Vector2(), []);
+  const pointerInside = useRef(false);
   const accumulator = useRef(0), frames = useRef({ count: 0, time: 0 });
   const runId = useGame(s => s.runId), phase = useGame(s => s.phase);
-  useEffect(() => { if (runId) engine.reset(); }, [runId]);
+  useEffect(() => { if (runId) { engine.reset(); pointerInside.current = false; } }, [runId]);
   useEffect(() => {
     if (phase === 'menu') { engine.player.x = 0; engine.player.z = 0; engine.preview(); engine.bolts = []; engine.gems = []; engine.particles = []; engine.vortices = []; engine.arcs = []; }
     if (phase !== 'playing') { engine.input.keys.clear(); engine.input.dash = false; engine.input.surge = false; engine.input.moveX = 0; engine.input.moveZ = 0; accumulator.current = 0; }
@@ -135,22 +137,27 @@ function SceneController() {
     const blur = () => { engine.input.keys.clear(); if (useGame.getState().phase === 'playing') useGame.getState().setPhase('paused'); };
     const visibility = () => { if (document.hidden) blur(); };
     const move = (e: PointerEvent) => {
-      if (e.pointerType === 'touch') return;
+      if (e.pointerType === 'touch' || useGame.getState().phase !== 'playing') return;
       const rect = gl.domElement.getBoundingClientRect(); pointer.set((e.clientX - rect.left) / rect.width * 2 - 1, -(e.clientY - rect.top) / rect.height * 2 + 1);
+      pointerInside.current = true;
       raycaster.setFromCamera(pointer, camera); if (raycaster.ray.intersectPlane(plane, aim)) { engine.input.aimX = aim.x; engine.input.aimZ = aim.z; engine.input.aiming = true; }
     };
+    const leave = () => { pointerInside.current = false; engine.input.aiming = false; };
     const click = (e: PointerEvent) => { if (e.button === 2 && useGame.getState().phase === 'playing') engine.input.dash = true; };
     const context = (e: MouseEvent) => e.preventDefault();
     window.addEventListener('keydown', down); window.addEventListener('keyup', up); window.addEventListener('blur', blur); document.addEventListener('visibilitychange', visibility);
     gl.domElement.addEventListener('pointermove', move); gl.domElement.addEventListener('pointerdown', click); gl.domElement.addEventListener('contextmenu', context);
+    gl.domElement.addEventListener('pointerleave', leave);
     return () => {
       window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); window.removeEventListener('blur', blur); document.removeEventListener('visibilitychange', visibility);
       gl.domElement.removeEventListener('pointermove', move); gl.domElement.removeEventListener('pointerdown', click); gl.domElement.removeEventListener('contextmenu', context);
+      gl.domElement.removeEventListener('pointerleave', leave);
     };
   }, [camera, gl, raycaster, plane, aim, pointer]);
   useFrame((state, delta) => {
     const s = useGame.getState();
     if (s.phase === 'playing') {
+      if (pointerInside.current) { raycaster.setFromCamera(pointer, camera); if (raycaster.ray.intersectPlane(plane, aim)) { engine.input.aimX = aim.x; engine.input.aimZ = aim.z; engine.input.aiming = true; } }
       accumulator.current += Math.min(delta, 0.1);
       while (accumulator.current >= 1 / 60) { engine.tick(1 / 60); accumulator.current -= 1 / 60; }
     }
@@ -185,7 +192,7 @@ export default function Arena() {
     <color attach="background" args={['#080d0d']} />
     <fog attach="fog" args={['#080d0d', 36, 78]} />
     <ShipLighting />
-    <SceneController /><Terrain /><MissionActors /><ProtocolRing /><ShipFleet />
+    <SceneController /><Terrain /><MissionActors /><TargetMarker /><ProtocolRing /><ShipFleet />
     <Projectiles /><Effects /><CombatEffects /><Stars radius={65} depth={35} count={600} factor={1.3} saturation={0} fade speed={0.1} />
     <PostFX />
   </Canvas>;

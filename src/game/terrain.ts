@@ -24,6 +24,17 @@ export function clearTerrainPosition(body: { x: number; z: number }, radius: num
     if (d2 < r * r) { const d = Math.sqrt(d2); body.x = prop.x + (d > 1e-6 ? dx / d : 1) * r; body.z = prop.z + (d > 1e-6 ? dz / d : 0) * r; }
   }
 }
+export function terrainImpact(a: { x: number; z: number }, b: { x: number; z: number }, padding = 0.08): { x: number; z: number } | null {
+  const dx = b.x - a.x, dz = b.z - a.z, length2 = dx * dx + dz * dz; let first = Infinity;
+  for (let cx = Math.floor((Math.min(a.x, b.x) - 3) / TERRAIN_CELL); cx <= Math.floor((Math.max(a.x, b.x) + 3) / TERRAIN_CELL); cx++) for (let cz = Math.floor((Math.min(a.z, b.z) - 3) / TERRAIN_CELL); cz <= Math.floor((Math.max(a.z, b.z) + 3) / TERRAIN_CELL); cz++) {
+    const prop = terrainProp(cx, cz); if (!prop || terrainHeight(prop.x, prop.z) + prop.height < 0.7) continue;
+    const ox = a.x - prop.x, oz = a.z - prop.z, radius = prop.radius + padding, c = ox * ox + oz * oz - radius * radius;
+    if (c <= 0) { first = 0; continue; } if (length2 < 1e-8) continue;
+    const dot = ox * dx + oz * dz, discriminant = dot * dot - length2 * c; if (discriminant < 0) continue;
+    const t = (-dot - Math.sqrt(discriminant)) / length2; if (t >= 0 && t <= 1 && t < first) first = t;
+  }
+  return Number.isFinite(first) ? { x: a.x + dx * first, z: a.z + dz * first } : null;
+}
 export function buildTerrainTextures(size = 256) {
   const albedo = new Uint8Array(size * size * 4), normals = new Uint8Array(size * size * 4), roughness = new Uint8Array(size * size * 4);
   const sample = (x: number, z: number) => {

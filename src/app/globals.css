@@ -208,3 +208,6 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 
 .result-extra { flex-wrap: wrap; row-gap: 9px; }
 @media(max-width:600px) { .hud:has(.mission-panel) .combo { top: 408px; } }
+
+.target-readout { position: absolute; left: 32px; bottom: 142px; display: flex; align-items: center; gap: 10px; padding: 11px 14px; background: #0b191ada; border: 1px solid #7aa78b25; border-radius: 4px; color: #6b9180; min-width: 200px; }.target-readout.locked { color: #c2f8a7; border-color: #baff7240; }.target-readout span { display: block; font: 6px var(--mono); letter-spacing: 1px; margin-bottom: 7px; }.target-readout strong { display: block; font: 8px var(--mono); letter-spacing: .6px; font-weight: 400; }.target-readout i { display: block; height: 2px; background: #ffffff10; margin-top: 8px; }.target-readout b { display: block; height: 100%; background: #b9f57c; transition: width .1s; }
+@media(max-width:600px) { .target-readout { left: 16px; bottom: 239px; padding: 9px; gap: 7px; min-width: 145px; }.target-readout strong { font-size: 6px; }.target-readout span { font-size: 5px; margin-bottom: 5px; }.target-readout>svg { width: 11px; } }

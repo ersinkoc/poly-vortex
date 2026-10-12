@@ -2,7 +2,8 @@ import { audio } from './audio';
 import { useGame } from './store';
 import { SECTORS, sectorAt } from './progression';
 import { MissionDirector } from './missions';
-import { clearTerrainPosition } from './terrain';
+import { clearTerrainPosition, terrainImpact } from './terrain';
+import { angleDifference, friendlyInLine, PULSE_RANGE, selectTarget, turnTowards } from './targeting';
 import type { Arc, Bolt, Cache, DamageText, Entity, Gem, Hazard, Input, Particle, Shockwave, Supply, Upgrade, UpgradeId, Vortex, WeaponId } from './types';
 
 export const LIMITS = { enemies: 280, bolts: 500, particles: 1000, gems: 400, shockwaves: 40, damageTexts: 40, hazards: 12, supplies: 10, caches: 8 };
@@ -26,6 +27,7 @@ const defs: Record<UpgradeId, [string, string]> = {
 
 export class GameEngine {
   missions = new MissionDirector();
+  targetId = 0;
   player = { x: 0, z: 0, vx: 0, vz: 0, angle: 0, hp: 100, maxHp: 100, invulnerable: 0, dashTime: 0, dashCooldown: 0 };
   input: Input = { keys: new Set(), aimX: 0, aimZ: -8, aiming: false, dash: false, surge: false, moveX: 0, moveZ: 0 };
   enemies: Entity[] = []; bolts: Bolt[] = []; particles: Particle[] = []; gems: Gem[] = []; arcs: Arc[] = []; vortices: Vortex[] = [];
@@ -44,6 +46,7 @@ export class GameEngine {
   random() { this.seed = (Math.imul(1664525, this.seed) + 1013904223) >>> 0; return this.seed / 4294967296; }
   reset() {
     this.missions.reset();
+    this.targetId = 0;
     const s = useGame.getState();
     this.player = { x: 0, z: 0, vx: 0, vz: 0, angle: 0, hp: s.maxHp, maxHp: s.maxHp, invulnerable: 1.5, dashTime: 0, dashCooldown: 0 };
     this.enemies = []; this.bolts = []; this.particles = []; this.gems = []; this.arcs = []; this.vortices = [];
@@ -194,7 +197,9 @@ export class GameEngine {
     useGame.setState({ phase: 'upgrade', upgradeSource: 'level', choices: this.createChoices() }); this.publish();
   }
   publish() {
+    const target = this.enemies.find(e => e.id === this.targetId && e.hp > 0);
     useGame.setState({
+      targeting: this.input.aiming ? 'aim' : 'auto', target: target ? { id: target.id, kind: target.kind, distance: distance(target, this.player), hp: target.hp, maxHp: target.maxHp } : null,
       time: this.time, hp: this.player.hp, maxHp: this.player.maxHp, xp: this.xp, nextXp: this.nextXp, level: this.level, score: this.score, kills: this.kills, combo: this.combo, dash: this.player.dashCooldown, enemies: this.enemies.length, weapons: { ...this.weapons },
       shield: this.shield, maxShield: this.maxShield, surge: this.surge, sector: this.sector, bossPhase: this.bossPhase, peakCombo: this.peakCombo, elites: this.eliteKills, caches: this.caches.length, salvage: this.salvage, rerolls: this.rerolls, overdrive: this.overdriveTime, repair: this.repairTime, announcement: this.announcement, announcementDetail: this.announcementDetail, announcementTime: this.announcementTime,
       mission: this.missions.snapshot(), missionsCompleted: this.missions.completed, rescued: this.missions.rescued,
@@ -231,8 +236,8 @@ export class GameEngine {
     let mx = Number(k.has('KeyD') || k.has('ArrowRight')) - Number(k.has('KeyA') || k.has('ArrowLeft')) + this.input.moveX;
     let mz = Number(k.has('KeyS') || k.has('ArrowDown')) - Number(k.has('KeyW') || k.has('ArrowUp')) + this.input.moveZ;
     const length = Math.hypot(mx, mz); if (length > 1) { mx /= length; mz /= length; }
-    if (this.input.aiming) p.angle = Math.atan2(this.input.aimX - p.x, this.input.aimZ - p.z);
-    else if (length > 0) p.angle = Math.atan2(mx, mz);
+    if (this.input.aiming) p.angle = turnTowards(p.angle, Math.atan2(this.input.aimX - p.x, this.input.aimZ - p.z), dt * 10);
+    else if (length > 0 && !this.targetId) p.angle = Math.atan2(mx, mz);
     if (this.input.dash && p.dashCooldown <= 0) {
       p.dashTime = 0.2; p.invulnerable = 0.38; p.dashCooldown = 3 * this.haste;
       const dx = this.input.aiming ? this.input.aimX - p.x : length > 0 ? mx : Math.sin(p.angle);
@@ -259,12 +264,10 @@ export class GameEngine {
       const key = `${Math.floor(e.x / 2)},${Math.floor(e.z / 2)}`; const bin = bins.get(key);
       if (bin) bin.push(e); else bins.set(key, [e]);
     }
-    let nearest: Entity | undefined, nearestDistance = Infinity;
     for (const e of this.enemies) {
       if (e.hp <= 0) continue;
       e.age += dt; e.timer -= dt;
       const dx = p.x - e.x, dz = p.z - e.z, d = Math.hypot(dx, dz) || 0.01;
-      if (d < nearestDistance) { nearestDistance = d; nearest = e; }
       const speed = [2.8, 2.1, 1.4, 1.15][e.kind] * (1 + this.time / 360) * (this.overdrive ? 1.2 : 1) * (e.elite ? 1.14 : 1);
       let vx = dx / d * speed, vz = dz / d * speed;
       if (e.kind === 1 && d < 10) { const radial = d < 7 ? -0.7 : 0; vx = dx / d * radial - dz / d * 1.4; vz = dz / d * radial + dx / d * 1.4; }
@@ -305,26 +308,31 @@ export class GameEngine {
       }
     }
     if (useGame.getState().phase !== 'playing') return;
+    const friendlies = this.missions.mission?.kind === 'rescue' && this.missions.mission.status === 'active' ? this.missions.mission.targets.filter(t => !t.done) : [];
+    const primary = selectTarget(this.enemies, p, this.input, this.targetId, friendlies); this.targetId = primary?.id ?? 0;
+    if (primary && !this.input.aiming) p.angle = turnTowards(p.angle, Math.atan2(primary.x - p.x, primary.z - p.z), dt * 6);
+    const facingTarget = primary && Math.abs(angleDifference(Math.atan2(primary.x - p.x, primary.z - p.z), p.angle)) < (this.input.aiming ? 0.5 : 0.25);
     this.shotTimer -= dt;
-    if (nearest && nearestDistance < 23 && this.shotTimer <= 0) {
+    if (primary && facingTarget && this.shotTimer <= 0) {
       this.shotTimer = Math.max(0.1, 0.46 - this.weapons.pulse * 0.045) * this.haste * (this.overdriveTime > 0 ? 0.55 : 1); audio.shot();
-      const targets = this.enemies.filter(e => e.hp > 0).sort((a, b) => distance(a, p) - distance(b, p));
-      for (let i = 0; i < Math.ceil(this.weapons.pulse / 2) && this.bolts.length < LIMITS.bolts; i++) {
-        const target = targets[i % targets.length]; if (!target) continue;
-        const d = distance(target, p) || 1;
-        this.bolts.push({ x: p.x, z: p.z, vx: (target.x - p.x) / d * 22, vz: (target.z - p.z) / d * 22, enemy: false, age: 0, target: target.id, damage: (15 + this.weapons.pulse * 4) * this.damage * (this.overdriveTime > 0 ? 1.35 : 1), pierce: this.piercing, hits: [] });
+      const count = Math.ceil(this.weapons.pulse / 2), muzzleLead = Math.min(0.8, Math.max(0.1, distance(primary, p) - primary.radius - 0.15));
+      for (let i = 0; i < count && this.bolts.length < LIMITS.bolts; i++) {
+        const side = (i - (count - 1) / 2) * 0.18, x = p.x + Math.sin(p.angle) * muzzleLead + Math.cos(p.angle) * side, z = p.z + Math.cos(p.angle) * muzzleLead - Math.sin(p.angle) * side;
+        if (terrainImpact(p, { x, z })) continue;
+        const d = Math.hypot(primary.x - x, primary.z - z) || 1;
+        this.bolts.push({ x, z, vx: (primary.x - x) / d * 22, vz: (primary.z - z) / d * 22, enemy: false, age: 0, target: primary.id, damage: (15 + this.weapons.pulse * 4) * this.damage * (this.overdriveTime > 0 ? 1.35 : 1), pierce: this.piercing, hits: [], traveled: 0, range: PULSE_RANGE });
       }
     }
     this.cryoTimer -= dt;
-    if (this.weapons.cryo && nearest && this.cryoTimer <= 0) {
-      this.cryoTimer = 6 * this.haste; this.vortices.push({ x: nearest.x, z: nearest.z, radius: 3.5 + this.weapons.cryo * 0.3, life: 3.5 }); audio.tone(100, 0.5, 'sine', 0.35, 400);
+    if (this.weapons.cryo && primary && distance(primary, p) < 16 && this.cryoTimer <= 0) {
+      this.cryoTimer = 6 * this.haste; this.vortices.push({ x: primary.x, z: primary.z, radius: 3.5 + this.weapons.cryo * 0.3, life: 3.5 }); audio.tone(100, 0.5, 'sine', 0.35, 400);
     }
     this.teslaTimer -= dt;
-    if (this.weapons.tesla && nearest && nearestDistance < 15 && this.teslaTimer <= 0) {
+    if (this.weapons.tesla && primary && distance(primary, p) < 15 && this.teslaTimer <= 0) {
       this.teslaTimer = 2 * this.haste; const points: [number, number][] = [[p.x, p.z]]; const hit = new Set<number>(); let origin: { x: number; z: number } = p;
       for (let i = 0; i < Math.min(5, 2 + this.weapons.tesla); i++) {
-        let target: Entity | undefined, best = i === 0 ? 15 : 7;
-        for (const e of this.enemies) { const d = distance(e, origin); if (e.hp > 0 && !hit.has(e.id) && d < best) { best = d; target = e; } }
+        let target: Entity | undefined = i === 0 ? primary : undefined, best = 7;
+        if (i > 0) for (const e of this.enemies) { const d = distance(e, origin); if (e.hp > 0 && !hit.has(e.id) && d < best && !terrainImpact(origin, e) && !friendlyInLine(origin, e, friendlies)) { best = d; target = e; } }
         if (!target) break; hit.add(target.id); points.push([target.x, target.z]); this.hitEnemy(target, (22 + this.weapons.tesla * 12) * this.damage); origin = target;
       }
       this.arcs.push({ points, life: 0.24 }); audio.tone(1600, 0.14, 'sawtooth', 0.18, 100);
@@ -336,10 +344,16 @@ export class GameEngine {
         const target = byId.get(b.target);
         if (target && target.hp > 0) {
           const dx = target.x - b.x, dz = target.z - b.z, d = Math.hypot(dx, dz) || 1;
-          b.vx += (dx / d * 22 - b.vx) * Math.min(1, dt * 8); b.vz += (dz / d * 22 - b.vz) * Math.min(1, dt * 8);
+          const desired = Math.atan2(dx / d, dz / d), heading = Math.atan2(b.vx, b.vz), speed = Math.hypot(b.vx, b.vz);
+          if (Math.abs(angleDifference(desired, heading)) < Math.PI * 0.55) { const angle = turnTowards(heading, desired, dt * 2.2); b.vx = Math.sin(angle) * speed; b.vz = Math.cos(angle) * speed; } else b.target = 0;
         }
       }
-      b.x += b.vx * dt; b.z += b.vz * dt;
+      const oldX = b.x, oldZ = b.z; b.x += b.vx * dt; b.z += b.vz * dt;
+      b.traveled = (b.traveled ?? 0) + Math.hypot(b.x - oldX, b.z - oldZ);
+      const impact = terrainImpact({ x: oldX, z: oldZ }, b);
+      if (impact) { b.x = impact.x; b.z = impact.z; b.age = 10; this.burst(b.x, b.z, '#e0d2ad', 3); continue; }
+      if (!b.enemy && friendlyInLine({ x: oldX, z: oldZ }, b, friendlies)) { b.age = 10; this.burst(b.x, b.z, '#89eadd', 3); continue; }
+      if (b.traveled > (b.range ?? Infinity)) { b.age = 10; continue; }
       if (b.enemy) { if (distance(b, p) < 0.7) { this.hurt(b.damage); b.age = 10; } }
       else for (const e of this.enemies) if (e.hp > 0 && !b.hits?.includes(e.id) && distance(b, e) < e.radius + 0.25) {
         const critical = this.random() < this.criticalChance; this.hitEnemy(e, b.damage * (critical ? 2 : 1), critical); (b.hits ??= []).push(e.id);

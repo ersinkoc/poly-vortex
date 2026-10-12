@@ -55,6 +55,13 @@ Collect cyan XP prisms. Choose randomized common, rare, or overclocked upgrades.
 - Instanced shockwaves, shield impacts, floating damage numbers, critical indicators, tactical radar, sector transmissions, and overdrive status.
 - Persistent flight records and seven achievements. Legacy saves retain credits and upgrades; known victories and deployment counts unlock the corresponding records. Audio, quality, difficulty, and starting loadout preferences are also saved locally.
 
+## Deliberate targeting
+
+- Mouse aim selects a hostile within a narrow aiming cone. The cannon holds fire when the aim is empty, obstructed, or points past an unrescued pilot. Without mouse aim, stable automatic tracking remains available for keyboard and touch play.
+- Pulse upgrades create a focused multi-barrel salvo at the same primary target. The ship turns before firing; moving sideways does not break automatic tracking. A target ring, subtle aiming cone, target name, range, and integrity meter make the selected hostile visible.
+- Laser steering has a limited turn rate. Bolts stop following targets behind their flight direction, retain their heading after losing a target, expire at their travel range, and hit terrain instead of passing through it. Enemy shots also collide with cover.
+- Cryo has a 16-unit deployment range. Tesla starts on the primary target, then chains only to nearby hostiles with clear lines. Survivors are separate from hostile targets and prevent friendly shots through their position.
+
 ## Field operations and terrain
 
 - The first operation opens after eight seconds. Three stranded human pilots wait beside damaged escape pods: remain within the amber perimeter for 1.5 seconds each to beam them out. Leaving the perimeter gradually interrupts extraction.
