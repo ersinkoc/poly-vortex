@@ -55,6 +55,14 @@ Collect cyan XP prisms. Choose randomized common, rare, or overclocked upgrades.
 - Instanced shockwaves, shield impacts, floating damage numbers, critical indicators, tactical radar, sector transmissions, and overdrive status.
 - Persistent flight records and seven achievements. Legacy saves retain credits and upgrades; known victories and deployment counts unlock the corresponding records. Audio, quality, difficulty, and starting loadout preferences are also saved locally.
 
+## Field operations and terrain
+
+- The first operation opens after eight seconds. Three stranded human pilots wait beside damaged escape pods: remain within the amber perimeter for 1.5 seconds each to beam them out. Leaving the perimeter gradually interrupts extraction.
+- Rescue, relay restoration, and blockade missions rotate. Relays require eight seconds inside their perimeter; blockade operations count twenty new eliminations. Operations have deadlines, navigation arrows, radar markers, progress meters, and a ten-second breather after success.
+- A rescue grants 45 bonus credits; relay and blockade operations grant 30. All completed operations also grant 1,500 score, 15 integrity, and 25 EMP charge. Rescued pilots and completed missions appear in the run summary. Failed operations yield no reward and a new operation follows.
+- The world now has actual height geometry, shallow crater basins, uneven rock formations, and industrial ruins. Stone albedo, normal, and roughness maps are generated locally. The neon grid and explosion ripples follow the shaped surface.
+- Terrain is regenerated around the moving player, with bounded instanced scenery. Ships slide around solid formations; mission locations spawn outside their footprint. Existing first-aid packs and weapons remain available.
+
 ## Architecture
 
 - `src/game/engine.ts`: Seedable, fixed-step simulation. Mutable game state runs outside React. Horde flocking uses local spatial bins; enemies, projectiles, debris, and XP have hard pool limits.

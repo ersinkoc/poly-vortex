@@ -11,40 +11,11 @@ import { useGame } from '@/game/store';
 import ShipFleet from './ships';
 import ShipLighting from './ship-lighting';
 import CombatEffects from './combat-effects';
-import { SECTORS } from '@/game/progression';
+import Terrain from './terrain';
+import MissionActors from './mission-actors';
 
 const dummy = new THREE.Object3D();
 const color = new THREE.Color();
-const floorVertex = `varying vec3 vWorld; void main(){ vec4 world = modelMatrix * vec4(position,1.); vWorld = world.xyz; gl_Position = projectionMatrix * viewMatrix * world; }`;
-const floorFragment = `
-  varying vec3 vWorld; uniform float uTime; uniform vec3 uPulse; uniform vec2 uCenter; uniform vec3 uTint;
-  void main(){
-    vec2 p = vWorld.xz; vec2 a = abs(fract(p/2.-.5)-.5)/fwidth(p/2.);
-    float line = 1.-min(min(a.x,a.y),1.);
-    vec2 b = abs(fract(p/10.-.5)-.5)/fwidth(p/10.); float major = 1.-min(min(b.x,b.y),1.);
-    float d = length(p-uCenter); float fade = exp(-d*.037);
-    float elapsed = max(0.,uTime-uPulse.z);
-    float wave = exp(-pow(length(p-uPulse.xy)-elapsed*12.,2.)*.7) * exp(-elapsed*1.4);
-    vec3 base = vec3(.009,.017,.018); vec3 grid = uTint*line*.1 + uTint*major*.075;
-    gl_FragColor = vec4(base + grid*fade + vec3(.35,.85,.16)*wave*.25*line,1.);
-  }`;
-
-function GridFloor() {
-  const ref = useRef<THREE.ShaderMaterial>(null);
-  const mesh = useRef<THREE.Mesh>(null);
-  const uniforms = useMemo(() => ({ uTime: { value: 0 }, uPulse: { value: new THREE.Vector3(0, 0, -100) }, uCenter: { value: new THREE.Vector2() }, uTint: { value: new THREE.Color(SECTORS[0].color) } }), []);
-  useFrame(({ clock }) => {
-    if (!ref.current) return; const playing = useGame.getState().phase !== 'menu';
-    uniforms.uTime.value = playing ? engine.time : clock.elapsedTime;
-    uniforms.uCenter.value.set(engine.player.x, engine.player.z);
-    uniforms.uTint.value.set(SECTORS[playing ? engine.sector : 0].color);
-    if (mesh.current) { mesh.current.position.x = Math.floor(engine.player.x / 100) * 100; mesh.current.position.z = Math.floor(engine.player.z / 100) * 100; }
-    if (playing) uniforms.uPulse.value.set(engine.pulse.x, engine.pulse.z, engine.pulse.time);
-    else uniforms.uPulse.value.set(0, 0, Math.floor(clock.elapsedTime / 5) * 5);
-  });
-  return <mesh ref={mesh} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]}><planeGeometry args={[4000, 4000]} /><shaderMaterial ref={ref} uniforms={uniforms} vertexShader={floorVertex} fragmentShader={floorFragment} /></mesh>;
-}
-
 function Projectiles() {
   const bolts = useRef<THREE.InstancedMesh>(null), gems = useRef<THREE.InstancedMesh>(null), particles = useRef<THREE.InstancedMesh>(null);
   useFrame(({ clock }) => {
@@ -214,7 +185,7 @@ export default function Arena() {
     <color attach="background" args={['#080d0d']} />
     <fog attach="fog" args={['#080d0d', 36, 78]} />
     <ShipLighting />
-    <SceneController /><GridFloor /><ProtocolRing /><ShipFleet />
+    <SceneController /><Terrain /><MissionActors /><ProtocolRing /><ShipFleet />
     <Projectiles /><Effects /><CombatEffects /><Stars radius={65} depth={35} count={600} factor={1.3} saturation={0} fade speed={0.1} />
     <PostFX />
   </Canvas>;

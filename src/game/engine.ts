@@ -1,6 +1,8 @@
 import { audio } from './audio';
 import { useGame } from './store';
 import { SECTORS, sectorAt } from './progression';
+import { MissionDirector } from './missions';
+import { clearTerrainPosition } from './terrain';
 import type { Arc, Bolt, Cache, DamageText, Entity, Gem, Hazard, Input, Particle, Shockwave, Supply, Upgrade, UpgradeId, Vortex, WeaponId } from './types';
 
 export const LIMITS = { enemies: 280, bolts: 500, particles: 1000, gems: 400, shockwaves: 40, damageTexts: 40, hazards: 12, supplies: 10, caches: 8 };
@@ -23,6 +25,7 @@ const defs: Record<UpgradeId, [string, string]> = {
 };
 
 export class GameEngine {
+  missions = new MissionDirector();
   player = { x: 0, z: 0, vx: 0, vz: 0, angle: 0, hp: 100, maxHp: 100, invulnerable: 0, dashTime: 0, dashCooldown: 0 };
   input: Input = { keys: new Set(), aimX: 0, aimZ: -8, aiming: false, dash: false, surge: false, moveX: 0, moveZ: 0 };
   enemies: Entity[] = []; bolts: Bolt[] = []; particles: Particle[] = []; gems: Gem[] = []; arcs: Arc[] = []; vortices: Vortex[] = [];
@@ -40,6 +43,7 @@ export class GameEngine {
   constructor(seed = Date.now()) { this.seed = seed >>> 0; }
   random() { this.seed = (Math.imul(1664525, this.seed) + 1013904223) >>> 0; return this.seed / 4294967296; }
   reset() {
+    this.missions.reset();
     const s = useGame.getState();
     this.player = { x: 0, z: 0, vx: 0, vz: 0, angle: 0, hp: s.maxHp, maxHp: s.maxHp, invulnerable: 1.5, dashTime: 0, dashCooldown: 0 };
     this.enemies = []; this.bolts = []; this.particles = []; this.gems = []; this.arcs = []; this.vortices = [];
@@ -193,6 +197,7 @@ export class GameEngine {
     useGame.setState({
       time: this.time, hp: this.player.hp, maxHp: this.player.maxHp, xp: this.xp, nextXp: this.nextXp, level: this.level, score: this.score, kills: this.kills, combo: this.combo, dash: this.player.dashCooldown, enemies: this.enemies.length, weapons: { ...this.weapons },
       shield: this.shield, maxShield: this.maxShield, surge: this.surge, sector: this.sector, bossPhase: this.bossPhase, peakCombo: this.peakCombo, elites: this.eliteKills, caches: this.caches.length, salvage: this.salvage, rerolls: this.rerolls, overdrive: this.overdriveTime, repair: this.repairTime, announcement: this.announcement, announcementDetail: this.announcementDetail, announcementTime: this.announcementTime,
+      mission: this.missions.snapshot(), missionsCompleted: this.missions.completed, rescued: this.missions.rescued,
     });
   }
   tick(dt: number) {
@@ -211,11 +216,11 @@ export class GameEngine {
     this.repairTimer -= dt;
     if (this.repairTimer <= 0 && this.supplies.length < LIMITS.supplies) {
       this.repairTimer = 20 + this.random() * 8; const a = this.random() * Math.PI * 2;
-      this.supplies.push({ x: p.x + Math.sin(a) * 6, z: p.z + Math.cos(a) * 6, type: 'repair', age: 0 });
+      const supply: Supply = { x: p.x + Math.sin(a) * 6, z: p.z + Math.cos(a) * 6, type: 'repair', age: 0 }; clearTerrainPosition(supply, 1.2); this.supplies.push(supply);
     }
     if (this.supplyTimer <= 0 && this.supplies.length < LIMITS.supplies) {
       this.supplyTimer = 22; const a = this.random() * Math.PI * 2;
-      this.supplies.push({ x: p.x + Math.sin(a) * 8, z: p.z + Math.cos(a) * 8, type: this.sector % 2 ? 'overdrive' : 'magnet', age: 0 });
+      const supply: Supply = { x: p.x + Math.sin(a) * 8, z: p.z + Math.cos(a) * 8, type: this.sector % 2 ? 'overdrive' : 'magnet', age: 0 }; clearTerrainPosition(supply, 1.2); this.supplies.push(supply);
     }
     if (this.input.surge) this.activateSurge(); this.input.surge = false;
     if (useGame.getState().phase !== 'playing') return;
@@ -240,6 +245,7 @@ export class GameEngine {
     if (p.dashTime <= 0) { const lerp = 1 - Math.exp(-11 * dt); p.vx += (mx * 7.5 * this.speed - p.vx) * lerp; p.vz += (mz * 7.5 * this.speed - p.vz) * lerp; }
     else this.burst(p.x, p.z, '#9effcf', 2);
     p.x += p.vx * dt; p.z += p.vz * dt;
+    clearTerrainPosition(p, 0.7);
     this.spawnTimer -= dt;
     if (this.spawnTimer <= 0) {
       const pressure = 1 + this.time / 45;
@@ -272,6 +278,7 @@ export class GameEngine {
       }
       for (const v of this.vortices) { const vd = distance(e, v); if (vd < v.radius && vd > 0.1) { vx += (v.x - e.x) / vd * 5; vz += (v.z - e.z) / vd * 5; this.hitEnemy(e, dt * (12 + this.weapons.cryo * 7) * this.damage); } }
       e.x += vx * dt; e.z += vz * dt;
+      clearTerrainPosition(e, e.radius);
       if (d < e.radius + 0.6) this.hurt([10, 14, 24, 35][e.kind]);
       if (e.kind === 3) {
         const stage = e.hp / e.maxHp > 0.66 ? 1 : e.hp / e.maxHp > 0.33 ? 2 : 3;
@@ -358,6 +365,16 @@ export class GameEngine {
     for (const c of this.caches) { c.age += dt; if (distance(c, p) < 1.2) this.collectCache(c); }
     this.caches = this.caches.filter(c => c.age < 90);
     this.checkLevel();
+    if (useGame.getState().phase === 'playing') for (const event of this.missions.tick(dt, p, this.kills, () => this.random())) {
+      const mission = this.missions.mission!;
+      if (event === 'started') this.announce(mission.title, mission.description);
+      if (event === 'rescued') { this.wave(p.x, p.z, 4, '#ffd797'); this.burst(p.x, p.z, '#ffe4a6', 18); audio.salvage(); }
+      if (event === 'complete') {
+        this.salvage += mission.reward; this.score += 1500; this.surge = Math.min(100, this.surge + 25); this.player.hp = Math.min(this.player.maxHp, this.player.hp + 15);
+        this.announce('MISSION COMPLETE', `+${mission.reward} credits · +15 integrity · +25 EMP charge.`); this.wave(p.x, p.z, 6, '#82ffc5'); audio.salvage(); this.publish();
+      }
+      if (event === 'failed') this.announce('SIGNAL LOST', 'The window closed. A new operation will follow.');
+    }
     for (const q of this.particles) { q.life -= dt; q.x += q.vx * dt; q.y += q.vy * dt; q.z += q.vz * dt; q.vy -= dt * 8; }
     this.particles = this.particles.filter(q => q.life > 0);
     for (const a of this.arcs) a.life -= dt; this.arcs = this.arcs.filter(a => a.life > 0);
