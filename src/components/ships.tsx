@@ -11,6 +11,7 @@ import GroundRovers from './ground-rovers';
 import { DRONE_FIRE, DRONE_FORMATION, DRONE_ORBIT, droneMuzzle, dronePose } from '@/game/orbital-drones';
 import { terrainHeight } from '@/game/terrain';
 import { attachDamageMaterial, buildDamageUniforms, damageHeat, hullDamage } from '@/game/ship-damage';
+import { GOLIATH, goliathMuzzle, goliathPose } from '@/game/goliath-ai';
 
 type ActorAsset = { model: ShipModel; materials: ReturnType<typeof buildShipMaterials> };
 const accents = ['#ff5774', '#a685ff', '#ffae50', '#ff3a5d'];
@@ -49,34 +50,46 @@ function PlayerShip({ asset, shadow }: { asset: ActorAsset & { damage: ReturnTyp
 }
 
 function EnemyShips({ kind, asset, shadow }: { kind: 0 | 1 | 2 | 3; asset: ActorAsset; shadow: THREE.Texture }) {
-  const layers = useRef<(THREE.InstancedMesh | null)[]>([]), footprints = useRef<THREE.InstancedMesh>(null);
+  const layers = useRef<(THREE.InstancedMesh | null)[]>([]), footprints = useRef<THREE.InstancedMesh>(null), cannonLights = useRef<THREE.InstancedMesh>(null);
   useEffect(() => {
-    for (const layer of layers.current) layer?.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    const owned = [...layers.current, footprints.current];
+    const owned = [...layers.current, footprints.current, cannonLights.current];
+    for (const mesh of owned) mesh?.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     return () => { owned.forEach(mesh => mesh?.dispose()); };
   }, []);
   useFrame(({ clock }) => {
-    const menu = useGame.getState().phase === 'menu'; let count = 0;
+    const state = useGame.getState(), menu = state.phase === 'menu'; let count = 0, lightCount = 0;
     for (const e of engine.enemies) {
       if (e.kind !== kind) continue;
       const orbit = menu ? clock.elapsedTime * 0.035 : 0;
       const x = e.x * Math.cos(orbit) - e.z * Math.sin(orbit), z = e.x * Math.sin(orbit) + e.z * Math.cos(orbit);
-      const yaw = kind === 1 ? clock.elapsedTime * 0.25 + e.id : Math.atan2((menu ? 0 : engine.player.x) - x, (menu ? 0 : engine.player.z) - z);
+      const heavy = kind === 2 && !menu ? goliathPose(e, engine.player) : null;
+      const yaw = heavy?.yaw ?? (kind === 1 ? clock.elapsedTime * 0.25 + e.id : Math.atan2((menu ? 0 : engine.player.x) - x, (menu ? 0 : engine.player.z) - z));
       const scale = e.radius * (menu ? 1.45 : 1);
       matrixObject.position.set(x, e.radius * 0.75 + 0.3 + Math.sin(clock.elapsedTime * 2 + e.id) * 0.045, z);
       matrixObject.rotation.set(Math.sin(e.age + e.id) * 0.025, yaw, Math.cos(e.age * 1.5 + e.id) * (kind === 0 ? 0.09 : 0.025));
+      if (heavy) { matrixObject.position.set(heavy.x, heavy.y, heavy.z); matrixObject.rotation.set(heavy.pitch, heavy.yaw, heavy.bank, 'XYZ'); }
       matrixObject.scale.setScalar(scale); matrixObject.updateMatrix();
       for (const mesh of layers.current) mesh?.setMatrixAt(count, matrixObject.matrix);
       if (footprints.current) {
         matrixObject.position.set(x, terrainHeight(x, z) + 0.025 + kind * 0.001, z); matrixObject.rotation.set(-Math.PI / 2, 0, -yaw); matrixObject.scale.set(scale * 2.5, scale * 2.9, 1); matrixObject.updateMatrix(); footprints.current.setMatrixAt(count, matrixObject.matrix);
       }
+      if (kind === 2 && !menu && e.hp > 0 && cannonLights.current) {
+        const flash = e.cannonFlash && e.age - e.cannonFlash.at < GOLIATH.flash ? e.cannonFlash : null;
+        for (const side of [-1, 1] as const) {
+          if (!e.cannon && (!flash || flash.side !== side || state.reducedEffects)) continue;
+          const muzzle = goliathMuzzle(e, engine.player, side), size = e.cannon ? 0.035 + 0.075 * Math.max(0, 1 - e.cannon.remaining / GOLIATH.windup) : 0.2 * (1 - (e.age - flash!.at) / GOLIATH.flash);
+          matrixObject.position.set(muzzle.x, muzzle.y, muzzle.z); matrixObject.rotation.set(0, 0, 0); matrixObject.scale.setScalar(size); matrixObject.updateMatrix(); cannonLights.current.setMatrixAt(lightCount++, matrixObject.matrix);
+        }
+      }
       count++;
     }
     for (const mesh of [...layers.current, footprints.current]) if (mesh) { mesh.count = count; mesh.instanceMatrix.needsUpdate = true; }
+    if (cannonLights.current) { cannonLights.current.count = lightCount; cannonLights.current.instanceMatrix.needsUpdate = true; }
   });
   return <>
     {SURFACES.map((surface, i) => <instancedMesh key={surface} ref={mesh => { layers.current[i] = mesh; }} args={[asset.model[surface], asset.materials[surface], LIMITS.enemies]} frustumCulled={false} dispose={null} castShadow={surface === 'hull' || surface === 'armor'} receiveShadow />)}
     <instancedMesh ref={footprints} args={[undefined, undefined, LIMITS.enemies]} frustumCulled={false}><planeGeometry args={[1, 1]} /><meshBasicMaterial map={shadow} transparent opacity={0.3} depthWrite={false} /></instancedMesh>
+    {kind === 2 && <instancedMesh ref={cannonLights} args={[undefined, undefined, LIMITS.enemies * 2]} count={0} frustumCulled={false}><sphereGeometry args={[1, 8, 6]} /><meshBasicMaterial color={[3.5, 1.4, 0.4]} toneMapped={false} transparent opacity={0.8} depthWrite={false} blending={THREE.AdditiveBlending} /></instancedMesh>}
   </>;
 }
 

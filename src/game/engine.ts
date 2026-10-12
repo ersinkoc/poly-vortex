@@ -15,6 +15,7 @@ import { EXPEDITION, doctrineAt, dockStatus, fleetScale, type RunMode, type Serv
 import { DRONE_FIRE, DroneFormation, createDroneGuns, droneCount, droneDamage, droneInLine, droneMuzzle, dronePose } from './orbital-drones';
 import { CHARGE_RULES, chargeRemaining, type GroundCharge } from './ground-charges';
 import { RoverBay, ROVER_RULES, type GroundRover } from './ground-rovers';
+import { GOLIATH, goliathMuzzle, goliathRadial } from './goliath-ai';
 import type { Arc, Bolt, Cache, DamageText, Entity, Gem, Hazard, Input, Particle, Rocket, Shockwave, Supply, Upgrade, UpgradeId, Vortex, WeaponId } from './types';
 
 export const LIMITS = { enemies: 280, bolts: 500, rockets: 16, particles: 1000, gems: 400, shockwaves: 40, damageTexts: 40, hazards: 12, supplies: 10, caches: 8 };
@@ -138,7 +139,7 @@ export class GameEngine {
     const isElite = elite && kind !== 3;
     const scale = this.runMode === 'expedition' ? fleetScale(this.chapter, this.chapterTime).health : 1 + this.time / 240;
     const hp = [16, 35, 100, 2200][kind] * scale * (this.overdrive ? 1.3 : 1) * (isElite ? 2.8 : 1);
-    this.enemies.push({ id: ++this.uid, x: x ?? this.player.x + Math.sin(angle) * r, z: z ?? this.player.z + Math.cos(angle) * r, hp, maxHp: hp, kind, radius: [0.48, 0.62, 1.1, 2.3][kind] * (isElite ? 1.18 : 1), age: 0, timer: 1 + this.random() * 2, elite: isElite });
+    this.enemies.push({ id: ++this.uid, x: x ?? this.player.x + Math.sin(angle) * r, z: z ?? this.player.z + Math.cos(angle) * r, hp, maxHp: hp, kind, radius: [0.48, 0.62, 1.1, 2.3][kind] * (isElite ? 1.18 : 1), age: 0, timer: (kind === 2 ? GOLIATH.firstShot : 1) + this.random() * 2, elite: isElite });
   }
   announce(title: string, detail: string) { this.announcement = title; this.announcementDetail = detail; this.announcementTime = 5; }
   wave(x: number, z: number, radius: number, color: string, life = 0.7) {
@@ -466,6 +467,7 @@ export class GameEngine {
       const dx = p.x - e.x, dz = p.z - e.z, d = Math.hypot(dx, dz) || 0.01;
       const speed = [2.8, 2.1, 1.4, 1.15][e.kind] * motionScale * (e.kind === 0 ? chaserScale : 1) * (this.overdrive ? 1.2 : 1) * (e.elite ? 1.14 : 1);
       let vx = dx / d * speed, vz = dz / d * speed;
+      if (e.kind === 2) { const radial = e.cannon && d >= GOLIATH.holdMin ? 0 : goliathRadial(d, speed); vx = dx / d * radial; vz = dz / d * radial; }
       if (e.kind === 1 && d < 10) { const radial = d < 7 ? -0.7 : 0; vx = dx / d * radial - dz / d * 1.4; vz = dz / d * radial + dx / d * 1.4; }
       const bx = Math.floor(e.x / 2), bz = Math.floor(e.z / 2);
       for (let ox = -1; ox <= 1; ox++) for (let oz = -1; oz <= 1; oz++) {
@@ -475,10 +477,15 @@ export class GameEngine {
           if (nd > 0.01 && nd < safe) { const push = (safe - nd) * 2.5 / nd; vx += (e.x - other.x) * push; vz += (e.z - other.z) * push; }
         }
       }
+      if (e.kind === 2 && d <= GOLIATH.holdMax) {
+        const radial = vx * dx / d + vz * dz / d, limit = d < GOLIATH.holdMin ? -speed * GOLIATH.retreat : 0;
+        if (radial > limit) { vx -= dx / d * (radial - limit); vz -= dz / d * (radial - limit); }
+      }
       for (const v of this.vortices) { const vd = distance(e, v); if (vd < v.radius && vd > 0.1) { vx += (v.x - e.x) / vd * 5; vz += (v.z - e.z) / vd * 5; this.hitEnemy(e, dt * (12 + this.weapons.cryo * 7) * this.damage); } }
       if (e.hp <= 0) continue;
       e.x += vx * dt; e.z += vz * dt; e.vx = vx; e.vz = vz;
       clearTerrainPosition(e, e.radius);
+      if (e.kind === 2) this.tickGoliath(e, dt);
       if (d < e.radius + 0.6) this.hurt([10, 14, 24, 35][e.kind], e);
       if (e.kind === 3) {
         const stage = e.hp / e.maxHp > 0.66 ? 1 : e.hp / e.maxHp > 0.33 ? 2 : 3;
@@ -639,6 +646,26 @@ export class GameEngine {
     for (const s of this.scorches) s.age += dt; this.scorches = this.scorches.filter(s => s.age < 22);
     audio.combo = this.combo;
     this.hudTimer += dt; if (this.hudTimer > 0.1) { this.hudTimer = 0; this.publish(); }
+  }
+
+  private tickGoliath(e: Entity, dt: number) {
+    const d = distance(e, this.player);
+    if (e.cannon) {
+      const aim = { x: e.cannon.aimX, z: e.cannon.aimZ }, side = (e.cannonShots ?? 0) % 2 === 0 ? -1 : 1, muzzle = goliathMuzzle(e, aim, side);
+      if (d < GOLIATH.holdMin || d > GOLIATH.fireRange || terrainImpact(e, muzzle) || terrainImpact(muzzle, aim)) { e.cannon = undefined; e.timer = GOLIATH.retry; return; }
+      e.cannon.remaining -= dt;
+      if (e.cannon.remaining > 1e-8) return;
+      if (this.bolts.length < LIMITS.bolts) {
+        const dx = aim.x - muzzle.x, dz = aim.z - muzzle.z, distance = Math.hypot(dx, dz) || 1, flight = Math.max(0.1, distance / GOLIATH.shellSpeed);
+        this.bolts.push({ ...muzzle, vx: dx / distance * GOLIATH.shellSpeed, vz: dz / distance * GOLIATH.shellSpeed, vy: (0.95 - muzzle.y) / flight, age: 0, enemy: true, target: 0, heavy: e.id, damage: GOLIATH.damage, traveled: 0, range: GOLIATH.shellRange });
+        e.cannonFlash = { at: e.age, aimX: aim.x, aimZ: aim.z, side }; e.cannonShots = (e.cannonShots ?? 0) + 1; audio.cannonShot();
+      }
+      e.cannon = undefined; e.timer = GOLIATH.reload; return;
+    }
+    if (e.timer > 0 || d < GOLIATH.holdMin || d > GOLIATH.fireRange) return;
+    const muzzle = goliathMuzzle(e, this.player, -1);
+    if (terrainImpact(e, muzzle) || terrainImpact(muzzle, this.player)) { e.timer = GOLIATH.retry; return; }
+    e.cannon = { remaining: GOLIATH.windup, aimX: this.player.x, aimZ: this.player.z };
   }
 
   private engageSentinel() {

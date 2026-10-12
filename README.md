@@ -45,6 +45,14 @@ The custom domain is `poly-vortex.oxog.dev`, configured in `public/CNAME` and Gi
 
 Collect cyan XP prisms. A compact side reel automatically installs one randomized common, rare, or overclocked upgrade without pausing combat. Mix pulse lasers, escort drones, cryo-singularities, and Tesla arcs. At three minutes the Vortex Sentinel arrives. Classic extracts immediately on its defeat; Expedition opens a service and extraction window, then continues into another front. Standard and Overdrive difficulties are available. Every run awards core credits, saved in browser local storage, for permanent armor, damage, and speed upgrades. There are no accounts or server dependencies.
 
+## Goliath firing positions — 1.17
+
+Heavy Goliaths approach to a 9–12m engagement band, hold position there and slowly reverse if the core gets closer. Crowd separation cannot push them into a deliberate charge; cryo gravity still pulls them normally. Chaser, Orbiter and Sentinel attack patterns retain their own behavior.
+
+Normal and elite Goliaths wait at least 3.5 seconds after spawning before preparing their first cannon shot. Both barrels glow during a full one-second wind-up, locking the core's position at its start so the shot can be dodged. They launch one amber shell at 5.5m/s, alternating barrels, then reload for 6.5 seconds: subsequent shots are at least 7.5 seconds apart regardless of difficulty, haste or elite status. Each shell deals 18 damage, travels at most 20m and consumes one slot in the existing projectile pool. Cover and leaving the firing band cancel unfinished shots; full pools produce no false shot or catch-up volley.
+
+Simulation time drives charging, reload and muzzle flash. Pause, hit-stop and ended runs freeze the cannon, restart removes its state, and Sentinel arrival recalls the heavy units and their shells. Rendered body transforms and muzzle positions are shared with firing. One bounded instanced light batch shows charging and flash without added point lights, downloaded assets or React updates per shot. Reduced effects retains the steady charging cue and suppresses the short flash.
+
 ## Adaptive elevated escorts — 1.16
 
 Escorts hover in stable slots above the core instead of continuously circling it. Their baseline altitude is 2.85m. The shared formation smoothly expands from its 3m resting radius toward 4.4m in close combat, and contracts toward 2.6m during fast movement, dash or near cluttered terrain. Ducted-fan bodies retain gentle hover pitch/bank and their propellers continue rotating. The formation moves with the core; it does not lag into the hull during a phase shift.

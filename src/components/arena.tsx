@@ -25,8 +25,8 @@ function Projectiles() {
   useFrame(({ clock }) => {
     if (bolts.current) {
       engine.bolts.forEach((b, i) => {
-        dummy.position.set(b.x, b.y ?? 0.7, b.z); dummy.rotation.set(-Math.atan2(b.vy ?? 0, Math.hypot(b.vx, b.vz)), Math.atan2(b.vx, b.vz), 0, 'YXZ'); dummy.scale.set(b.enemy ? 0.17 : b.drone !== undefined ? 0.055 : 0.08, 0.08, b.enemy ? 0.17 : 0.6); dummy.updateMatrix();
-        bolts.current!.setMatrixAt(i, dummy.matrix); bolts.current!.setColorAt(i, color.set(b.enemy ? '#ff4088' : b.drone !== undefined ? '#78e8ff' : '#b5ff62').multiplyScalar(3));
+        dummy.position.set(b.x, b.y ?? 0.7, b.z); dummy.rotation.set(-Math.atan2(b.vy ?? 0, Math.hypot(b.vx, b.vz)), Math.atan2(b.vx, b.vz), 0, 'YXZ'); dummy.scale.set(b.heavy !== undefined ? 0.16 : b.enemy ? 0.17 : b.drone !== undefined ? 0.055 : 0.08, b.heavy !== undefined ? 0.16 : 0.08, b.heavy !== undefined ? 0.36 : b.enemy ? 0.17 : 0.6); dummy.updateMatrix();
+        bolts.current!.setMatrixAt(i, dummy.matrix); bolts.current!.setColorAt(i, color.set(b.heavy !== undefined ? '#ffc280' : b.enemy ? '#ff4088' : b.drone !== undefined ? '#78e8ff' : '#b5ff62').multiplyScalar(3));
       });
       bolts.current.count = engine.bolts.length; bolts.current.instanceMatrix.needsUpdate = true; if (bolts.current.instanceColor) bolts.current.instanceColor.needsUpdate = true;
     }
