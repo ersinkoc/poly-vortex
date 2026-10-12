@@ -5,6 +5,7 @@ export type UpgradeId = WeaponId | 'damage' | 'speed' | 'magnet' | 'repair' | 'h
 export type Upgrade = { id: UpgradeId; title: string; description: string; rarity: 'COMMON' | 'RARE' | 'OVERCLOCKED'; power: number };
 export type Entity = { id: number; x: number; z: number; hp: number; maxHp: number; kind: 0 | 1 | 2 | 3; radius: number; age: number; timer: number; elite: boolean };
 export type Bolt = { x: number; z: number; vx: number; vz: number; age: number; enemy: boolean; target: number; damage: number; pierce?: number; hits?: number[]; traveled?: number; range?: number };
+export type Rocket = { x: number; z: number; vx: number; vz: number; age: number; target: number; traveled: number; trail: number };
 export type Particle = { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; maxLife: number; color: string; size: number };
 export type Gem = { x: number; z: number; value: number; age: number };
 export type Arc = { points: [number, number][]; life: number };
@@ -12,10 +13,10 @@ export type Vortex = { x: number; z: number; life: number; radius: number };
 export type Shockwave = { x: number; z: number; radius: number; life: number; maxLife: number; color: string };
 export type DamageText = { x: number; z: number; value: number; critical: boolean; life: number };
 export type Hazard = { x: number; z: number; radius: number; age: number; delay: number; duration: number; detonated: boolean };
-export type Supply = { x: number; z: number; type: 'repair' | 'magnet' | 'overdrive'; age: number };
+export type Supply = { x: number; z: number; type: 'repair' | 'magnet' | 'overdrive' | 'ammo'; age: number };
 export type Cache = { x: number; z: number; age: number };
 export type Profile = { credits: number; best: number; runs: number; wins: number; totalKills: number; achievements: string[]; upgrades: { armor: number; reactor: number; thrusters: number } };
-export type Input = { keys: Set<string>; aimX: number; aimZ: number; aiming: boolean; dash: boolean; surge: boolean; moveX: number; moveZ: number };
+export type Input = { keys: Set<string>; aimX: number; aimZ: number; aiming: boolean; dash: boolean; surge: boolean; rocket: boolean; moveX: number; moveZ: number };
 
 export const WEAPONS: Record<WeaponId, { name: string; code: string; description: string; color: string }> = {
   pulse: { name: 'Pulse laser', code: 'PL-01', description: 'Rapid-fire homing bolts. Precision, at the speed of light.', color: '#bbff57' },

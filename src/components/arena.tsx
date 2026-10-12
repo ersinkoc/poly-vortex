@@ -121,7 +121,7 @@ function SceneController() {
   useEffect(() => { if (runId) { engine.reset(); pointerInside.current = false; } }, [runId]);
   useEffect(() => {
     if (phase === 'menu') { engine.player.x = 0; engine.player.z = 0; engine.preview(); engine.bolts = []; engine.gems = []; engine.particles = []; engine.vortices = []; engine.arcs = []; }
-    if (phase !== 'playing') { engine.input.keys.clear(); engine.input.dash = false; engine.input.surge = false; engine.input.moveX = 0; engine.input.moveZ = 0; accumulator.current = 0; }
+    if (phase !== 'playing') { engine.input.keys.clear(); engine.input.dash = false; engine.input.surge = false; engine.input.rocket = false; engine.input.moveX = 0; engine.input.moveZ = 0; accumulator.current = 0; }
   }, [phase]);
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -132,6 +132,7 @@ function SceneController() {
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code)) e.preventDefault();
       engine.input.keys.add(e.code); if (e.code === 'Space') engine.input.dash = true;
       if (e.code === 'KeyQ' && !e.repeat) engine.input.surge = true;
+      if (e.code === 'KeyE' && !e.repeat) engine.input.rocket = true;
     };
     const up = (e: KeyboardEvent) => engine.input.keys.delete(e.code);
     const blur = () => { engine.input.keys.clear(); if (useGame.getState().phase === 'playing') useGame.getState().setPhase('paused'); };

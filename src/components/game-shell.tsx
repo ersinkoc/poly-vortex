@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowDown, ArrowRight, ArrowUpRight, Check, ChevronRight, CircleDot, Cpu, Crosshair, Disc3, Expand, Hexagon, Keyboard, Layers3, MousePointer2, Orbit, Pause, Play, Radio, RotateCcw, Shield, SlidersHorizontal, Snowflake, Sparkles, Trophy, Volume2, VolumeX, Wind, X, Zap } from 'lucide-react';
+import { ArrowDown, ArrowRight, ArrowUpRight, Check, ChevronRight, CircleDot, Cpu, Crosshair, Disc3, Expand, Hexagon, Keyboard, Layers3, MousePointer2, Orbit, Pause, Play, Radio, Rocket, RotateCcw, Shield, SlidersHorizontal, Snowflake, Sparkles, Trophy, Volume2, VolumeX, Wind, X, Zap } from 'lucide-react';
 import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
 import { audio } from '@/game/audio';
 import { engine, RUN_DURATION } from '@/game/engine';
@@ -48,7 +48,7 @@ function Menu({ open, start }: { open: (panel: Panel) => void; start: () => void
     </header>
     <main className="menu-main">
       <div className="hero-copy">
-        <motion.div className="eyebrow" initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}><span className="tiny-cross">+</span> A GEOMETRIC ROGUELITE <span className="version">V.05</span></motion.div>
+        <motion.div className="eyebrow" initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}><span className="tiny-cross">+</span> A GEOMETRIC ROGUELITE <span className="version">V.06</span></motion.div>
         <motion.h1 initial={{ y: 18, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.18, duration: 0.6 }}>SHAPE<br />THE <span className="title-star">✳</span><br /><span>CHAOS.</span></motion.h1>
         <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.28 }}>
           <p className="hero-description">One core. Infinite chaos.<br />Outlast the swarm. Evolve your arsenal.<br /><span>Break the protocol.</span></p>
@@ -70,7 +70,7 @@ function Menu({ open, start }: { open: (panel: Panel) => void; start: () => void
       </div>
       <div className="deployment-bar"><span><CircleDot size={14} /> READY FOR DEPLOYMENT</span><button onClick={() => open('settings')}>MODE <strong>{difficulty === 'standard' ? 'STANDARD' : 'OVERDRIVE'}</strong><ChevronRight size={13} /></button><button onClick={() => open('armory')}>LOADOUT <strong>{WEAPONS[loadout].name.toUpperCase()}</strong><ChevronRight size={13} /></button><button onClick={() => open('core')}>CORE CREDITS <strong>{number(profile.credits)}</strong><ArrowUpRight size={13} /></button></div>
     </main>
-    <footer className="footer"><span>DESIGNED TO BE OUTNUMBERED.</span><span className="footer-center"><i /> ALL SYSTEMS PROCEDURAL</span><button onClick={() => open('records')}>PERSONAL BEST <strong>{number(profile.best).padStart(6, '0')}</strong><Trophy size={13} /></button><span className="build-number">BUILD 005 / 2026</span></footer>
+    <footer className="footer"><span>DESIGNED TO BE OUTNUMBERED.</span><span className="footer-center"><i /> ALL SYSTEMS PROCEDURAL</span><button onClick={() => open('records')}>PERSONAL BEST <strong>{number(profile.best).padStart(6, '0')}</strong><Trophy size={13} /></button><span className="build-number">BUILD 006 / 2026</span></footer>
   </motion.div>;
 }
 
@@ -87,9 +87,10 @@ function PanelContent({ panel }: { panel: Exclude<Panel, null> }) {
     <div className="control-row"><span><MousePointer2 /> AIM DIRECTION</span><div className="keys"><kbd>MOUSE</kbd></div></div>
     <div className="control-row"><span><Wind /> PHASE SHIFT</span><div className="keys"><kbd>SPACE</kbd><em>or right-click</em></div></div>
     <div className="control-row"><span><Zap /> VORTEX SURGE</span><div className="keys"><kbd>Q</kbd><em>EMP / clear bullets</em></div></div>
+    <div className="control-row"><span><Rocket /> HELLION ROCKET</span><div className="keys"><kbd>E</kbd><em>6 rounds / ammo crates refill 3</em></div></div>
     <div className="control-row"><span><Pause /> PAUSE</span><div className="keys"><kbd>ESC</kbd></div></div>
     <div className="control-row"><span><Layers3 /> CHOOSE UPGRADE</span><div className="keys"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd></div></div>
-    <div className="tip"><Sparkles size={18} /><p><strong>A little advice</strong>Dash through danger: phase shift makes you briefly invulnerable. Collect cyan prisms to level up. Gold elites drop rare salvage. Mouse aim focuses the pulse salvo on one hostile. Rocks stop bullets, and pilots in the firing line hold friendly fire. Q discharges your EMP, and blue shields regenerate after four seconds without a hit. Amber signals mark stranded pilots: stay in their perimeter for 1.5 seconds to extract. Follow the field-operation arrow for timed missions. Touch controls appear on mobile.</p></div>
+    <div className="tip"><Sparkles size={18} /><p><strong>A little advice</strong>Dash through danger: phase shift makes you briefly invulnerable. Collect cyan prisms to level up. Gold elites drop rare salvage. Mouse aim focuses the pulse salvo on one hostile. Rocks stop bullets, and pilots in the firing line hold friendly fire. Q discharges your EMP, and blue shields regenerate after four seconds without a hit. Amber signals mark stranded pilots: stay in their perimeter for 1.5 seconds to extract. Follow the field-operation arrow for timed missions. E fires a limited rocket at your locked target. Blue crates refill up to three rockets and 20 EMP charge. Red first-aid cases are rare. Touch controls appear on mobile.</p></div>
   </>;
   if (panel === 'protocol') return <>
     <p className="panel-intro">You are the last stable core in a collapsing geometric system. The protocol wants you erased. Rewrite it.</p>
@@ -150,7 +151,7 @@ function HUD() {
   return <div className="hud">
     <div className="hud-top"><div className="hud-core"><Logo small /><div className="integrity-label"><span>CORE INTEGRITY</span><strong>{Math.ceil(s.hp)}<small> / {s.maxHp}</small></strong></div><div className={`integrity-bar ${s.hp / s.maxHp < 0.3 ? 'critical' : ''}`}><i style={{ width: `${s.hp / s.maxHp * 100}%` }} /></div></div><div className="hud-timer"><span>{boss ? 'SENTINEL AWAKENED' : 'SURVIVE THE PROTOCOL'}</span><strong>{time(s.time)}</strong><small>{boss ? 'DESTROY TO EXTRACT' : `SENTINEL IN ${time(Math.max(0, RUN_DURATION - s.time))}`}</small></div><div className="hud-right"><button className="icon-button" aria-label={s.sound ? 'Mute audio' : 'Enable audio'} onClick={() => useGame.setState({ sound: !s.sound })}>{s.sound ? <Volume2 size={18} /> : <VolumeX size={18} />}</button><button className="icon-button" aria-label="Pause game" onClick={() => { if (s.phase === 'playing') s.setPhase('paused'); }}><Pause size={18} /></button><div className="score"><span>SCORE</span><strong>{number(s.score).padStart(6, '0')}</strong><small>{number(s.kills)} ELIMINATED</small></div></div></div>
     {boss && bossEnemy && <div className="boss-bar"><span>VORTEX SENTINEL // PHASE {s.bossPhase || 1}</span><div><i style={{ width: `${bossEnemy.hp / bossEnemy.maxHp * 100}%` }} /></div></div>}
-    <AnimatePresence>{notice && s.phase === 'playing' && <motion.div className="deploy-notice" initial={{ opacity: 0, y: 10, x: '-50%' }} animate={{ opacity: 1, y: 0, x: '-50%' }} exit={{ opacity: 0, x: '-50%' }}><span>PROTOCOL INITIATED</span><h2>KEEP. MOVING.</h2><p>Mouse aims. A clear target is required to fire. Q clears the swarm.</p></motion.div>}</AnimatePresence>
+    <AnimatePresence>{notice && s.phase === 'playing' && <motion.div className="deploy-notice" initial={{ opacity: 0, y: 10, x: '-50%' }} animate={{ opacity: 1, y: 0, x: '-50%' }} exit={{ opacity: 0, x: '-50%' }}><span>PROTOCOL INITIATED</span><h2>KEEP. MOVING.</h2><p>Mouse aims. E launches limited rockets. Q clears the swarm.</p></motion.div>}</AnimatePresence>
     {s.combo >= 2 && <div className="combo"><strong>×{Math.floor(s.combo)}</strong><span>CHAIN MULTIPLIER</span></div>}
     <div className="hud-bottom"><div className="weapon-slots">{(Object.keys(WEAPONS) as WeaponId[]).map(id => { const Icon = weaponIcons[id], lv = s.weapons[id]; return <div key={id} className={`weapon-slot ${lv ? 'equipped' : ''}`} style={{ '--weapon-color': WEAPONS[id].color } as React.CSSProperties} title={`${WEAPONS[id].name} · ${lv ? `Level ${lv}` : 'Not equipped'}`}><Icon size={23} /><span>{lv ? `LV ${lv}` : '—'}</span></div>; })}<div className={`dash-slot ${s.dash <= 0 ? 'ready' : ''}`}><Wind size={22} /><div><span>PHASE SHIFT</span><strong>{s.dash <= 0 ? 'READY' : `${s.dash.toFixed(1)}s`}</strong></div><kbd>SPACE</kbd></div></div><div className="hud-performance"><span><i /> SECTOR_{String(s.sector + 1).padStart(2, '0')}</span><small>{s.enemies} HOSTILES <span>/</span> {s.fps} FPS</small></div></div>
     <div className="xp-container"><span>LV. {s.level}</span><div className="xp-bar"><i style={{ width: `${Math.min(100, s.xp / s.nextXp * 100)}%` }} /></div><small>{Math.floor(s.xp)} / {s.nextXp} XP</small></div>

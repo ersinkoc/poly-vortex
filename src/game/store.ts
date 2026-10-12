@@ -2,8 +2,10 @@ import { create } from 'zustand';
 import { EMPTY_PROFILE, type Difficulty, type Phase, type Profile, type Upgrade, type WeaponId } from './types';
 import { ACHIEVEMENTS } from './progression';
 import type { Mission } from './missions';
+import { ROCKET_CAPACITY } from './supplies';
 
 type GameStore = {
+  rocketAmmo: number; rocketCapacity: number; rocketCooldown: number; rocketReady: boolean;
   targeting: 'aim' | 'auto'; target: { id: number; kind: 0 | 1 | 2 | 3; distance: number; hp: number; maxHp: number } | null;
   mission: Mission | null; missionsCompleted: number; rescued: number;
   phase: Phase; difficulty: Difficulty; loadout: WeaponId; sound: boolean; quality: 'high' | 'performance';
@@ -18,6 +20,7 @@ type GameStore = {
 };
 const save = (profile: Profile) => { try { localStorage.setItem('poly-vortex-profile-v1', JSON.stringify(profile)); } catch { /* Storage can be unavailable in private browsing. */ } };
 export const useGame = create<GameStore>((set, get) => ({
+  rocketAmmo: ROCKET_CAPACITY, rocketCapacity: ROCKET_CAPACITY, rocketCooldown: 0, rocketReady: false,
   targeting: 'auto', target: null,
   mission: null, missionsCompleted: 0, rescued: 0,
   phase: 'menu', difficulty: 'standard', loadout: 'pulse', sound: true, quality: 'high',

@@ -25,9 +25,10 @@ test('first-aid repairs immediately and continues at four integrity per second',
   advance(7); expect(game.player.hp).toBeCloseTo(80, 4); expect(game.repairTime).toBe(0);
 });
 test('first-aid spawns periodically without requiring any kills and respects the pool cap', () => {
-  advance(11.9); expect(game.supplies.filter(s => s.type === 'repair')).toHaveLength(0);
+  advance(29.9); expect(game.supplies.filter(s => s.type === 'repair')).toHaveLength(0);
   advance(0.2); const kit = game.supplies.find(s => s.type === 'repair'); expect(kit).toBeDefined(); expect(Math.hypot(kit!.x, kit!.z)).toBeCloseTo(6, 4); expect(game.kills).toBe(0);
-  advance(28); expect(game.supplies.filter(s => s.type === 'repair')).toHaveLength(2);
+  expect(game.dropSupply('repair', 10, 10)).toBe(false);
+  advance(75); expect(game.supplies.filter(s => s.type === 'repair')).toHaveLength(1);
   game.supplies = Array.from({ length: LIMITS.supplies }, () => ({ x: 100, z: 100, type: 'repair' as const, age: 0 }));
   advance(30); expect(game.supplies).toHaveLength(LIMITS.supplies);
 });

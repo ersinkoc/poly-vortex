@@ -4,9 +4,10 @@ import { SECTORS, sectorAt } from './progression';
 import { MissionDirector } from './missions';
 import { clearTerrainPosition, terrainImpact } from './terrain';
 import { angleDifference, friendlyInLine, PULSE_RANGE, selectTarget, turnTowards } from './targeting';
-import type { Arc, Bolt, Cache, DamageText, Entity, Gem, Hazard, Input, Particle, Shockwave, Supply, Upgrade, UpgradeId, Vortex, WeaponId } from './types';
+import { ROCKET_CAPACITY, SUPPLY_RULES, supplyLifetime } from './supplies';
+import type { Arc, Bolt, Cache, DamageText, Entity, Gem, Hazard, Input, Particle, Rocket, Shockwave, Supply, Upgrade, UpgradeId, Vortex, WeaponId } from './types';
 
-export const LIMITS = { enemies: 280, bolts: 500, particles: 1000, gems: 400, shockwaves: 40, damageTexts: 40, hazards: 12, supplies: 10, caches: 8 };
+export const LIMITS = { enemies: 280, bolts: 500, rockets: 16, particles: 1000, gems: 400, shockwaves: 40, damageTexts: 40, hazards: 12, supplies: 10, caches: 8 };
 export const RUN_DURATION = 180;
 const colors = ['#ff567f', '#b58aff', '#ffab56', '#ff466d'];
 const distance = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -28,8 +29,9 @@ const defs: Record<UpgradeId, [string, string]> = {
 export class GameEngine {
   missions = new MissionDirector();
   targetId = 0;
+  rockets: Rocket[] = []; rocketAmmo = ROCKET_CAPACITY; rocketCooldown = 0;
   player = { x: 0, z: 0, vx: 0, vz: 0, angle: 0, hp: 100, maxHp: 100, invulnerable: 0, dashTime: 0, dashCooldown: 0 };
-  input: Input = { keys: new Set(), aimX: 0, aimZ: -8, aiming: false, dash: false, surge: false, moveX: 0, moveZ: 0 };
+  input: Input = { keys: new Set(), aimX: 0, aimZ: -8, aiming: false, dash: false, surge: false, rocket: false, moveX: 0, moveZ: 0 };
   enemies: Entity[] = []; bolts: Bolt[] = []; particles: Particle[] = []; gems: Gem[] = []; arcs: Arc[] = []; vortices: Vortex[] = [];
   shockwaves: Shockwave[] = []; damageTexts: DamageText[] = []; hazards: Hazard[] = []; supplies: Supply[] = []; caches: Cache[] = [];
   shield = 40; maxShield = 40; surge = 100; sector = 0; bossPhase = 0; peakCombo = 1; eliteKills = 0; salvage = 0; rerolls = 2;
@@ -41,18 +43,21 @@ export class GameEngine {
   damage = 1; speed = 1; magnet = 1; haste = 1; bossSpawned = false;
   private uid = 0; private spawnTimer = 0; private shotTimer = 0; private cryoTimer = 2; private teslaTimer = 1;
   private hudTimer = 0; private comboTimer = 0; private seed: number; private overdrive = false;
-  private hazardTimer = 37; private supplyTimer = 18; private repairTimer = 12;
+  private hazardTimer = 37; private supplyTimer = 24; private repairTimer = SUPPLY_RULES.repair.first as number; private ammoTimer = SUPPLY_RULES.ammo.first as number;
+  private lastCombatSupply = -25;
   constructor(seed = Date.now()) { this.seed = seed >>> 0; }
   random() { this.seed = (Math.imul(1664525, this.seed) + 1013904223) >>> 0; return this.seed / 4294967296; }
   reset() {
     this.missions.reset();
     this.targetId = 0;
+    this.rockets = []; this.rocketAmmo = ROCKET_CAPACITY; this.rocketCooldown = 0; this.ammoTimer = SUPPLY_RULES.ammo.first;
+    this.lastCombatSupply = -25;
     const s = useGame.getState();
     this.player = { x: 0, z: 0, vx: 0, vz: 0, angle: 0, hp: s.maxHp, maxHp: s.maxHp, invulnerable: 1.5, dashTime: 0, dashCooldown: 0 };
     this.enemies = []; this.bolts = []; this.particles = []; this.gems = []; this.arcs = []; this.vortices = [];
     this.shockwaves = []; this.damageTexts = []; this.hazards = []; this.supplies = []; this.caches = [];
     this.shield = 40; this.maxShield = 40; this.surge = 100; this.sector = 0; this.bossPhase = 0; this.peakCombo = 1; this.eliteKills = 0; this.salvage = 0; this.rerolls = 2;
-    this.criticalChance = 0.05; this.piercing = 0; this.overdriveTime = 0; this.repairTime = 0; this.shieldDelay = 0; this.hazardTimer = 37; this.supplyTimer = 18; this.repairTimer = 12;
+    this.criticalChance = 0.05; this.piercing = 0; this.overdriveTime = 0; this.repairTime = 0; this.shieldDelay = 0; this.hazardTimer = 37; this.supplyTimer = 24; this.repairTimer = SUPPLY_RULES.repair.first;
     this.announcement = ''; this.announcementDetail = ''; this.announcementTime = 0;
     this.weapons = { pulse: 0, glaive: 0, cryo: 0, tesla: 0 }; this.weapons[s.loadout] = 1;
     // Every core has a basic pulse cannon, even with a specialized starting module.
@@ -65,6 +70,7 @@ export class GameEngine {
     this.uid = 0; this.spawnTimer = 0; this.shotTimer = 0; this.cryoTimer = 2; this.teslaTimer = 1; this.hudTimer = 0; this.comboTimer = 0;
     this.input.keys.clear(); this.input.dash = false; this.input.moveX = 0; this.input.moveZ = 0; this.input.aiming = false;
     this.input.surge = false;
+    this.input.rocket = false;
     this.publish();
   }
   preview() {
@@ -105,8 +111,40 @@ export class GameEngine {
   addHazard(x: number, z: number, radius = 3.2, delay = 1.8) {
     if (this.hazards.length < LIMITS.hazards) this.hazards.push({ x, z, radius, delay, age: 0, duration: 0.5, detonated: false });
   }
+  dropSupply(type: Supply['type'], x: number, z: number) {
+    const cap = type === 'repair' || type === 'ammo' ? SUPPLY_RULES[type].cap : LIMITS.supplies;
+    if (this.supplies.length >= LIMITS.supplies || this.supplies.filter(s => s.type === type && s.age < supplyLifetime(s)).length >= cap) return false;
+    const supply: Supply = { x, z, type, age: 0 }; clearTerrainPosition(supply, 1.2); this.supplies.push(supply); return true;
+  }
+  fireRocket() {
+    if (useGame.getState().phase !== 'playing' || this.rocketAmmo <= 0 || this.rocketCooldown > 0 || this.rockets.length >= LIMITS.rockets) return false;
+    const allies = this.missions.mission?.kind === 'rescue' && this.missions.mission.status === 'active' ? this.missions.mission.targets.filter(t => !t.done) : [];
+    const target = selectTarget(this.enemies, this.player, this.input, this.targetId, allies); if (!target) return false;
+    const p = this.player, angle = Math.atan2(target.x - p.x, target.z - p.z);
+    if (Math.abs(angleDifference(angle, p.angle)) > 0.5) return false;
+    const lead = Math.min(0.9, Math.max(0.1, distance(target, p) - target.radius - 0.2));
+    const start = { x: p.x + Math.sin(angle) * lead, z: p.z + Math.cos(angle) * lead }; if (terrainImpact(p, start)) return false;
+    this.rocketAmmo--; this.rocketCooldown = 0.75; this.targetId = target.id;
+    this.rockets.push({ ...start, vx: Math.sin(angle) * 14, vz: Math.cos(angle) * 14, age: 0, target: target.id, traveled: 0, trail: 0 });
+    audio.rocket(); this.publish(); return true;
+  }
+  explodeRocket(rocket: Rocket, directHit = 0) {
+    if (rocket.age >= 10) return; rocket.age = 10;
+    this.wave(rocket.x, rocket.z, 4.5, '#ffb876', 0.85); this.wave(rocket.x, rocket.z, 1.7, '#fff1c4', 0.4); this.burst(rocket.x, rocket.z, '#ff9b57', 48);
+    this.trauma = Math.min(1, this.trauma + 0.55); this.hitStop = 0.05; audio.explosion();
+    for (const enemy of [...this.enemies]) {
+      const d = distance(enemy, rocket);
+      if (enemy.hp > 0 && d < 4.5 && (enemy.id === directHit || !terrainImpact(rocket, enemy, -0.15))) this.hitEnemy(enemy, 130 * this.damage * (enemy.id === directHit ? 1 : 1 - d / 4.5 * 0.7));
+      if (useGame.getState().phase !== 'playing') break;
+    }
+  }
   collectSupply(supply: Supply) {
-    if (supply.age >= 45) return;
+    if (useGame.getState().phase !== 'playing' || supply.age >= supplyLifetime(supply)) return;
+    if (supply.type === 'ammo') {
+      const rounds = Math.min(3, ROCKET_CAPACITY - this.rocketAmmo), charge = Math.min(20, 100 - this.surge);
+      if (!rounds && !charge) return;
+      this.rocketAmmo += rounds; this.surge += charge; this.announce('ORDNANCE RECHARGED', `+${rounds} rockets · +${Math.round(charge)} EMP charge.`);
+    }
     if (supply.type === 'repair') {
       this.player.hp = Math.min(this.player.maxHp, this.player.hp + 28); this.shield = Math.min(this.maxShield, this.shield + 15); this.repairTime = 8;
       this.announce('FIELD REPAIR ACTIVE', '+28 integrity · +15 shield · 4 integrity/sec for 8 seconds.');
@@ -114,7 +152,7 @@ export class GameEngine {
     }
     if (supply.type === 'magnet') { for (const gem of this.gems) { this.xp += gem.value; gem.value = 0; } }
     if (supply.type === 'overdrive') this.overdriveTime = 9;
-    this.wave(supply.x, supply.z, 3, supply.type === 'repair' ? '#ff5768' : supply.type === 'magnet' ? '#68eee4' : '#ffbf68');
+    this.wave(supply.x, supply.z, 3, supply.type === 'repair' ? '#ff5768' : supply.type === 'ammo' ? '#83c6ff' : supply.type === 'magnet' ? '#68eee4' : '#ffbf68');
     supply.age = 100; audio.salvage();
   }
   collectCache(cache: Cache) {
@@ -143,7 +181,7 @@ export class GameEngine {
     this.kills++; this.score += Math.round([100, 200, 500, 10000][enemy.kind] * this.combo);
     this.surge = Math.min(100, this.surge + (enemy.elite ? 12 : 3));
     if (enemy.elite) { this.eliteKills++; if (this.caches.length < LIMITS.caches) this.caches.push({ x: enemy.x, z: enemy.z, age: 0 }); this.wave(enemy.x, enemy.z, 5, '#ffcf6c'); }
-    else if (this.kills % 14 === 0 && this.supplies.length < LIMITS.supplies) this.supplies.push({ x: enemy.x, z: enemy.z, type: this.kills % 28 ? 'repair' : 'magnet', age: 0 });
+    else if (this.kills % 45 === 0 && this.time - this.lastCombatSupply >= 25 && this.dropSupply(this.kills % 90 ? 'magnet' : 'overdrive', enemy.x, enemy.z)) this.lastCombatSupply = this.time;
     this.burst(enemy.x, enemy.z, colors[enemy.kind], enemy.kind >= 2 ? 40 : 13);
     if (this.gems.length < LIMITS.gems) this.gems.push({ x: enemy.x, z: enemy.z, value: [3, 7, 18, 100][enemy.kind], age: 0 });
     this.pulse = { x: enemy.x, z: enemy.z, time: this.time };
@@ -199,6 +237,7 @@ export class GameEngine {
   publish() {
     const target = this.enemies.find(e => e.id === this.targetId && e.hp > 0);
     useGame.setState({
+      rocketAmmo: this.rocketAmmo, rocketCapacity: ROCKET_CAPACITY, rocketCooldown: this.rocketCooldown, rocketReady: !!target && Math.abs(angleDifference(Math.atan2(target.x - this.player.x, target.z - this.player.z), this.player.angle)) <= 0.5,
       targeting: this.input.aiming ? 'aim' : 'auto', target: target ? { id: target.id, kind: target.kind, distance: distance(target, this.player), hp: target.hp, maxHp: target.maxHp } : null,
       time: this.time, hp: this.player.hp, maxHp: this.player.maxHp, xp: this.xp, nextXp: this.nextXp, level: this.level, score: this.score, kills: this.kills, combo: this.combo, dash: this.player.dashCooldown, enemies: this.enemies.length, weapons: { ...this.weapons },
       shield: this.shield, maxShield: this.maxShield, surge: this.surge, sector: this.sector, bossPhase: this.bossPhase, peakCombo: this.peakCombo, elites: this.eliteKills, caches: this.caches.length, salvage: this.salvage, rerolls: this.rerolls, overdrive: this.overdriveTime, repair: this.repairTime, announcement: this.announcement, announcementDetail: this.announcementDetail, announcementTime: this.announcementTime,
@@ -209,6 +248,7 @@ export class GameEngine {
     if (useGame.getState().phase !== 'playing') return;
     if (this.hitStop > 0) { this.hitStop -= dt; return; }
     this.time += dt; const p = this.player;
+    this.rocketCooldown = Math.max(0, this.rocketCooldown - dt);
     p.hp = Math.min(p.maxHp, p.hp + Math.min(dt, this.repairTime) * 4); this.repairTime = Math.max(0, this.repairTime - dt);
     this.announcementTime = Math.max(0, this.announcementTime - dt); this.overdriveTime = Math.max(0, this.overdriveTime - dt);
     this.shieldDelay -= dt; if (this.shieldDelay <= 0) this.shield = Math.min(this.maxShield, this.shield + dt * 7);
@@ -219,13 +259,15 @@ export class GameEngine {
     if (this.hazardTimer <= 0) { this.hazardTimer = this.sector >= 3 ? 6 : 11; this.addHazard(p.x + p.vx * 0.55, p.z + p.vz * 0.55); }
     this.supplyTimer -= dt;
     this.repairTimer -= dt;
-    if (this.repairTimer <= 0 && this.supplies.length < LIMITS.supplies) {
-      this.repairTimer = 20 + this.random() * 8; const a = this.random() * Math.PI * 2;
-      const supply: Supply = { x: p.x + Math.sin(a) * 6, z: p.z + Math.cos(a) * 6, type: 'repair', age: 0 }; clearTerrainPosition(supply, 1.2); this.supplies.push(supply);
+    if (this.repairTimer <= 0) {
+      this.repairTimer = SUPPLY_RULES.repair.interval + this.random() * SUPPLY_RULES.repair.variance; const a = this.random() * Math.PI * 2;
+      this.dropSupply('repair', p.x + Math.sin(a) * 6, p.z + Math.cos(a) * 6);
     }
+    this.ammoTimer -= dt;
+    if (this.ammoTimer <= 0) { this.ammoTimer = SUPPLY_RULES.ammo.interval + this.random() * SUPPLY_RULES.ammo.variance; const a = this.random() * Math.PI * 2; this.dropSupply('ammo', p.x + Math.sin(a) * 8, p.z + Math.cos(a) * 8); }
     if (this.supplyTimer <= 0 && this.supplies.length < LIMITS.supplies) {
-      this.supplyTimer = 22; const a = this.random() * Math.PI * 2;
-      const supply: Supply = { x: p.x + Math.sin(a) * 8, z: p.z + Math.cos(a) * 8, type: this.sector % 2 ? 'overdrive' : 'magnet', age: 0 }; clearTerrainPosition(supply, 1.2); this.supplies.push(supply);
+      this.supplyTimer = 40; const a = this.random() * Math.PI * 2;
+      this.dropSupply(this.sector % 2 ? 'overdrive' : 'magnet', p.x + Math.sin(a) * 8, p.z + Math.cos(a) * 8);
     }
     if (this.input.surge) this.activateSurge(); this.input.surge = false;
     if (useGame.getState().phase !== 'playing') return;
@@ -337,7 +379,32 @@ export class GameEngine {
       }
       this.arcs.push({ points, life: 0.24 }); audio.tone(1600, 0.14, 'sawtooth', 0.18, 100);
     }
+    if (this.input.rocket) this.fireRocket(); this.input.rocket = false;
     const byId = new Map(this.enemies.map(e => [e.id, e]));
+    for (const rocket of this.rockets) {
+      if (rocket.age >= 10) continue; rocket.age += dt;
+      const target = byId.get(rocket.target), speed = Math.min(26, Math.hypot(rocket.vx, rocket.vz) + dt * 18); let angle = Math.atan2(rocket.vx, rocket.vz);
+      if (target && target.hp > 0) { const desired = Math.atan2(target.x - rocket.x, target.z - rocket.z); if (Math.abs(angleDifference(desired, angle)) < Math.PI * 0.6) angle = turnTowards(angle, desired, dt * 3); else rocket.target = 0; }
+      rocket.vx = Math.sin(angle) * speed; rocket.vz = Math.cos(angle) * speed;
+      const previous = { x: rocket.x, z: rocket.z }; rocket.x += rocket.vx * dt; rocket.z += rocket.vz * dt; rocket.traveled += speed * dt;
+      const wall = terrainImpact(previous, rocket);
+      let contact = Infinity, directHit = 0; const dx = rocket.x - previous.x, dz = rocket.z - previous.z, segmentLength2 = dx * dx + dz * dz;
+      for (const enemy of this.enemies) {
+        if (enemy.hp <= 0) continue;
+        const ox = previous.x - enemy.x, oz = previous.z - enemy.z, c = ox * ox + oz * oz - (enemy.radius + 0.22) ** 2, dot = ox * dx + oz * dz, discriminant = dot * dot - segmentLength2 * c;
+        if (discriminant < 0) continue;
+        const t = c <= 0 ? 0 : (-dot - Math.sqrt(discriminant)) / (segmentLength2 || 1);
+        if (t >= 0 && t <= 1 && t < contact) { contact = t; directHit = enemy.id; }
+      }
+      const wallT = wall ? Math.hypot(wall.x - previous.x, wall.z - previous.z) / (Math.sqrt(segmentLength2) || 1) : Infinity;
+      if (wall && wallT <= contact) { rocket.x = wall.x; rocket.z = wall.z; this.explodeRocket(rocket); continue; }
+      if (friendlyInLine(previous, rocket, friendlies)) { rocket.age = 10; this.burst(rocket.x, rocket.z, '#8cdfff', 6); continue; }
+      if (directHit) { rocket.x = previous.x + dx * contact; rocket.z = previous.z + dz * contact; this.explodeRocket(rocket, directHit); continue; }
+      if (rocket.age >= 4 || rocket.traveled >= 32) { this.explodeRocket(rocket); continue; }
+      rocket.trail += dt; if (rocket.trail > 0.04) { rocket.trail = 0; this.burst(rocket.x, rocket.z, '#8e9492', 1); }
+    }
+    this.rockets = this.rockets.filter(r => r.age < 4);
+    if (useGame.getState().phase !== 'playing') return;
     for (const b of this.bolts) {
       b.age += dt;
       if (!b.enemy) {
@@ -375,7 +442,7 @@ export class GameEngine {
     }
     this.hazards = this.hazards.filter(h => h.age < h.delay + h.duration);
     for (const s of this.supplies) { s.age += dt; if (distance(s, p) < 1.1) this.collectSupply(s); }
-    this.supplies = this.supplies.filter(s => s.age < 45);
+    this.supplies = this.supplies.filter(s => s.age < supplyLifetime(s));
     for (const c of this.caches) { c.age += dt; if (distance(c, p) < 1.2) this.collectCache(c); }
     this.caches = this.caches.filter(c => c.age < 90);
     this.checkLevel();

@@ -36,6 +36,7 @@ The custom domain is `poly-vortex.oxog.dev`, configured in `public/CNAME` and Gi
 - **WASD / arrows:** Move with smooth inertia.
 - **Mouse:** Aim your ship and dash direction. Weapons target automatically.
 - **Space / right-click:** Phase shift. A brief invulnerable dash with a three-second base cooldown.
+- **E / rocket button:** Fire one Hellion rocket at a clear, aligned hostile. Six rounds per deployment; blue ammo crates refill up to three rounds and 20 EMP charge.
 - **Escape:** Pause or resume. Changing tabs or losing focus also pauses the game.
 - **1 / 2 / 3:** Pick a level-up module.
 - **Touch:** Use the on-screen movement joystick and dash button.
@@ -48,12 +49,19 @@ Collect cyan XP prisms. Choose randomized common, rare, or overclocked upgrades.
 - Regenerating Aegis shields; four seconds without taking a hit starts recovery.
 - **Q / on-screen Surge:** an EMP that damages and pushes back nearby enemies, clears nearby hostile projectiles, and grants brief invulnerability. Charge rebuilds from combat and time; its own kills cannot refill it.
 - Gold-marked elite variants carry rare salvage. Collect their crates for 20 extra run credits, a small repair, and a guaranteed rare-or-better module choice.
-- White first-aid cases with red crosses spawn nearby at 12 seconds, then every 20–28 seconds, as well as through combat drops. Collect for +28 integrity, +15 shields, and 8 seconds of fast repair (+4 integrity/second). Red plus signs on the radar and hovering beacons mark their location. Additional kits refresh the repair duration; integrity never exceeds its maximum.
-- Prism-magnet and temporary overdrive supply drops.
+- White first-aid cases with red crosses first spawn at 30 seconds, then at 55–75-second intervals. Only one can remain on the field, it expires after 35 seconds, and routine kills no longer drop medical kits. Collect for +28 integrity, +15 shields, and 8 seconds of fast repair (+4 integrity/second). Red plus signs on the radar and hovering beacons mark their location. Additional kits refresh the repair duration; integrity never exceeds its maximum.
+- Prism-magnet and temporary overdrive supply drops are also spaced out: timed drops every 40 seconds after the first at 24 seconds, combat drops no more than once per 25 seconds.
 - Critical-targeting, shield-capacity, and piercing-round upgrades; two card rerolls per deployment (**R**).
 - A three-phase Sentinel with radial, spiral, and targeted barrages plus telegraphed strikes.
 - Instanced shockwaves, shield impacts, floating damage numbers, critical indicators, tactical radar, sector transmissions, and overdrive status.
 - Persistent flight records and seven achievements. Legacy saves retain credits and upgrades; known victories and deployment counts unlock the corresponding records. Audio, quality, difficulty, and starting loadout preferences are also saved locally.
+
+## Limited ordnance
+
+- Hellion rockets are manually launched with **E** or the HUD button. The rack holds six rounds, has a 0.75-second firing cooldown, and never regenerates ammunition over time. Invalid targets, blocked firing lanes, and suspended gameplay spend no ammunition.
+- Rockets accelerate, steer towards the locked hostile, leave exhaust trails, and explode on contact with terrain or a hostile. A direct hit deals 130 base damage; nearby hostiles receive distance-based blast damage within 4.5 units. Cover and protected pilots remain part of the targeting rules.
+- Blue rocket-rack crates first appear at 18 seconds, then every 35–50 seconds. Up to two can remain on the map for 70 seconds. They refill up to three rockets and 20 EMP charge; a crate stays available if both resources are already full. Ammo markers appear in blue on the radar.
+- Red first-aid cases are scarce: first at 30 seconds, then every 55–75 seconds, at most one on the map. They expire after 35 seconds. Dense kill streaks cannot flood the map with medical or support drops.
 
 ## Deliberate targeting
 

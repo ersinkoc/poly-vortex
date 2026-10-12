@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { engine, LIMITS } from '@/game/engine';
 import { useGame } from '@/game/store';
+import { supplyLifetime } from '@/game/supplies';
 
 const pose = new THREE.Object3D();
 const box = (w: number, h: number, d: number, x = 0, y = 0, z = 0) => new THREE.BoxGeometry(w, h, d).translate(x, y, z);
@@ -26,7 +27,7 @@ export default function FirstAidSupplies() {
     if (!body.current || !crosses.current || !beacons.current) return;
     let count = 0;
     if (useGame.getState().phase !== 'menu') for (const supply of engine.supplies) {
-      if (supply.type !== 'repair' || supply.age >= 45) continue;
+      if (supply.type !== 'repair' || supply.age >= supplyLifetime(supply)) continue;
       const bob = Math.sin(clock.elapsedTime * 2.8 + count) * 0.08;
       pose.position.set(supply.x, 0.65 + bob, supply.z); pose.rotation.set(0, clock.elapsedTime * 0.35, 0); pose.scale.setScalar(1); pose.updateMatrix();
       body.current.setMatrixAt(count, pose.matrix); crosses.current.setMatrixAt(count, pose.matrix);
