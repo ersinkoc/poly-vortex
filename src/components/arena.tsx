@@ -10,12 +10,14 @@ import { engine, LIMITS } from '@/game/engine';
 import { useGame } from '@/game/store';
 import ShipFleet from './ships';
 import ShipLighting from './ship-lighting';
+import CombatEffects from './combat-effects';
+import { SECTORS } from '@/game/progression';
 
 const dummy = new THREE.Object3D();
 const color = new THREE.Color();
 const floorVertex = `varying vec3 vWorld; void main(){ vec4 world = modelMatrix * vec4(position,1.); vWorld = world.xyz; gl_Position = projectionMatrix * viewMatrix * world; }`;
 const floorFragment = `
-  varying vec3 vWorld; uniform float uTime; uniform vec3 uPulse; uniform vec2 uCenter;
+  varying vec3 vWorld; uniform float uTime; uniform vec3 uPulse; uniform vec2 uCenter; uniform vec3 uTint;
   void main(){
     vec2 p = vWorld.xz; vec2 a = abs(fract(p/2.-.5)-.5)/fwidth(p/2.);
     float line = 1.-min(min(a.x,a.y),1.);
@@ -23,18 +25,19 @@ const floorFragment = `
     float d = length(p-uCenter); float fade = exp(-d*.037);
     float elapsed = max(0.,uTime-uPulse.z);
     float wave = exp(-pow(length(p-uPulse.xy)-elapsed*12.,2.)*.7) * exp(-elapsed*1.4);
-    vec3 base = vec3(.009,.017,.018); vec3 grid = vec3(.11,.22,.18)*line*.38 + vec3(.16,.32,.22)*major*.24;
+    vec3 base = vec3(.009,.017,.018); vec3 grid = uTint*line*.1 + uTint*major*.075;
     gl_FragColor = vec4(base + grid*fade + vec3(.35,.85,.16)*wave*.25*line,1.);
   }`;
 
 function GridFloor() {
   const ref = useRef<THREE.ShaderMaterial>(null);
   const mesh = useRef<THREE.Mesh>(null);
-  const uniforms = useMemo(() => ({ uTime: { value: 0 }, uPulse: { value: new THREE.Vector3(0, 0, -100) }, uCenter: { value: new THREE.Vector2() } }), []);
+  const uniforms = useMemo(() => ({ uTime: { value: 0 }, uPulse: { value: new THREE.Vector3(0, 0, -100) }, uCenter: { value: new THREE.Vector2() }, uTint: { value: new THREE.Color(SECTORS[0].color) } }), []);
   useFrame(({ clock }) => {
     if (!ref.current) return; const playing = useGame.getState().phase !== 'menu';
     uniforms.uTime.value = playing ? engine.time : clock.elapsedTime;
     uniforms.uCenter.value.set(engine.player.x, engine.player.z);
+    uniforms.uTint.value.set(SECTORS[playing ? engine.sector : 0].color);
     if (mesh.current) { mesh.current.position.x = Math.floor(engine.player.x / 100) * 100; mesh.current.position.z = Math.floor(engine.player.z / 100) * 100; }
     if (playing) uniforms.uPulse.value.set(engine.pulse.x, engine.pulse.z, engine.pulse.time);
     else uniforms.uPulse.value.set(0, 0, Math.floor(clock.elapsedTime / 5) * 5);
@@ -145,7 +148,7 @@ function SceneController() {
   useEffect(() => { if (runId) engine.reset(); }, [runId]);
   useEffect(() => {
     if (phase === 'menu') { engine.player.x = 0; engine.player.z = 0; engine.preview(); engine.bolts = []; engine.gems = []; engine.particles = []; engine.vortices = []; engine.arcs = []; }
-    if (phase !== 'playing') { engine.input.keys.clear(); engine.input.dash = false; engine.input.moveX = 0; engine.input.moveZ = 0; accumulator.current = 0; }
+    if (phase !== 'playing') { engine.input.keys.clear(); engine.input.dash = false; engine.input.surge = false; engine.input.moveX = 0; engine.input.moveZ = 0; accumulator.current = 0; }
   }, [phase]);
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -155,6 +158,7 @@ function SceneController() {
       if (s.phase !== 'playing') return;
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code)) e.preventDefault();
       engine.input.keys.add(e.code); if (e.code === 'Space') engine.input.dash = true;
+      if (e.code === 'KeyQ' && !e.repeat) engine.input.surge = true;
     };
     const up = (e: KeyboardEvent) => engine.input.keys.delete(e.code);
     const blur = () => { engine.input.keys.clear(); if (useGame.getState().phase === 'playing') useGame.getState().setPhase('paused'); };
@@ -211,7 +215,7 @@ export default function Arena() {
     <fog attach="fog" args={['#080d0d', 36, 78]} />
     <ShipLighting />
     <SceneController /><GridFloor /><ProtocolRing /><ShipFleet />
-    <Projectiles /><Effects /><Stars radius={65} depth={35} count={600} factor={1.3} saturation={0} fade speed={0.1} />
+    <Projectiles /><Effects /><CombatEffects /><Stars radius={65} depth={35} count={600} factor={1.3} saturation={0} fade speed={0.1} />
     <PostFX />
   </Canvas>;
 }

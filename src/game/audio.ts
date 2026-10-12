@@ -25,6 +25,9 @@ class Synth {
   hit() { this.tone(160, 0.09, 'square', 0.12, 50); }
   explosion() { this.tone(90, 0.35, 'sawtooth', 0.45, 18); }
   dash() { this.tone(180, 0.2, 'sawtooth', 0.25, 1200); }
+  surge() { this.tone(1600, 0.5, 'sawtooth', 0.3, 40); this.tone(65, 0.8, 'sine', 0.6, 22); }
+  shield() { this.tone(700, 0.12, 'sine', 0.17, 180); }
+  salvage() { [330, 440, 660].forEach((f, i) => setTimeout(() => this.tone(f, 0.3, 'triangle', 0.2), i * 65)); }
   pickup() { this.tone(1200, 0.08, 'sine', 0.08, 1600); }
   level() { [440, 554, 659, 880].forEach((f, i) => setTimeout(() => this.tone(f, 0.25, 'triangle', 0.25), i * 80)); }
   startMusic() {

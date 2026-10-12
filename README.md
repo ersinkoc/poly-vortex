@@ -42,6 +42,18 @@ The custom domain is `poly-vortex.oxog.dev`, configured in `public/CNAME` and Gi
 
 Collect cyan XP prisms. Choose randomized common, rare, or overclocked upgrades. Mix pulse lasers, orbital glaives, cryo-singularities, and Tesla arcs. At three minutes the Vortex Sentinel arrives; destroy it to extract. Standard and Overdrive difficulties are available. Every run awards core credits, saved in browser local storage, for permanent armor, damage, and speed upgrades. There are no accounts or server dependencies.
 
+## Protocol expansion
+
+- Five escalating sectors with distinct grid colors and timed ion-strike warnings.
+- Regenerating Aegis shields; four seconds without taking a hit starts recovery.
+- **Q / on-screen Surge:** an EMP that damages and pushes back nearby enemies, clears nearby hostile projectiles, and grants brief invulnerability. Charge rebuilds from combat and time; its own kills cannot refill it.
+- Gold-marked elite variants carry rare salvage. Collect their crates for 20 extra run credits, a small repair, and a guaranteed rare-or-better module choice.
+- Repair, prism-magnet, and temporary overdrive supply drops.
+- Critical-targeting, shield-capacity, and piercing-round upgrades; two card rerolls per deployment (**R**).
+- A three-phase Sentinel with radial, spiral, and targeted barrages plus telegraphed strikes.
+- Instanced shockwaves, shield impacts, floating damage numbers, critical indicators, tactical radar, sector transmissions, and overdrive status.
+- Persistent flight records and seven achievements. Legacy saves retain credits and upgrades; known victories and deployment counts unlock the corresponding records. Audio, quality, difficulty, and starting loadout preferences are also saved locally.
+
 ## Architecture
 
 - `src/game/engine.ts`: Seedable, fixed-step simulation. Mutable game state runs outside React. Horde flocking uses local spatial bins; enemies, projectiles, debris, and XP have hard pool limits.

@@ -1,13 +1,16 @@
 import { create } from 'zustand';
 import { EMPTY_PROFILE, type Difficulty, type Phase, type Profile, type Upgrade, type WeaponId } from './types';
+import { ACHIEVEMENTS } from './progression';
 
 type GameStore = {
   phase: Phase; difficulty: Difficulty; loadout: WeaponId; sound: boolean; quality: 'high' | 'performance';
   time: number; hp: number; maxHp: number; xp: number; nextXp: number; level: number;
   kills: number; score: number; combo: number; dash: number; enemies: number; fps: number;
   weapons: Record<WeaponId, number>; choices: Upgrade[]; profile: Profile; earned: number; runId: number;
+  shield: number; maxShield: number; surge: number; sector: number; bossPhase: number; peakCombo: number; elites: number; caches: number;
+  overdrive: number; salvage: number; rerolls: number; upgradeSource: 'level' | 'salvage'; announcement: string; announcementDetail: string; announcementTime: number;
   setPhase: (phase: Phase) => void; start: () => void; hydrate: () => void;
-  saveRun: (score: number, kills: number, won: boolean) => void;
+  saveRun: (score: number, kills: number, won: boolean, bonus?: number) => void;
   purchase: (id: keyof Profile['upgrades']) => void;
 };
 const save = (profile: Profile) => { try { localStorage.setItem('poly-vortex-profile-v1', JSON.stringify(profile)); } catch { /* Storage can be unavailable in private browsing. */ } };
@@ -15,20 +18,39 @@ export const useGame = create<GameStore>((set, get) => ({
   phase: 'menu', difficulty: 'standard', loadout: 'pulse', sound: true, quality: 'high',
   time: 0, hp: 100, maxHp: 100, xp: 0, nextXp: 12, level: 1, kills: 0, score: 0, combo: 1, dash: 0,
   enemies: 0, fps: 60, weapons: { pulse: 1, glaive: 0, cryo: 0, tesla: 0 }, choices: [], profile: EMPTY_PROFILE, earned: 0, runId: 0,
-  setPhase: phase => set({ phase }),
+  shield: 40, maxShield: 40, surge: 100, sector: 0, bossPhase: 0, peakCombo: 1, elites: 0, caches: 0, overdrive: 0, salvage: 0, rerolls: 2,
+  upgradeSource: 'level', announcement: '', announcementDetail: '', announcementTime: 0,
+  setPhase: phase => {
+    const current = get().phase;
+    if (phase === 'paused' && current !== 'playing' || phase === 'playing' && current !== 'paused') return;
+    set({ phase });
+  },
   start: () => set(s => ({ phase: 'playing', runId: s.runId + 1, time: 0, earned: 0, choices: [], hp: 100 + s.profile.upgrades.armor * 15, maxHp: 100 + s.profile.upgrades.armor * 15 })),
   hydrate: () => {
+    try {
+      const settings = JSON.parse(localStorage.getItem('poly-vortex-settings-v1') || 'null');
+      if (settings && typeof settings === 'object') set({
+        sound: typeof settings.sound === 'boolean' ? settings.sound : true,
+        quality: settings.quality === 'performance' ? 'performance' : 'high',
+        difficulty: settings.difficulty === 'overdrive' ? 'overdrive' : 'standard',
+        loadout: ['pulse', 'glaive', 'cryo', 'tesla'].includes(settings.loadout) ? settings.loadout : 'pulse',
+      });
+    } catch { /* Corrupt preferences do not affect the flight record. */ }
     try {
       const raw = JSON.parse(localStorage.getItem('poly-vortex-profile-v1') || 'null');
       if (!raw || typeof raw !== 'object') return;
       const n = (v: unknown, max = 1e9) => typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(max, Math.floor(v))) : 0;
-      set({ profile: { credits: n(raw.credits), best: n(raw.best), runs: n(raw.runs), wins: n(raw.wins), upgrades: { armor: n(raw.upgrades?.armor, 5), reactor: n(raw.upgrades?.reactor, 5), thrusters: n(raw.upgrades?.thrusters, 5) } } });
+      const recorded = Array.isArray(raw.achievements) ? raw.achievements.filter((id: unknown) => ACHIEVEMENTS.some(a => a.id === id)) as string[] : [];
+      const achievements = [...new Set([...recorded, ...(n(raw.runs) > 0 ? ['first-run'] : []), ...(n(raw.runs) >= 10 ? ['veteran'] : []), ...(n(raw.wins) > 0 ? ['breaker'] : []), ...(n(raw.wins) >= 3 ? ['ace'] : []), ...(n(raw.totalKills) >= 250 ? ['hunter'] : [])])];
+      set({ profile: { credits: n(raw.credits), best: n(raw.best), runs: n(raw.runs), wins: n(raw.wins), totalKills: n(raw.totalKills), achievements, upgrades: { armor: n(raw.upgrades?.armor, 5), reactor: n(raw.upgrades?.reactor, 5), thrusters: n(raw.upgrades?.thrusters, 5) } } });
     } catch { /* A corrupt save starts a fresh profile. */ }
   },
-  saveRun: (score, kills, won) => {
+  saveRun: (score, kills, won, bonus = 0) => {
     const s = get(); if (s.phase === 'dead' || s.phase === 'won') return;
-    const earned = Math.floor(kills / 3) + (won ? 100 : 10);
-    const profile = { ...s.profile, credits: s.profile.credits + earned, best: Math.max(s.profile.best, score), runs: s.profile.runs + 1, wins: s.profile.wins + Number(won) };
+    const earned = Math.floor(kills / 3) + (won ? 100 : 10) + Math.max(0, Math.floor(bonus));
+    const totalKills = s.profile.totalKills + kills, runs = s.profile.runs + 1, wins = s.profile.wins + Number(won);
+    const unlocked = ['first-run', ...(totalKills >= 250 ? ['hunter'] : []), ...(won ? ['breaker'] : []), ...(s.peakCombo >= 5 ? ['chain'] : []), ...(s.level >= 10 ? ['evolution'] : []), ...(runs >= 10 ? ['veteran'] : []), ...(wins >= 3 ? ['ace'] : [])];
+    const profile = { ...s.profile, credits: s.profile.credits + earned, best: Math.max(s.profile.best, score), runs, wins, totalKills, achievements: [...new Set([...s.profile.achievements, ...unlocked])] };
     save(profile); set({ profile, earned, phase: won ? 'won' : 'dead' });
   },
   purchase: id => {
@@ -38,3 +60,8 @@ export const useGame = create<GameStore>((set, get) => ({
     save(profile); set({ profile });
   },
 }));
+
+useGame.subscribe((s, previous) => {
+  if (s.sound === previous.sound && s.quality === previous.quality && s.difficulty === previous.difficulty && s.loadout === previous.loadout) return;
+  try { localStorage.setItem('poly-vortex-settings-v1', JSON.stringify({ sound: s.sound, quality: s.quality, difficulty: s.difficulty, loadout: s.loadout })); } catch { /* Preferences are optional when storage is unavailable. */ }
+});
