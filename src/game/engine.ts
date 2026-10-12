@@ -6,6 +6,7 @@ import { clearTerrainPosition, terrainImpact } from './terrain';
 import { angleDifference, friendlyInLine, PULSE_RANGE, selectTarget, turnTowards } from './targeting';
 import { ROCKET_CAPACITY, SUPPLY_RULES, supplyLifetime } from './supplies';
 import { EncounterDirector } from './director';
+import { inspectLauncher, LAUNCHER_COPY, ROCKET_RULES } from './launcher';
 import type { Arc, Bolt, Cache, DamageText, Entity, Gem, Hazard, Input, Particle, Rocket, Shockwave, Supply, Upgrade, UpgradeId, Vortex, WeaponId } from './types';
 
 export const LIMITS = { enemies: 280, bolts: 500, rockets: 16, particles: 1000, gems: 400, shockwaves: 40, damageTexts: 40, hazards: 12, supplies: 10, caches: 8 };
@@ -32,6 +33,8 @@ export class GameEngine {
   missions = new MissionDirector();
   targetId = 0;
   rockets: Rocket[] = []; rocketAmmo = ROCKET_CAPACITY; rocketCooldown = 0;
+  rocketPending = 0; private pendingRocketTarget = 0;
+  rocketNotice = ''; rocketNoticeKind: 'success' | 'warning' = 'success'; rocketNoticeTime = 0;
   player = { x: 0, z: 0, vx: 0, vz: 0, angle: 0, hp: 100, maxHp: 100, invulnerable: 0, dashTime: 0, dashCooldown: 0 };
   input: Input = { keys: new Set(), aimX: 0, aimZ: -8, aiming: false, dash: false, surge: false, rocket: false, moveX: 0, moveZ: 0 };
   enemies: Entity[] = []; bolts: Bolt[] = []; particles: Particle[] = []; gems: Gem[] = []; arcs: Arc[] = []; vortices: Vortex[] = [];
@@ -55,6 +58,7 @@ export class GameEngine {
     this.missions.reset();
     this.targetId = 0;
     this.rockets = []; this.rocketAmmo = ROCKET_CAPACITY; this.rocketCooldown = 0; this.ammoTimer = SUPPLY_RULES.ammo.first;
+    this.rocketPending = 0; this.pendingRocketTarget = 0; this.rocketNotice = ''; this.rocketNoticeTime = 0; this.rocketNoticeKind = 'success';
     this.lastCombatSupply = -25;
     const s = useGame.getState();
     this.player = { x: 0, z: 0, vx: 0, vz: 0, angle: 0, hp: s.maxHp, maxHp: s.maxHp, invulnerable: 1.5, dashTime: 0, dashCooldown: 0 };
@@ -120,25 +124,41 @@ export class GameEngine {
     if (this.supplies.length >= LIMITS.supplies || this.supplies.filter(s => s.type === type && s.age < supplyLifetime(s)).length >= cap) return false;
     const supply: Supply = { x, z, type, age: 0 }; clearTerrainPosition(supply, 1.2); this.supplies.push(supply); return true;
   }
-  fireRocket() {
-    if (useGame.getState().phase !== 'playing' || this.rocketAmmo <= 0 || this.rocketCooldown > 0 || this.rockets.length >= LIMITS.rockets) return false;
+  launcherLock() {
     const allies = this.missions.mission?.kind === 'rescue' && this.missions.mission.status === 'active' ? this.missions.mission.targets.filter(t => !t.done) : [];
-    const target = selectTarget(this.enemies, this.player, this.input, this.targetId, allies, PULSE_RANGE, useGame.getState().aimMode); if (!target) return false;
-    const p = this.player, angle = Math.atan2(target.x - p.x, target.z - p.z);
-    if (Math.abs(angleDifference(angle, p.angle)) > 0.5) return false;
-    const lead = Math.min(0.9, Math.max(0.1, distance(target, p) - target.radius - 0.2));
-    const start = { x: p.x + Math.sin(angle) * lead, z: p.z + Math.cos(angle) * lead }; if (terrainImpact(p, start)) return false;
-    this.rocketAmmo--; this.rocketCooldown = 0.75; this.targetId = target.id;
-    this.rockets.push({ ...start, vx: Math.sin(angle) * 14, vz: Math.cos(angle) * 14, age: 0, target: target.id, traveled: 0, trail: 0 });
+    const s = useGame.getState();
+    return inspectLauncher({ phase: s.phase, ammo: this.rocketAmmo, cooldown: this.rocketCooldown, active: this.rockets.length, limit: LIMITS.rockets, player: this.player, input: this.input, mode: s.aimMode, lockedId: this.targetId, enemies: this.enemies, allies });
+  }
+  rocketFeedback(message: string, kind: 'success' | 'warning' = 'warning') { this.rocketNotice = message; this.rocketNoticeKind = kind; this.rocketNoticeTime = 2.5; }
+  cancelRocket(reason?: string) { if (this.rocketPending > 0 && reason) this.rocketFeedback(reason); this.rocketPending = 0; this.pendingRocketTarget = 0; }
+  requestRocket() {
+    const lock = this.launcherLock();
+    if (lock.status === 'paused') { this.cancelRocket(); return false; }
+    if (this.rocketPending > 0) return false;
+    if (lock.status === 'ready') return this.fireRocket();
+    if (lock.status === 'aligning' && lock.target) {
+      this.rocketPending = ROCKET_RULES.intentWindow; this.pendingRocketTarget = lock.target.id;
+      this.rocketFeedback('SHOT QUEUED · hold the same hostile while the ship turns.', 'success'); this.publish(); return true;
+    }
+    this.rocketFeedback(`${LAUNCHER_COPY[lock.status].title} · ${LAUNCHER_COPY[lock.status].hint}`); this.publish(); return false;
+  }
+  fireRocket() {
+    const lock = this.launcherLock();
+    if (lock.status !== 'ready' || !lock.target || !lock.start) return false;
+    const { target, angle, start } = lock;
+    this.cancelRocket(); this.rocketAmmo--; this.rocketCooldown = ROCKET_RULES.cooldown; this.targetId = target.id;
+    this.rockets.push({ ...start, vx: Math.sin(angle) * 14, vz: Math.cos(angle) * 14, age: 0, target: target.id, traveled: 0, trail: 0, aimX: target.x, aimZ: target.z });
+    this.burst(start.x, start.z, '#ffc17a', 6); this.wave(start.x, start.z, 1.5, '#ffbb73', 0.25);
+    this.rocketFeedback(`ROCKET AWAY · ${this.rocketAmmo}/${ROCKET_CAPACITY} rounds remaining.`, 'success');
     audio.rocket(); this.publish(); return true;
   }
   explodeRocket(rocket: Rocket, directHit = 0) {
     if (rocket.age >= 10) return; rocket.age = 10;
-    this.wave(rocket.x, rocket.z, 4.5, '#ffb876', 0.85); this.wave(rocket.x, rocket.z, 1.7, '#fff1c4', 0.4); this.burst(rocket.x, rocket.z, '#ff9b57', 48);
+    this.wave(rocket.x, rocket.z, ROCKET_RULES.blastRadius, '#ffb876', 0.85); this.wave(rocket.x, rocket.z, 1.7, '#fff1c4', 0.4); this.burst(rocket.x, rocket.z, '#ff9b57', 48);
     this.trauma = Math.min(1, this.trauma + 0.55); this.hitStop = 0.05; audio.explosion();
     for (const enemy of [...this.enemies]) {
       const d = distance(enemy, rocket);
-      if (enemy.hp > 0 && d < 4.5 && (enemy.id === directHit || !terrainImpact(rocket, enemy, -0.15))) this.hitEnemy(enemy, 130 * this.damage * (enemy.id === directHit ? 1 : 1 - d / 4.5 * 0.7));
+      if (enemy.hp > 0 && d < ROCKET_RULES.blastRadius && (enemy.id === directHit || !terrainImpact(rocket, enemy, -0.15))) this.hitEnemy(enemy, ROCKET_RULES.damage * this.damage * (enemy.id === directHit ? 1 : 1 - d / ROCKET_RULES.blastRadius * 0.7));
       if (useGame.getState().phase !== 'playing') break;
     }
   }
@@ -148,6 +168,7 @@ export class GameEngine {
       const rounds = Math.min(3, ROCKET_CAPACITY - this.rocketAmmo), charge = Math.min(20, 100 - this.surge);
       if (!rounds && !charge) return;
       this.rocketAmmo += rounds; this.surge += charge; this.announce('ORDNANCE RECHARGED', `+${rounds} rockets · +${Math.round(charge)} EMP charge.`);
+      this.rocketFeedback(rounds ? `AMMO RELOADED · +${rounds} rocket${rounds === 1 ? '' : 's'} · rack ${this.rocketAmmo}/${ROCKET_CAPACITY} · +${Math.round(charge)} EMP.` : `EMP RECHARGED · +${Math.round(charge)} charge · rack ${this.rocketAmmo}/${ROCKET_CAPACITY}.`, 'success'); this.publish();
     }
     if (supply.type === 'repair') {
       this.player.hp = Math.min(this.player.maxHp, this.player.hp + 28); this.shield = Math.min(this.maxShield, this.shield + 15); this.repairTime = 8;
@@ -240,9 +261,12 @@ export class GameEngine {
   }
   publish() {
     const target = this.enemies.find(e => e.id === this.targetId && e.hp > 0);
+    const lock = this.launcherLock();
     useGame.setState({
+      launcherStatus: lock.status, rocketPending: this.rocketPending, rocketLock: lock.target ? { kind: lock.target.kind, distance: distance(lock.target, this.player), alignment: lock.alignment } : null,
+      rocketNotice: this.rocketNotice, rocketNoticeKind: this.rocketNoticeKind, rocketNoticeTime: this.rocketNoticeTime,
       encounter: this.director.phase, encounterRemaining: this.director.remaining, encounterRound: this.director.round, combatPressure: this.director.stress,
-      rocketAmmo: this.rocketAmmo, rocketCapacity: ROCKET_CAPACITY, rocketCooldown: this.rocketCooldown, rocketReady: !!target && Math.abs(angleDifference(Math.atan2(target.x - this.player.x, target.z - this.player.z), this.player.angle)) <= 0.5,
+      rocketAmmo: this.rocketAmmo, rocketCapacity: ROCKET_CAPACITY, rocketCooldown: this.rocketCooldown, rocketReady: lock.status === 'ready',
       targeting: this.input.aiming ? 'aim' : 'auto', target: target ? { id: target.id, kind: target.kind, distance: distance(target, this.player), hp: target.hp, maxHp: target.maxHp } : null,
       time: this.time, hp: this.player.hp, maxHp: this.player.maxHp, xp: this.xp, nextXp: this.nextXp, level: this.level, score: this.score, kills: this.kills, combo: this.combo, dash: this.player.dashCooldown, enemies: this.enemies.length, weapons: { ...this.weapons },
       shield: this.shield, maxShield: this.maxShield, surge: this.surge, sector: this.sector, bossPhase: this.bossPhase, peakCombo: this.peakCombo, elites: this.eliteKills, caches: this.caches.length, salvage: this.salvage, rerolls: this.rerolls, overdrive: this.overdriveTime, repair: this.repairTime, announcement: this.announcement, announcementDetail: this.announcementDetail, announcementTime: this.announcementTime,
@@ -250,13 +274,14 @@ export class GameEngine {
     });
   }
   tick(dt: number) {
-    if (useGame.getState().phase !== 'playing') return;
+    if (useGame.getState().phase !== 'playing') { this.cancelRocket('SHOT CANCELLED · gameplay suspended. No ammunition spent.'); return; }
     if (this.hitStop > 0) { this.hitStop -= dt; return; }
     this.time += dt; const p = this.player;
     const nearby = this.enemies.reduce((count, e) => count + (e.hp > 0 && distance(e, p) < 7 ? e.kind >= 2 ? 3 : 1 : 0), 0);
     const pressure = Math.min(1, nearby / 18 * 0.6 + (1 - p.hp / p.maxHp) * 0.4 + (1 - this.shield / this.maxShield) * 0.2);
     this.director.tick(dt, pressure, this.time >= RUN_DURATION);
     this.rocketCooldown = Math.max(0, this.rocketCooldown - dt);
+    this.rocketNoticeTime = Math.max(0, this.rocketNoticeTime - dt);
     p.hp = Math.min(p.maxHp, p.hp + Math.min(dt, this.repairTime) * 4); this.repairTime = Math.max(0, this.repairTime - dt);
     this.announcementTime = Math.max(0, this.announcementTime - dt); this.overdriveTime = Math.max(0, this.overdriveTime - dt);
     this.shieldDelay -= dt; if (this.shieldDelay <= 0) this.shield = Math.min(this.maxShield, this.shield + dt * 7);
@@ -362,6 +387,14 @@ export class GameEngine {
     const primary = selectTarget(this.enemies, p, this.input, this.targetId, friendlies, PULSE_RANGE, useGame.getState().aimMode); this.targetId = primary?.id ?? 0;
     if (primary && !this.input.aiming) p.angle = turnTowards(p.angle, Math.atan2(primary.x - p.x, primary.z - p.z), dt * 6);
     const facingTarget = primary && Math.abs(angleDifference(Math.atan2(primary.x - p.x, primary.z - p.z), p.angle)) < (this.input.aiming ? 0.5 : 0.25);
+    if (this.input.rocket) this.requestRocket(); this.input.rocket = false;
+    if (this.rocketPending > 0) {
+      const lock = this.launcherLock(); this.rocketPending = Math.max(0, this.rocketPending - dt);
+      if (!lock.target || lock.target.id !== this.pendingRocketTarget || !['ready', 'aligning'].includes(lock.status)) {
+        this.cancelRocket(); this.rocketFeedback('SHOT CANCELLED · lock lost. No ammunition spent.'); this.publish();
+      } else if (lock.status === 'ready') this.fireRocket();
+      else if (this.rocketPending <= 0) { this.cancelRocket(); this.rocketFeedback('ALIGNMENT TIMED OUT · aim steadily and press E again.'); this.publish(); }
+    }
     this.shotTimer -= dt;
     if (primary && facingTarget && this.shotTimer <= 0) {
       this.shotTimer = Math.max(0.1, 0.46 - this.weapons.pulse * 0.045) * this.haste * (this.overdriveTime > 0 ? 0.55 : 1); audio.shot();
@@ -387,12 +420,12 @@ export class GameEngine {
       }
       this.arcs.push({ points, life: 0.24 }); audio.tone(1600, 0.14, 'sawtooth', 0.18, 100);
     }
-    if (this.input.rocket) this.fireRocket(); this.input.rocket = false;
     const byId = new Map(this.enemies.map(e => [e.id, e]));
     for (const rocket of this.rockets) {
       if (rocket.age >= 10) continue; rocket.age += dt;
       const target = byId.get(rocket.target), speed = Math.min(26, Math.hypot(rocket.vx, rocket.vz) + dt * 18); let angle = Math.atan2(rocket.vx, rocket.vz);
-      if (target && target.hp > 0) { const desired = Math.atan2(target.x - rocket.x, target.z - rocket.z); if (Math.abs(angleDifference(desired, angle)) < Math.PI * 0.6) angle = turnTowards(angle, desired, dt * 3); else rocket.target = 0; }
+      if (target && target.hp > 0) { rocket.aimX = target.x; rocket.aimZ = target.z; }
+      if (rocket.target && rocket.aimX !== undefined && rocket.aimZ !== undefined) { const desired = Math.atan2(rocket.aimX - rocket.x, rocket.aimZ - rocket.z); if (Math.abs(angleDifference(desired, angle)) < Math.PI * 0.6) angle = turnTowards(angle, desired, dt * 3); else rocket.target = 0; }
       rocket.vx = Math.sin(angle) * speed; rocket.vz = Math.cos(angle) * speed;
       const previous = { x: rocket.x, z: rocket.z }; rocket.x += rocket.vx * dt; rocket.z += rocket.vz * dt; rocket.traveled += speed * dt;
       const wall = terrainImpact(previous, rocket);
@@ -404,10 +437,15 @@ export class GameEngine {
         const t = c <= 0 ? 0 : (-dot - Math.sqrt(discriminant)) / (segmentLength2 || 1);
         if (t >= 0 && t <= 1 && t < contact) { contact = t; directHit = enemy.id; }
       }
+      let airburst = false;
+      if (rocket.target && (!target || target.hp <= 0) && rocket.aimX !== undefined && rocket.aimZ !== undefined) {
+        const ox = previous.x - rocket.aimX, oz = previous.z - rocket.aimZ, c = ox * ox + oz * oz - 0.7 ** 2, dot = ox * dx + oz * dz, discriminant = dot * dot - segmentLength2 * c;
+        if (discriminant >= 0) { const t = c <= 0 ? 0 : (-dot - Math.sqrt(discriminant)) / (segmentLength2 || 1); if (t >= 0 && t <= 1 && t < contact) { contact = t; directHit = 0; airburst = true; } }
+      }
       const wallT = wall ? Math.hypot(wall.x - previous.x, wall.z - previous.z) / (Math.sqrt(segmentLength2) || 1) : Infinity;
       if (wall && wallT <= contact) { rocket.x = wall.x; rocket.z = wall.z; this.explodeRocket(rocket); continue; }
       if (friendlyInLine(previous, rocket, friendlies)) { rocket.age = 10; this.burst(rocket.x, rocket.z, '#8cdfff', 6); continue; }
-      if (directHit) { rocket.x = previous.x + dx * contact; rocket.z = previous.z + dz * contact; this.explodeRocket(rocket, directHit); continue; }
+      if (directHit || airburst) { rocket.x = previous.x + dx * contact; rocket.z = previous.z + dz * contact; this.explodeRocket(rocket, directHit); continue; }
       if (rocket.age >= 4 || rocket.traveled >= 32) { this.explodeRocket(rocket); continue; }
       rocket.trail += dt; if (rocket.trail > 0.04) { rocket.trail = 0; this.burst(rocket.x, rocket.z, '#8e9492', 1); }
     }

@@ -10,12 +10,13 @@ import { useGame } from '@/game/store';
 import { ACHIEVEMENTS } from '@/game/progression';
 import { previewUpgrade } from '@/game/upgrade-preview';
 import TacticalHUD from './tactical-hud';
+import RocketGuide from './rocket-guide';
 import { WEAPONS, type Profile, type Upgrade, type WeaponId } from '@/game/types';
 
 const Arena = dynamic(() => import('./arena'), { ssr: false, loading: () => <div className="arena-loading"><Hexagon size={32} /><span>INITIALIZING THE VORTEX</span><i /></div> });
-type Panel = 'protocol' | 'controls' | 'armory' | 'settings' | 'core' | 'records' | null;
+type Panel = 'protocol' | 'controls' | 'armory' | 'settings' | 'core' | 'records' | 'ordnance' | null;
 const weaponIcons = { pulse: Crosshair, glaive: Disc3, cryo: Snowflake, tesla: Zap };
-const panelTitles = { protocol: 'The protocol', controls: 'Know your controls', armory: 'Choose your arsenal', settings: 'System settings', core: 'Core modifications', records: 'Flight record' };
+const panelTitles = { protocol: 'The protocol', controls: 'Know your controls', armory: 'Choose your arsenal', settings: 'System settings', core: 'Core modifications', records: 'Flight record', ordnance: 'Rocket flight manual' };
 const number = (n: number) => Math.floor(n).toLocaleString('en-US');
 const time = (n: number) => `${Math.floor(n / 60).toString().padStart(2, '0')}:${Math.floor(n % 60).toString().padStart(2, '0')}`;
 
@@ -49,7 +50,7 @@ function Menu({ open, start }: { open: (panel: Panel) => void; start: () => void
     </header>
     <main className="menu-main">
       <div className="hero-copy">
-        <motion.div className="eyebrow" initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}><span className="tiny-cross">+</span> A GEOMETRIC ROGUELITE <span className="version">V.07</span></motion.div>
+        <motion.div className="eyebrow" initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}><span className="tiny-cross">+</span> A GEOMETRIC ROGUELITE <span className="version">V.08</span></motion.div>
         <motion.h1 initial={{ y: 18, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.18, duration: 0.6 }}>SHAPE<br />THE <span className="title-star">✳</span><br /><span>CHAOS.</span></motion.h1>
         <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.28 }}>
           <p className="hero-description">One core. Infinite chaos.<br />Outlast the swarm. Evolve your arsenal.<br /><span>Break the protocol.</span></p>
@@ -71,13 +72,14 @@ function Menu({ open, start }: { open: (panel: Panel) => void; start: () => void
       </div>
       <div className="deployment-bar"><span><CircleDot size={14} /> READY FOR DEPLOYMENT</span><button onClick={() => open('settings')}>MODE <strong>{difficulty === 'standard' ? 'STANDARD' : 'OVERDRIVE'}</strong><ChevronRight size={13} /></button><button onClick={() => open('armory')}>LOADOUT <strong>{WEAPONS[loadout].name.toUpperCase()}</strong><ChevronRight size={13} /></button><button onClick={() => open('core')}>CORE CREDITS <strong>{number(profile.credits)}</strong><ArrowUpRight size={13} /></button></div>
     </main>
-    <footer className="footer"><span>DESIGNED TO BE OUTNUMBERED.</span><span className="footer-center"><i /> ALL SYSTEMS PROCEDURAL</span><button onClick={() => open('records')}>PERSONAL BEST <strong>{number(profile.best).padStart(6, '0')}</strong><Trophy size={13} /></button><span className="build-number">BUILD 007 / 2026</span></footer>
+    <footer className="footer"><span>DESIGNED TO BE OUTNUMBERED.</span><span className="footer-center"><i /> ALL SYSTEMS PROCEDURAL</span><button onClick={() => open('records')}>PERSONAL BEST <strong>{number(profile.best).padStart(6, '0')}</strong><Trophy size={13} /></button><span className="build-number">BUILD 008 / 2026</span></footer>
   </motion.div>;
 }
 
 function PanelContent({ panel }: { panel: Exclude<Panel, null> }) {
   const aimMode = useGame(s => s.aimMode), reducedEffects = useGame(s => s.reducedEffects);
   const profile = useGame(s => s.profile), sound = useGame(s => s.sound), quality = useGame(s => s.quality), difficulty = useGame(s => s.difficulty), loadout = useGame(s => s.loadout);
+  if (panel === 'ordnance') return <RocketGuide />;
   if (panel === 'records') return <>
     <p className="panel-intro">Every deployment leaves a signal. Your flight record is saved with your core.</p>
     <div className="profile-stats flight-stats"><div><span>LIFETIME HOSTILES</span><strong>{number(profile.totalKills)}</strong></div><div><span>DEPLOYMENTS</span><strong>{profile.runs}</strong></div><div><span>EXTRACTIONS</span><strong>{profile.wins}</strong></div></div>
@@ -147,7 +149,7 @@ function Modal({ panel, close }: { panel: Exclude<Panel, null>; close: () => voi
   return <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={close}><motion.div ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="panel-title" className="panel" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }} onClick={e => e.stopPropagation()}><div className="panel-header"><div><span className="micro">POLY-VORTEX / SYSTEM INTERFACE</span><h2 id="panel-title">{panelTitles[panel]}</h2></div><button className="icon-button" aria-label="Close dialog" onClick={close}><X size={20} /></button></div><PanelContent panel={panel} /></motion.div></motion.div>;
 }
 
-function HUD() {
+function HUD({ open }: { open: (panel: Panel) => void }) {
   const s = useGame();
   const [notice, setNotice] = useState(true);
   useEffect(() => { setNotice(true); const t = setTimeout(() => setNotice(false), 6500); return () => clearTimeout(t); }, [s.runId]);
@@ -160,7 +162,7 @@ function HUD() {
     {s.combo >= 2 && <div className="combo"><strong>×{Math.floor(s.combo)}</strong><span>CHAIN MULTIPLIER</span></div>}
     <div className="hud-bottom"><div className="weapon-slots">{(Object.keys(WEAPONS) as WeaponId[]).map(id => { const Icon = weaponIcons[id], lv = s.weapons[id]; return <div key={id} className={`weapon-slot ${lv ? 'equipped' : ''}`} style={{ '--weapon-color': WEAPONS[id].color } as React.CSSProperties} title={`${WEAPONS[id].name} · ${lv ? `Level ${lv}` : 'Not equipped'}`}><Icon size={23} /><span>{lv ? `LV ${lv}` : '—'}</span></div>; })}<div className={`dash-slot ${s.dash <= 0 ? 'ready' : ''}`}><Wind size={22} /><div><span>PHASE SHIFT</span><strong>{s.dash <= 0 ? 'READY' : `${s.dash.toFixed(1)}s`}</strong></div><kbd>SPACE</kbd></div></div><div className="hud-performance"><span><i /> SECTOR_{String(s.sector + 1).padStart(2, '0')}</span><small>{s.enemies} HOSTILES <span>/</span> {s.fps} FPS</small></div></div>
     <div className="xp-container"><span>LV. {s.level}</span><div className="xp-bar"><i style={{ width: `${Math.min(100, s.xp / s.nextXp * 100)}%` }} /></div><small>{Math.floor(s.xp)} / {s.nextXp} XP</small></div>
-    <TacticalHUD /><TouchControls />
+    <TacticalHUD onOrdnanceHelp={() => { if (useGame.getState().phase === 'playing') useGame.getState().setPhase('paused'); open('ordnance'); }} /><TouchControls />
   </div>;
 }
 
@@ -209,7 +211,7 @@ export default function GameShell() {
   const start = () => { setPanel(null); void audio.unlock().catch(() => { useGame.setState({ sound: false }); }); useGame.getState().start(); };
   return <MotionConfig reducedMotion={reducedEffects ? 'always' : 'user'}><div className={`app-shell ${phase === 'menu' ? 'is-menu' : 'is-game'} ${reducedEffects ? 'reduced-effects' : ''}`}>
     <div className="arena-canvas"><ArenaBoundary><Arena /></ArenaBoundary></div>
-    <AnimatePresence mode="wait">{phase === 'menu' ? <Menu key="menu" open={setPanel} start={start} /> : <motion.div key="game" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="game-interface"><HUD /><AnimatePresence>{phase === 'upgrade' && <UpgradeOverlay key="upgrade" />}{phase === 'paused' && <PauseOverlay key="pause" open={setPanel} />}{(phase === 'dead' || phase === 'won') && <ResultOverlay key="result" start={start} open={setPanel} />}</AnimatePresence></motion.div>}</AnimatePresence>
+    <AnimatePresence mode="wait">{phase === 'menu' ? <Menu key="menu" open={setPanel} start={start} /> : <motion.div key="game" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="game-interface"><HUD open={setPanel} /><AnimatePresence>{phase === 'upgrade' && <UpgradeOverlay key="upgrade" />}{phase === 'paused' && <PauseOverlay key="pause" open={setPanel} />}{(phase === 'dead' || phase === 'won') && <ResultOverlay key="result" start={start} open={setPanel} />}</AnimatePresence></motion.div>}</AnimatePresence>
     <AnimatePresence>{panel && <Modal key={panel} panel={panel} close={closePanel.current} />}</AnimatePresence>
   </div></MotionConfig>;
 }

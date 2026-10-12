@@ -123,7 +123,7 @@ function SceneController() {
   useEffect(() => { if (runId) { engine.reset(); pointerInside.current = false; } }, [runId]);
   useEffect(() => {
     if (phase === 'menu') { engine.player.x = 0; engine.player.z = 0; engine.preview(); engine.bolts = []; engine.gems = []; engine.particles = []; engine.vortices = []; engine.arcs = []; }
-    if (phase !== 'playing') { engine.input.keys.clear(); engine.input.dash = false; engine.input.surge = false; engine.input.rocket = false; engine.input.moveX = 0; engine.input.moveZ = 0; accumulator.current = 0; }
+    if (phase !== 'playing') { engine.cancelRocket('SHOT CANCELLED · gameplay suspended. No ammunition spent.'); engine.publish(); engine.input.keys.clear(); engine.input.dash = false; engine.input.surge = false; engine.input.rocket = false; engine.input.moveX = 0; engine.input.moveZ = 0; accumulator.current = 0; }
   }, [phase]);
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -146,7 +146,7 @@ function SceneController() {
       pointerInside.current = true;
       raycaster.setFromCamera(pointer, camera); if (raycaster.ray.intersectPlane(plane, aim)) { engine.input.aimX = aim.x; engine.input.aimZ = aim.z; engine.input.aiming = true; }
     };
-    const leave = () => { pointerInside.current = false; engine.input.aiming = false; };
+    const leave = (e: PointerEvent) => { pointerInside.current = false; if (!(e.relatedTarget instanceof Element) || !e.relatedTarget.closest('.launcher-panel')) engine.input.aiming = false; };
     const click = (e: PointerEvent) => { if (e.button === 2 && useGame.getState().phase === 'playing') engine.input.dash = true; };
     const context = (e: MouseEvent) => e.preventDefault();
     window.addEventListener('keydown', down); window.addEventListener('keyup', up); window.addEventListener('blur', blur); document.addEventListener('visibilitychange', visibility);

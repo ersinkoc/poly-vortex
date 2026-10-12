@@ -66,6 +66,15 @@ test('cover blocks launching and a rocket in flight hits the wall before a hosti
   const rocket = shell(p.x - p.radius - 0.15, p.z); rocket.vx = 26; rocket.vz = 0; game.rockets.push(rocket); game.tick(1 / 60);
   expect(rocket.age).toBe(10); expect(Math.hypot(rocket.x - enemy.x, rocket.z - enemy.z)).toBeLessThan(4.5); expect(enemy.hp).toBe(10000);
 });
+
+test('launcher readiness releases a previously locked hostile when cover blocks the firing lane', () => {
+  let obstacle: ReturnType<typeof terrainProp> = null;
+  for (let x = 1; x < 6; x++) for (let z = 1; z < 6; z++) { const p = terrainProp(x, z); if (p && terrainHeight(p.x, p.z) + p.height > 1) obstacle = p; }
+  if (!obstacle) throw new Error('Missing tall obstacle.'); const p = obstacle;
+  game.player.x = p.x - p.radius - 4; game.player.z = p.z; game.player.angle = Math.PI / 2;
+  game.spawn(2, p.x + p.radius + 4, p.z); game.targetId = game.enemies.at(-1)!.id; game.publish();
+  expect(game.fireRocket()).toBe(false); expect(useGame.getState().rocketReady).toBe(false); expect(game.rocketAmmo).toBe(6);
+});
 test('mass kills cannot flood the map with health or repeat combat drops in the same time window', () => {
   for (let i = 0; i < 135; i++) { game.spawn(0, 10, 0); const enemy = game.enemies.at(-1)!; game.hitEnemy(enemy, 1000); }
   expect(game.supplies.filter(s => s.type === 'repair')).toHaveLength(0); expect(game.supplies.length).toBeLessThanOrEqual(1);

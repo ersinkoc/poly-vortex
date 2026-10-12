@@ -70,6 +70,16 @@ The pacing design is informed by [Valve's AI Systems of Left 4 Dead](https://cdn
 
 ## Limited ordnance
 
+### Launcher clarity — 1.5
+
+The rocket panel now states **E / tap to fire**, shows the locked enemy and distance, the six-round rack, alignment/cycling progress, and an actionable explanation for missing aim, range, cover, protected pilots, empty ammunition or a full flight pool. HUD readiness and actual launch checks share one inspection function, so a stale laser lock cannot falsely mark a blocked rocket shot ready.
+
+Pressing E or tapping while the ship turns queues one launch for at most 0.85 seconds. The intent belongs to that exact hostile; target loss, a blocked lane, timeout, pause or upgrade cancels it without spending ammunition. Commands never transfer to another enemy and repeated presses cannot extend the queue. Ready launches remain immediate with a 0.75-second cycle. A launch flare, **ROCKET AWAY** feedback and the changing rack count confirm the shot. Reload notices show the actual capped round count or an EMP-only recharge.
+
+Manual rocket intent runs before automatic Pulse/Cryo/Tesla attacks, so a Tesla kill in the same frame cannot silently discard the command. A missile already in flight remembers its target's last position. If another weapon kills that hostile, it airbursts at that position instead of wandering past the fight; surviving nearby hostiles still receive covered, distance-based blast damage. Terrain collision and pilot protection retain priority.
+
+**HELP** on the launcher opens a four-step flight manual and pauses combat. Close the manual and resume when ready. It explains acquisition, launch, confirmation and blue-crate reloading. Precision aim holds while moving from the canvas onto the launcher panel for a mouse click; leaving the panel releases it. The keyboard and touch paths use the same finite-ammunition rules.
+
 - Hellion rockets are manually launched with **E** or the HUD button. The rack holds six rounds, has a 0.75-second firing cooldown, and never regenerates ammunition over time. Invalid targets, blocked firing lanes, and suspended gameplay spend no ammunition.
 - Rockets accelerate, steer towards the locked hostile, leave exhaust trails, and explode on contact with terrain or a hostile. A direct hit deals 130 base damage; nearby hostiles receive distance-based blast damage within 4.5 units. Cover and protected pilots remain part of the targeting rules.
 - Blue rocket-rack crates first appear at 18 seconds, then every 35–50 seconds. Up to two can remain on the map for 70 seconds. They refill up to three rockets and 20 EMP charge; a crate stays available if both resources are already full. Ammo markers appear in blue on the radar.

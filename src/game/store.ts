@@ -5,8 +5,11 @@ import type { Mission } from './missions';
 import { ROCKET_CAPACITY } from './supplies';
 import type { EncounterPhase } from './director';
 import type { ScreenSignal } from './navigation';
+import type { LauncherStatus } from './launcher';
 
 type GameStore = {
+  launcherStatus: LauncherStatus; rocketPending: number; rocketLock: { kind: number; distance: number; alignment: number } | null;
+  rocketNotice: string; rocketNoticeKind: 'success' | 'warning'; rocketNoticeTime: number;
   navigation: ScreenSignal[];
   encounter: EncounterPhase; encounterRemaining: number; encounterRound: number; combatPressure: number;
   aimMode: 'assisted' | 'precision'; reducedEffects: boolean;
@@ -25,6 +28,7 @@ type GameStore = {
 };
 const save = (profile: Profile) => { try { localStorage.setItem('poly-vortex-profile-v1', JSON.stringify(profile)); } catch { /* Storage can be unavailable in private browsing. */ } };
 export const useGame = create<GameStore>((set, get) => ({
+  launcherStatus: 'searching', rocketPending: 0, rocketLock: null, rocketNotice: '', rocketNoticeKind: 'success', rocketNoticeTime: 0,
   navigation: [],
   encounter: 'insertion', encounterRemaining: 12, encounterRound: 1, combatPressure: 0,
   aimMode: 'assisted', reducedEffects: false,

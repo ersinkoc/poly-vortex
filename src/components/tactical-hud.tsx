@@ -12,13 +12,13 @@ import EncounterHUD from './encounter-hud';
 import NavigationSignals from './navigation-signals';
 import { supplyLifetime } from '@/game/supplies';
 
-export default function TacticalHUD() {
+export default function TacticalHUD({ onOrdnanceHelp }: { onOrdnanceHelp: () => void }) {
   const s = useGame(); const sector = SECTORS[s.sector];
   const contacts = engine.enemies.filter(e => Math.hypot(e.x - engine.player.x, e.z - engine.player.z) < 32).slice(0, 48);
   return <>
     <MissionHUD />
     <TargetReadout />
-    <RocketControl />
+    <RocketControl onHelp={onOrdnanceHelp} />
     <EncounterHUD />
     <NavigationSignals />
     <div className="tactical-meters"><div><span><Shield size={10} /> AEGIS SHIELD</span><strong>{Math.ceil(s.shield)} / {s.maxShield}</strong></div><div className="shield-meter"><i style={{ width: `${s.shield / s.maxShield * 100}%` }} /></div></div>
