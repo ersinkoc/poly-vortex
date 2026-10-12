@@ -4,7 +4,7 @@ export const ENCOUNTERS = {
   buildup: { title: 'CONTACTS BUILDING', detail: 'Collect prisms. Prepare your dash and ordnance.', duration: 16, rate: 1, color: '#d0f58a' },
   assault: { title: 'SWARM ASSAULT', detail: 'Keep moving. Use cover, rockets and your EMP.', duration: 12, rate: 1.55, color: '#ff9e78' },
   recovery: { title: 'REINFORCEMENTS PAUSED', detail: 'Clear remaining threats. Recover and finish your operation.', duration: 8, rate: 0, color: '#8effcc' },
-  sentinel: { title: 'SENTINEL ENGAGED', detail: 'Watch the strike warnings. Destroy it to extract.', duration: 0, rate: 0.8, color: '#ff7899' },
+  sentinel: { title: 'SENTINEL ENGAGED', detail: 'Face the guardian alone. Dodge its barrages and strike warnings.', duration: 0, rate: 0, color: '#ff7899' },
 } as const;
 
 /** Changes reinforcement pacing only. Existing enemies and damage stay intact. */

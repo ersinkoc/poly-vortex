@@ -34,7 +34,7 @@ test('high pressure earns bounded relief, then reinforcements resume', () => {
 });
 test('successful operations cannot extend recovery indefinitely or interrupt a boss', () => {
   const d = new EncounterDirector(); d.tick(12, 0, false); d.recover(); d.tick(3, 0, false);
-  d.recover(); expect(d.remaining).toBe(5); d.tick(1, 1, true); d.recover(); expect(d.phase).toBe('sentinel'); expect(d.spawnRate).toBeGreaterThan(0);
+  d.recover(); expect(d.remaining).toBe(5); d.tick(1, 1, true); d.recover(); expect(d.phase).toBe('sentinel'); expect(d.spawnRate).toBe(0);
   d.reset(); expect(d.phase).toBe('insertion'); expect(d.round).toBe(1);
 });
 test('engine suspends reinforcements during recovery but preserves existing threats', () => {

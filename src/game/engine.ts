@@ -345,6 +345,8 @@ export class GameEngine {
     if (useGame.getState().phase !== 'playing') { this.input.bomb = false; this.cancelRocket('SHOT CANCELLED · gameplay suspended. No ammunition spent.'); return; }
     if (this.hitStop > 0) { this.hitStop -= dt; return; }
     this.time += dt; const p = this.player;
+    // Resolve the arena handoff before old contacts, bullets or strikes can tick.
+    if (!this.service && this.chapterTime >= RUN_DURATION && !this.bossSpawned) this.engageSentinel();
     const nearby = this.enemies.reduce((count, e) => count + (e.hp > 0 && distance(e, p) < 7 ? e.kind >= 2 ? 3 : 1 : 0), 0);
     const pressure = Math.min(1, nearby / 18 * 0.6 + (1 - p.hp / p.maxHp) * 0.4 + (1 - this.shield / this.maxShield) * 0.2);
     this.director.tick(dt, pressure, !this.service && this.chapterTime >= RUN_DURATION, !!this.service);
@@ -358,7 +360,7 @@ export class GameEngine {
     const nextSector = this.service ? this.sector : sectorAt(this.chapterTime);
     if (nextSector !== this.sector) { this.sector = nextSector; const zone = SECTORS[this.sector]; this.announce(zone.event, zone.description); audio.tone(240, 0.4, 'triangle', 0.2, 480); }
     this.hazardTimer -= dt;
-    if (this.hazardTimer <= 0 && !this.service && this.director.phase !== 'recovery') { this.hazardTimer = this.sector >= 3 ? 6 : 11; this.addHazard(p.x + p.vx * 0.55, p.z + p.vz * 0.55); }
+    if (this.hazardTimer <= 0 && !this.service && !this.bossSpawned && this.director.phase !== 'recovery') { this.hazardTimer = this.sector >= 3 ? 6 : 11; this.addHazard(p.x + p.vx * 0.55, p.z + p.vz * 0.55); }
     this.supplyTimer -= dt;
     this.repairTimer -= dt;
     if (this.repairTimer <= 0) {
@@ -441,13 +443,12 @@ export class GameEngine {
       }
     }
     this.spawnTimer -= dt;
-    if (this.spawnTimer <= 0 && !this.service && this.director.spawnRate > 0) {
+    if (this.spawnTimer <= 0 && !this.service && !this.bossSpawned && this.director.spawnRate > 0) {
       const pressure = this.runMode === 'expedition' ? fleetScale(this.chapter, this.chapterTime).pressure : 1 + this.time / 45;
       this.spawnTimer = Math.max(0.09, 0.75 / pressure) / (this.overdrive ? 1.4 : 1) / this.director.spawnRate;
       const doctrine = doctrineAt(this.runMode === 'expedition' ? this.chapter : 1);
       const r = this.random(); this.spawn(this.chapterTime > 35 && r > 1 - doctrine.heavy ? 2 : this.chapterTime > 14 && r > 1 - doctrine.heavy - doctrine.orbiter ? 1 : 0, undefined, undefined, this.chapterTime > 25 && this.uid % (this.sector >= 2 ? 8 : 12) === 0);
     }
-    if (!this.service && this.chapterTime >= RUN_DURATION && !this.bossSpawned) { this.bossSpawned = true; this.spawn(3, p.x, p.z - 18); audio.explosion(); }
     // Spatial bins keep flocking local; avoid a quadratic whole-horde comparison.
     const bins = new Map<string, Entity[]>();
     const motionScale = this.runMode === 'expedition' ? fleetScale(this.chapter, this.chapterTime).speed : 1 + this.time / 360;
@@ -481,9 +482,9 @@ export class GameEngine {
       if (e.kind === 3) {
         const stage = e.hp / e.maxHp > 0.66 ? 1 : e.hp / e.maxHp > 0.33 ? 2 : 3;
         if (stage !== this.bossPhase) {
-          this.bossPhase = stage; this.announce(stage === 1 ? 'SENTINEL // PHASE I' : stage === 2 ? 'SENTINEL // PHASE II' : 'SENTINEL // ENRAGED', stage === 1 ? 'Destroy the guardian to extract.' : stage === 2 ? 'Spiral barrage. Keep circling.' : 'Targeted volleys. Save a phase shift.');
+          this.bossPhase = stage; this.announce(stage === 1 ? 'SENTINEL // PHASE I' : stage === 2 ? 'SENTINEL // PHASE II' : 'SENTINEL // ENRAGED', stage === 1 ? 'Arena cleared. Face the guardian alone.' : stage === 2 ? 'Spiral barrage. Keep circling.' : 'Targeted volleys. Save a phase shift.');
           e.timer = Math.min(e.timer, 0.6); this.wave(e.x, e.z, 7, '#ff5478', 1);
-          if (stage > 1) { this.addHazard(p.x, p.z, 4, 2); for (let i = 0; i < 4; i++) this.spawn(0); }
+          if (stage > 1) this.addHazard(p.x, p.z, 4, 2);
         }
       }
       if ((e.kind === 1 || e.kind === 3) && e.timer <= 0 && d < 26) {
@@ -635,6 +636,17 @@ export class GameEngine {
     for (const s of this.scorches) s.age += dt; this.scorches = this.scorches.filter(s => s.age < 22);
     audio.combo = this.combo;
     this.hudTimer += dt; if (this.hudTimer > 0.1) { this.hudTimer = 0; this.publish(); }
+  }
+
+  private engageSentinel() {
+    this.bossSpawned = true;
+    // This is a recall, not a kill: retain collected progress without free drops.
+    this.enemies = this.enemies.filter(e => e.kind === 3 && e.hp > 0);
+    this.bolts = this.bolts.filter(b => !b.enemy); this.hazards = [];
+    this.targetId = 0; this.input.rocket = false;
+    this.cancelRocket('SENTINEL ENGAGED · previous target recalled. No ammunition spent.');
+    if (!this.enemies.length) this.spawn(3, this.player.x, this.player.z - 18);
+    this.wave(this.player.x, this.player.z, 26, '#ff7899', 1.1); this.trauma = Math.max(this.trauma, 0.25); audio.explosion(); this.publish();
   }
 
   placeCharge() {
