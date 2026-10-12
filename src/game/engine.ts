@@ -13,6 +13,7 @@ import { UPGRADE_LIMITS, previewUpgrade } from './upgrade-preview';
 import { shieldContact, shieldImpact, SHIELD_IMPACT, type HitSource, type ShieldHit } from './shield-impact';
 import { EXPEDITION, doctrineAt, dockStatus, fleetScale, type RunMode, type ServiceDock } from './expedition';
 import { DRONE_FIRE, createDroneGuns, droneCount, droneDamage, droneMuzzle, dronePose } from './orbital-drones';
+import { CHARGE_RULES, chargeRemaining, type GroundCharge } from './ground-charges';
 import type { Arc, Bolt, Cache, DamageText, Entity, Gem, Hazard, Input, Particle, Rocket, Shockwave, Supply, Upgrade, UpgradeId, Vortex, WeaponId } from './types';
 
 export const LIMITS = { enemies: 280, bolts: 500, rockets: 16, particles: 1000, gems: 400, shockwaves: 40, damageTexts: 40, hazards: 12, supplies: 10, caches: 8 };
@@ -35,6 +36,7 @@ const defs: Record<UpgradeId, [string, string]> = {
 };
 
 export class GameEngine {
+  charges: GroundCharge[] = []; chargeAmmo: number = CHARGE_RULES.capacity; chargeCooldown = 0; chargeNotice = ''; chargeNoticeTime = 0; private chargeUid = 0;
   droneGuns = createDroneGuns();
   runMode: RunMode = 'expedition'; chapter = 1; sentinels = 0; chapterStarted = 0; service: ServiceDock | null = null;
   get chapterTime() { return Math.max(0, this.time - this.chapterStarted); }
@@ -56,7 +58,7 @@ export class GameEngine {
   rocketPending = 0; private pendingRocketTarget = 0;
   rocketNotice = ''; rocketNoticeKind: 'success' | 'warning' = 'success'; rocketNoticeTime = 0;
   player = { x: 0, z: 0, vx: 0, vz: 0, angle: 0, hp: 100, maxHp: 100, hullHit: 0, invulnerable: 0, dashTime: 0, dashCooldown: 0 };
-  input: Input = { keys: new Set(), aimX: 0, aimZ: -8, aiming: false, dash: false, surge: false, rocket: false, moveX: 0, moveZ: 0 };
+  input: Input = { keys: new Set(), aimX: 0, aimZ: -8, aiming: false, dash: false, surge: false, rocket: false, bomb: false, moveX: 0, moveZ: 0 };
   enemies: Entity[] = []; bolts: Bolt[] = []; particles: Particle[] = []; gems: Gem[] = []; arcs: Arc[] = []; vortices: Vortex[] = [];
   shockwaves: Shockwave[] = []; damageTexts: DamageText[] = []; hazards: Hazard[] = []; supplies: Supply[] = []; caches: Cache[] = [];
   shield = 40; maxShield = 40; surge = 100; sector = 0; bossPhase = 0; peakCombo = 1; eliteKills = 0; salvage = 0;
@@ -76,6 +78,7 @@ export class GameEngine {
   }
   random() { this.seed = (Math.imul(1664525, this.seed) + 1013904223) >>> 0; return this.seed / 4294967296; }
   reset() {
+    this.charges = []; this.chargeAmmo = CHARGE_RULES.capacity; this.chargeCooldown = 0; this.chargeUid = 0; this.chargeNotice = ''; this.chargeNoticeTime = 0; this.input.bomb = false;
     this.droneGuns = createDroneGuns();
     this.shieldHits = [];
     this.rewards.reset(); this.publishRewards();
@@ -201,10 +204,12 @@ export class GameEngine {
   collectSupply(supply: Supply) {
     if (useGame.getState().phase !== 'playing' || supply.age >= supplyLifetime(supply)) return;
     if (supply.type === 'ammo') {
-      const rounds = Math.min(3, ROCKET_CAPACITY - this.rocketAmmo), charge = Math.min(20, 100 - this.surge);
-      if (!rounds && !charge) return;
-      this.rocketAmmo += rounds; this.surge += charge; this.announce('ORDNANCE RECHARGED', `+${rounds} rockets · +${Math.round(charge)} EMP charge.`);
-      this.rocketFeedback(rounds ? `AMMO RELOADED · +${rounds} rocket${rounds === 1 ? '' : 's'} · rack ${this.rocketAmmo}/${ROCKET_CAPACITY} · +${Math.round(charge)} EMP.` : `EMP RECHARGED · +${Math.round(charge)} charge · rack ${this.rocketAmmo}/${ROCKET_CAPACITY}.`, 'success'); this.publish();
+      const rounds = Math.min(3, ROCKET_CAPACITY - this.rocketAmmo), charge = Math.min(20, 100 - this.surge), bombs = Math.min(CHARGE_RULES.reload, CHARGE_RULES.capacity - this.chargeAmmo);
+      if (!rounds && !charge && !bombs) return;
+      this.chargeAmmo += bombs; if (bombs) { this.chargeNotice = ''; this.chargeNoticeTime = 0; }
+      this.rocketAmmo += rounds; this.surge += charge;
+      const detail = `${rounds ? `+${rounds} rockets · ` : ''}${bombs ? `+${bombs} ground charge · ` : ''}${charge ? `+${Math.round(charge)} EMP · ` : ''}rack ${this.rocketAmmo}/${ROCKET_CAPACITY}`;
+      this.announce('ORDNANCE RECHARGED', detail); this.rocketFeedback(`AMMO RELOADED · ${detail}.`, 'success'); this.publish();
     }
     if (supply.type === 'repair') {
       this.player.hp = Math.min(this.player.maxHp, this.player.hp + 28); this.shield = Math.min(this.maxShield, this.shield + 15); this.repairTime = 8;
@@ -319,6 +324,7 @@ export class GameEngine {
     const target = this.enemies.find(e => e.id === this.targetId && e.hp > 0);
     const lock = this.launcherLock();
     useGame.setState({
+      charges: this.charges.filter(c => !c.detonated).map(c => ({ ...c })), chargeAmmo: this.chargeAmmo, chargeCooldown: this.chargeCooldown, chargeNotice: this.chargeNotice, chargeNoticeTime: this.chargeNoticeTime,
       activeMode: this.runMode, chapter: this.chapter, sentinels: this.sentinels, sentinelIn: Math.max(0, RUN_DURATION - this.chapterTime), service: this.service ? { ...this.service } : null, dockDistance: this.service ? distance(this.player, this.service) : 0, canExtract: this.canExtract, dockStatus: dockStatus(this.player, this.service, this.enemies, this.shieldDelay),
       launcherStatus: lock.status, rocketPending: this.rocketPending, rocketLock: lock.target ? { kind: lock.target.kind, distance: distance(lock.target, this.player), alignment: lock.alignment } : null,
       rocketNotice: this.rocketNotice, rocketNoticeKind: this.rocketNoticeKind, rocketNoticeTime: this.rocketNoticeTime,
@@ -331,7 +337,7 @@ export class GameEngine {
     });
   }
   tick(dt: number) {
-    if (useGame.getState().phase !== 'playing') { this.cancelRocket('SHOT CANCELLED · gameplay suspended. No ammunition spent.'); return; }
+    if (useGame.getState().phase !== 'playing') { this.input.bomb = false; this.cancelRocket('SHOT CANCELLED · gameplay suspended. No ammunition spent.'); return; }
     if (this.hitStop > 0) { this.hitStop -= dt; return; }
     this.time += dt; const p = this.player;
     const nearby = this.enemies.reduce((count, e) => count + (e.hp > 0 && distance(e, p) < 7 ? e.kind >= 2 ? 3 : 1 : 0), 0);
@@ -339,6 +345,7 @@ export class GameEngine {
     this.director.tick(dt, pressure, !this.service && this.chapterTime >= RUN_DURATION, !!this.service);
     this.rocketCooldown = Math.max(0, this.rocketCooldown - dt);
     this.rocketNoticeTime = Math.max(0, this.rocketNoticeTime - dt);
+    const chargeCycle = this.chargeCooldown - dt; this.chargeCooldown = chargeCycle > 1e-8 ? chargeCycle : 0; this.chargeNoticeTime = Math.max(0, this.chargeNoticeTime - dt);
     p.hp = Math.min(p.maxHp, p.hp + Math.min(dt, this.repairTime) * 4); this.repairTime = Math.max(0, this.repairTime - dt);
     this.announcementTime = Math.max(0, this.announcementTime - dt); this.overdriveTime = Math.max(0, this.overdriveTime - dt);
     this.shieldDelay -= dt; if (this.shieldDelay <= 0) this.shield = Math.min(this.maxShield, this.shield + dt * 7);
@@ -384,6 +391,19 @@ export class GameEngine {
     else this.burst(p.x, p.z, '#9effcf', 2);
     p.x += p.vx * dt; p.z += p.vz * dt;
     clearTerrainPosition(p, 0.7);
+    for (const charge of this.charges) {
+      if (charge.detonated) continue;
+      charge.age += dt;
+      if (chargeRemaining(charge) <= 1e-8) this.detonateCharge(charge);
+      else {
+        const stage = Math.ceil(chargeRemaining(charge));
+        if (stage < charge.stage) { charge.stage = stage; audio.chargeTick(stage); }
+      }
+      if (useGame.getState().phase !== 'playing') break;
+    }
+    this.charges = this.charges.filter(c => !c.detonated);
+    if (useGame.getState().phase !== 'playing') { this.input.bomb = false; return; }
+    if (this.input.bomb) this.placeCharge(); this.input.bomb = false;
     if (this.service) {
       const dock = this.service; dock.remaining = Math.max(0, dock.remaining - dt);
       // Docking requires a slow approach, a clear perimeter, and no fresh hit.
@@ -394,8 +414,9 @@ export class GameEngine {
         if (dock.progress >= EXPEDITION.dockDuration && dock.remaining > 0) {
           dock.serviced = true; p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.35); this.shield = this.maxShield;
           this.rocketAmmo = Math.min(ROCKET_CAPACITY, this.rocketAmmo + 3); this.surge = Math.min(100, this.surge + 50);
+          this.chargeAmmo = Math.min(CHARGE_RULES.capacity, this.chargeAmmo + CHARGE_RULES.reload);
           this.wave(dock.x, dock.z, 5, '#82ffc5'); audio.salvage();
-          this.announce('FIELD SERVICE COMPLETE', '+35% hull · shield restored · +3 rockets · +50 EMP. Extract now or keep your build.');
+          this.announce('FIELD SERVICE COMPLETE', '+35% hull · shield restored · +3 rockets · +1 charge · +50 EMP. Extract now or keep your build.');
         }
       }
       if (dock.remaining <= 0) {
@@ -599,6 +620,26 @@ export class GameEngine {
     for (const s of this.scorches) s.age += dt; this.scorches = this.scorches.filter(s => s.age < 22);
     audio.combo = this.combo;
     this.hudTimer += dt; if (this.hudTimer > 0.1) { this.hudTimer = 0; this.publish(); }
+  }
+
+  placeCharge() {
+    if (useGame.getState().phase !== 'playing') return false;
+    const blocked = this.chargeAmmo <= 0 ? 'CHARGES EMPTY · blue crates reload +1.' : this.chargeCooldown > 0 ? `DEPLOYER CYCLING · ${this.chargeCooldown.toFixed(1)}s.` : this.charges.length >= CHARGE_RULES.activeLimit ? 'THREE CHARGES ARMED · wait for detonation.' : this.charges.some(c => !c.detonated && distance(c, this.player) < CHARGE_RULES.minSpacing) ? 'MOVE CLEAR · an armed charge is already here.' : '';
+    if (blocked) { this.chargeNotice = blocked; this.chargeNoticeTime = 2; this.publish(); return false; }
+    const site = { x: this.player.x, z: this.player.z }; clearTerrainPosition(site, 0.55);
+    this.charges.push({ ...site, id: ++this.chargeUid, age: 0, stage: CHARGE_RULES.fuse, detonated: false });
+    this.chargeAmmo--; this.chargeCooldown = CHARGE_RULES.cooldown; this.chargeNotice = ''; this.chargeNoticeTime = 0;
+    audio.chargeTick(3); this.publish(); return true;
+  }
+
+  private detonateCharge(charge: GroundCharge) {
+    if (charge.detonated || useGame.getState().phase !== 'playing') return;
+    charge.detonated = true;
+    this.blast(charge.x, charge.z, 4.5, '#ffb167'); this.burst(charge.x, charge.z, '#ffac65', 70);
+    this.wave(charge.x, charge.z, CHARGE_RULES.radius, '#ffbc75', 0.85);
+    this.trauma = Math.max(this.trauma, 0.65); this.hitStop = Math.max(this.hitStop, 0.05); audio.explosion();
+    for (const enemy of [...this.enemies]) if (enemy.hp > 0 && distance(enemy, charge) <= CHARGE_RULES.radius && !terrainImpact(charge, enemy, 0)) this.hitEnemy(enemy, CHARGE_RULES.damage * this.damage);
+    this.pulse = { x: charge.x, z: charge.z, time: this.time };
   }
 
   private fireDrones(dt: number, friendlies: readonly { x: number; z: number }[]) {

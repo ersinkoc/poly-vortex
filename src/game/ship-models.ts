@@ -126,6 +126,24 @@ export function buildEscortDrone(): ShipModel {
   return b.finish();
 }
 
+export function buildGroundCharge(): ShipModel {
+  const b = new ShipBuilder();
+  b.cylinder('hull', 0.34, 0.4, 0.14, [0, 0.08, 0], [0, 0, 0], 16);
+  b.cylinder('armor', 0.29, 0.33, 0.08, [0, 0.18, 0], [0, 0, 0], 12);
+  b.ring('metal', 0.36, 0.025, [0, 0.12, 0], [Math.PI / 2, 0, 0], 16);
+  b.cylinder('glass', 0.13, 0.13, 0.03, [0, 0.235, 0], [0, 0, 0], 12);
+  b.cylinder('signal', 0.07, 0.07, 0.016, [0, 0.258, 0], [0, 0, 0], 10);
+  b.box('engine', [0.14, 0.025, 0.04], [0, 0.224, 0.24], [0, 0, 0], 0.004);
+  for (let i = 0; i < 6; i++) {
+    const a = i * Math.PI / 3, x = Math.sin(a), z = Math.cos(a);
+    b.box('metal', [0.085, 0.05, 0.22], [x * 0.39, 0.025, z * 0.39], [0, a, 0], 0.012);
+    b.box('armor', [0.085, 0.06, 0.1], [x * 0.48, 0.025, z * 0.48], [0, a, 0], 0.014);
+    b.box('signal', [0.028, 0.025, 0.09], [x * 0.27, 0.23, z * 0.27], [0, a, 0], 0.005);
+    b.bolts([[x * 0.22, 0.233, z * 0.22]]);
+  }
+  return b.finish();
+}
+
 export function buildDroneRotor(): THREE.BufferGeometry {
   const parts = [0, Math.PI / 2].map(a => {
     const source = new THREE.BoxGeometry(0.32, 0.015, 0.035), blade = source.toNonIndexed();

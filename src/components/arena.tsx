@@ -119,7 +119,7 @@ function SceneController() {
   useEffect(() => { if (runId) { engine.reset(); pointerInside.current = false; } }, [runId]);
   useEffect(() => {
     if (phase === 'menu') { engine.player.x = 0; engine.player.z = 0; engine.preview(); engine.bolts = []; engine.gems = []; engine.particles = []; engine.vortices = []; engine.arcs = []; }
-    if (phase !== 'playing') { engine.cancelRocket('SHOT CANCELLED · gameplay suspended. No ammunition spent.'); engine.publish(); engine.input.keys.clear(); engine.input.dash = false; engine.input.surge = false; engine.input.rocket = false; engine.input.moveX = 0; engine.input.moveZ = 0; accumulator.current = 0; }
+    if (phase !== 'playing') { engine.cancelRocket('SHOT CANCELLED · gameplay suspended. No ammunition spent.'); engine.input.bomb = false; engine.publish(); engine.input.keys.clear(); engine.input.dash = false; engine.input.surge = false; engine.input.rocket = false; engine.input.moveX = 0; engine.input.moveZ = 0; accumulator.current = 0; }
   }, [phase]);
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -131,6 +131,7 @@ function SceneController() {
       engine.input.keys.add(e.code); if (e.code === 'Space') engine.input.dash = true;
       if (e.code === 'KeyQ' && !e.repeat) engine.input.surge = true;
       if (e.code === 'KeyE' && !e.repeat) engine.input.rocket = true;
+      if (e.code === 'KeyB' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); engine.input.bomb = true; }
       if (e.code === 'KeyF' && !e.repeat) { useGame.setState({ aimMode: s.aimMode === 'assisted' ? 'precision' : 'assisted' }); engine.targetId = 0; engine.publish(); }
     };
     const up = (e: KeyboardEvent) => engine.input.keys.delete(e.code);
@@ -174,7 +175,7 @@ function SceneController() {
     if (s.phase === 'playing' && navigationTimer.current >= 0.1) {
       navigationTimer.current = 0; camera.updateMatrixWorld();
       const { width, height } = state.size;
-      const navigation = navigationSignals(engine.player, engine.missions.mission, engine.supplies, engine.rocketAmmo, engine.service).map(signal => {
+      const navigation = navigationSignals(engine.player, engine.missions.mission, engine.supplies, engine.rocketAmmo, engine.service, engine.chargeAmmo).map(signal => {
         navigationPoint.set(signal.x, 1.8, signal.z).project(camera);
         const sign = navigationPoint.z > 1 ? -1 : 1;
         const x = navigationPoint.x * sign * width / 2, y = -navigationPoint.y * sign * height / 2;

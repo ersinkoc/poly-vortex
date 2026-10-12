@@ -5,7 +5,8 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { engine, LIMITS } from '@/game/engine';
 import { useGame } from '@/game/store';
-import { buildDroneRotor, buildEnemyShip, buildEscortDrone, buildPlayerShip, buildShadowTexture, buildShipMaterials, buildSurfaceTextures, SURFACES, type ShipModel } from '@/game/ship-models';
+import { buildDroneRotor, buildEnemyShip, buildEscortDrone, buildGroundCharge, buildPlayerShip, buildShadowTexture, buildShipMaterials, buildSurfaceTextures, SURFACES, type ShipModel } from '@/game/ship-models';
+import GroundCharges from './ground-charges';
 import { DRONE_FIRE, DRONE_ORBIT, droneCount, droneMuzzle, dronePose } from '@/game/orbital-drones';
 import { terrainHeight } from '@/game/terrain';
 import { attachDamageMaterial, buildDamageUniforms, damageHeat, hullDamage } from '@/game/ship-damage';
@@ -126,13 +127,14 @@ export default function ShipFleet() {
     const enemies = ([0, 1, 2, 3] as const).map(kind => ({ model: buildEnemyShip(kind), materials: buildShipMaterials(accents[kind], false, textures) }));
     const drone = { model: buildEscortDrone(), materials: buildShipMaterials('#6ee7ff', false, textures) };
     const rotor = buildDroneRotor();
-    return { textures, shadow, player, enemies, drone, rotor };
+    const charge = { model: buildGroundCharge(), materials: buildShipMaterials('#ffba6a', false, textures) };
+    return { textures, shadow, player, enemies, drone, rotor, charge };
   }, []);
   useEffect(() => () => {
-    for (const actor of [assets.player, ...assets.enemies, assets.drone]) {
+    for (const actor of [assets.player, ...assets.enemies, assets.drone, assets.charge]) {
       Object.values(actor.model).forEach(geometry => geometry.dispose()); Object.values(actor.materials).forEach(material => material.dispose());
     }
     Object.values(assets.textures).forEach(texture => texture.dispose()); assets.shadow.dispose(); assets.rotor.dispose();
   }, [assets]);
-  return <><PlayerShip asset={assets.player} shadow={assets.shadow} /><EscortDrones asset={assets.drone} rotor={assets.rotor} shadow={assets.shadow} />{([0, 1, 2, 3] as const).map(kind => <EnemyShips key={kind} kind={kind} asset={assets.enemies[kind]} shadow={assets.shadow} />)}</>;
+  return <><PlayerShip asset={assets.player} shadow={assets.shadow} /><EscortDrones asset={assets.drone} rotor={assets.rotor} shadow={assets.shadow} /><GroundCharges asset={assets.charge} />{([0, 1, 2, 3] as const).map(kind => <EnemyShips key={kind} kind={kind} asset={assets.enemies[kind]} shadow={assets.shadow} />)}</>;
 }

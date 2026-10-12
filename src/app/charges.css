@@ -1,0 +1,9 @@
+.charge-control { position: relative; flex-shrink: 0; }
+.charge-button { position: relative; width: 60px; height: 66px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; background: #171b13df; border: 1px solid #ffba6a35; border-radius: 4px; color: #e0a877; pointer-events: auto; }
+.charge-button.ready { border-color: #ffba6a85; color: #ffd1a1; background: #352619c9; }.charge-button.ready:hover { background: #513420dd; }
+.charge-button:disabled { opacity: .6; cursor: default; }.charge-button span { font: 5px var(--mono); letter-spacing: .5px; }.charge-button strong { font: 9px var(--mono); }.charge-button kbd { position: absolute; top: 4px; right: 4px; padding: 1px 3px; min-width: 0; font: 6px var(--mono); border: 0; background: #ffba6a16; color: #f4c18a; }
+.charge-feedback { position: absolute; bottom: 78px; right: 0; width: 220px; padding: 9px 11px; border: 1px solid #ffba6a55; border-radius: 4px; background: #17140ff2; color: #ffce99; font: 8px/1.5 var(--mono); pointer-events: none; }
+.charge-countdown { display: flex; align-items: baseline; gap: 3px; padding: 4px 7px; border: 1px solid #ffbf6b99; border-radius: 3px; background: #201309df; color: #ffcf8d; font: 700 12px var(--mono); white-space: nowrap; pointer-events: none; box-shadow: 0 0 12px #fba65220; }.charge-countdown small { font-size: 7px; font-weight: 400; }.charge-countdown.urgent { color: #ff9b8e; border-color: #ff6d60; background: #34110de8; }
+@media(max-width:800px) { .charge-button { width: 45px; height: 54px; gap: 3px; }.charge-button svg { width: 18px; }.charge-button span { font-size: 4px; }.charge-button strong { font-size: 8px; } }
+@media(max-width:600px) { .charge-button { width: 40px; height: 50px; }.charge-feedback { width: 170px; font-size: 7px; bottom: 62px; }.charge-countdown { font-size: 10px; padding: 3px 5px; } }
+@media(max-width:360px) { .hud .weapon-slot { width: 35px; }.charge-button { width: 36px; } }

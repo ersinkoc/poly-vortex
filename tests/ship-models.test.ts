@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
-import { buildEnemyShip, buildEscortDrone, buildPlayerShip, buildShadowTexture, buildShipMaterials, buildSurfaceTextures, SURFACES } from '../src/game/ship-models';
+import { buildEnemyShip, buildEscortDrone, buildGroundCharge, buildPlayerShip, buildShadowTexture, buildShipMaterials, buildSurfaceTextures, SURFACES } from '../src/game/ship-models';
 
-const factories = [buildPlayerShip, ...([0, 1, 2, 3] as const).map(kind => () => buildEnemyShip(kind)), buildEscortDrone];
-const names = ['poly-core', 'chaser', 'orbiter', 'goliath', 'sentinel', 'escort drone'];
+const factories = [buildPlayerShip, ...([0, 1, 2, 3] as const).map(kind => () => buildEnemyShip(kind)), buildEscortDrone, buildGroundCharge];
+const names = ['poly-core', 'chaser', 'orbiter', 'goliath', 'sentinel', 'escort drone', 'ground charge'];
 
 describe('procedural fleet GPU resources', () => {
   factories.forEach((build, i) => {

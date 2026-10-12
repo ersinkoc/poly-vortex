@@ -8,8 +8,10 @@ import type { EncounterPhase } from './director';
 import type { ScreenSignal } from './navigation';
 import type { LauncherStatus } from './launcher';
 import type { DockStatus, RunMode, ServiceDock } from './expedition';
+import { CHARGE_RULES, type GroundCharge } from './ground-charges';
 
 type GameStore = {
+  charges: GroundCharge[]; chargeAmmo: number; chargeCooldown: number; chargeNotice: string; chargeNoticeTime: number;
   runMode: RunMode; activeMode: RunMode; chapter: number; sentinels: number; sentinelIn: number; service: ServiceDock | null; dockDistance: number; canExtract: boolean; dockStatus: DockStatus;
   launcherStatus: LauncherStatus; rocketPending: number; rocketLock: { kind: number; distance: number; alignment: number } | null;
   rocketNotice: string; rocketNoticeKind: 'success' | 'warning'; rocketNoticeTime: number;
@@ -31,6 +33,7 @@ type GameStore = {
 };
 const save = (profile: Profile) => { try { localStorage.setItem('poly-vortex-profile-v1', JSON.stringify(profile)); } catch { /* Storage can be unavailable in private browsing. */ } };
 export const useGame = create<GameStore>((set, get) => ({
+  charges: [], chargeAmmo: CHARGE_RULES.capacity, chargeCooldown: 0, chargeNotice: '', chargeNoticeTime: 0,
   runMode: 'expedition', activeMode: 'expedition', chapter: 1, sentinels: 0, sentinelIn: 180, service: null, dockDistance: 0, canExtract: false, dockStatus: 'offline',
   launcherStatus: 'searching', rocketPending: 0, rocketLock: null, rocketNotice: '', rocketNoticeKind: 'success', rocketNoticeTime: 0,
   navigation: [],

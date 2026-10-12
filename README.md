@@ -38,11 +38,20 @@ The custom domain is `poly-vortex.oxog.dev`, configured in `public/CNAME` and Gi
 - **F / targeting button:** Switch Assisted targeting and Precision targeting. Precision requires the cursor in the arena and never falls back to an automatic target.
 - **Space / right-click:** Phase shift. A brief invulnerable dash with a three-second base cooldown.
 - **E / rocket button:** Fire one Hellion rocket at a clear, aligned hostile. Six rounds per deployment; blue ammo crates refill up to three rounds and 20 EMP charge.
+- **B / charge button:** Plant a ground charge at your position. Three-second fuse, 5.5m blast, three-charge rack. Blue crates and field service reload one.
 - **Escape:** Pause or resume. Changing tabs or losing focus also pauses the game.
 - **Module reel:** XP and elite salvage install upgrades automatically; keep moving.
 - **Touch:** Use the on-screen movement joystick and dash button.
 
 Collect cyan XP prisms. A compact side reel automatically installs one randomized common, rare, or overclocked upgrade without pausing combat. Mix pulse lasers, escort drones, cryo-singularities, and Tesla arcs. At three minutes the Vortex Sentinel arrives. Classic extracts immediately on its defeat; Expedition opens a service and extraction window, then continues into another front. Standard and Overdrive difficulties are available. Every run awards core credits, saved in browser local storage, for permanent armor, damage, and speed upgrades. There are no accounts or server dependencies.
+
+## Timed ground charges — 1.13
+
+Press **B** or tap the charge button beside the weapon slots to plant a procedural magnetic bomb on the terrain. It stays where it was placed. A numeric countdown and a shrinking near-body fuse ring track three seconds of simulation time; a larger amber ring follows the terrain surface and marks its 5.5m blast radius, turning red in the last second. Countdown beeps lead into a fire explosion, shockwave, glowing debris, smoke, ground scorch, reactive grid impact and camera trauma. Reduced effects keeps the countdown and warning visible with steadier brightness.
+
+The rack begins with three charges. Deployment has a 1.2-second cooldown, permits at most three armed bombs, and requires 1.2m separation from an already planted charge. Blocked attempts spend nothing. The blast deals 600 base damage multiplied by the reactor's weapon damage to live enemies within range; rocks and ruins block it. It can clear ordinary pursuers and damage bosses, and cannot damage the core or rescue pilots. Death rewards and each detonation occur only once. Pause/hit-stop freeze the fuse; ended runs cannot arm or detonate bombs, and a new deployment clears every bomb and restores its starting stock.
+
+Blue ammo crates refill one charge alongside their existing capped rocket/EMP rewards, including when only the charge rack is empty. Completed field service adds one charge once. Bombs never refill passively. Ammo navigation remains available when rockets are full but bombs are depleted; the supply spawn rates and caps are unchanged. Mechanical bomb bodies reuse the fleet's instanced PBR surfaces, while at most three locally rendered HTML countdown labels require no downloaded font or asset.
 
 ## Armed escort update — 1.12
 
@@ -62,7 +71,7 @@ World-space orbit positions are shared by rendering and close-range damage detec
 
 Expedition is the default route; Classic remains available beside the deploy button and in Settings. Each front brings a Sentinel after three minutes of simulation time. Defeating it opens a 30-second service window, suspends reinforcements and environmental strikes, clears its remaining projectiles, and creates a procedural field station at the wreck. Surviving hostiles remain active. Follow the green navigation signal, clear enemies within five metres, approach below two metres per second, and remain in the docking radius for three uninterrupted seconds with no recent damage. A hit, nearby hostile, fast movement or leaving the radius resets unfinished docking.
 
-Field service restores 35% of maximum hull, fills shields, and adds three rockets and 50 EMP charge, each capped at capacity. It works once per Sentinel. While docked and safe, **Extract & bank credits** ends the run successfully; the same option is available in Pause. Leaving or waiting out the window automatically starts the next front with the entire build, XP, reward queue, score, rescue missions and inventory intact. Extra Sentinel salvage starts at 50 credits and grows to a capped 200. Credits are recorded once at extraction or death. Changing the route during a run applies to the next deployment.
+Field service restores 35% of maximum hull, fills shields, and adds three rockets, one ground charge and 50 EMP charge, each capped at capacity. It works once per Sentinel. While docked and safe, **Extract & bank credits** ends the run successfully; the same option is available in Pause. Leaving or waiting out the window automatically starts the next front with the entire build, XP, reward queue, score, rescue missions and inventory intact. Extra Sentinel salvage starts at 50 credits and grows to a capped 200. Credits are recorded once at extraction or death. Changing the route during a run applies to the next deployment.
 
 Balanced patrols, faster interceptor packs, orbiter artillery lines and heavy armored columns cycle across fronts. Local front time drives escalation; reinforcement pressure and enemy speed are bounded, while hull strength grows logarithmically with expedition depth. Thruster and haste upgrades retain usable minimum/maximum values even in long runs. There is no fixed maximum run length, and pause freezes the next boss, service window and docking progress. Three Sentinels and ten minutes of survival unlock two new flight-record milestones. Survival still depends on piloting and upgrades; indefinite survival is not guaranteed.
 
