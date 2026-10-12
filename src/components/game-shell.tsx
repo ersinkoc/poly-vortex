@@ -1,0 +1,195 @@
+'use client';
+
+import dynamic from 'next/dynamic';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ArrowDown, ArrowRight, ArrowUpRight, Check, ChevronRight, CircleDot, Cpu, Crosshair, Disc3, Expand, Hexagon, Keyboard, Layers3, MousePointer2, Orbit, Pause, Play, Radio, RotateCcw, Shield, SlidersHorizontal, Snowflake, Sparkles, Trophy, Volume2, VolumeX, Wind, X, Zap } from 'lucide-react';
+import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
+import { audio } from '@/game/audio';
+import { engine, RUN_DURATION } from '@/game/engine';
+import { useGame } from '@/game/store';
+import { WEAPONS, type Profile, type Upgrade, type WeaponId } from '@/game/types';
+
+const Arena = dynamic(() => import('./arena'), { ssr: false, loading: () => <div className="arena-loading"><Hexagon size={32} /><span>INITIALIZING THE VORTEX</span><i /></div> });
+type Panel = 'protocol' | 'controls' | 'armory' | 'settings' | 'core' | null;
+const weaponIcons = { pulse: Crosshair, glaive: Disc3, cryo: Snowflake, tesla: Zap };
+const panelTitles = { protocol: 'The protocol', controls: 'Know your controls', armory: 'Choose your arsenal', settings: 'System settings', core: 'Core modifications' };
+const number = (n: number) => Math.floor(n).toLocaleString('en-US');
+const time = (n: number) => `${Math.floor(n / 60).toString().padStart(2, '0')}:${Math.floor(n % 60).toString().padStart(2, '0')}`;
+
+class ArenaBoundary extends Component<{ children: ReactNode }, { error: boolean }> {
+  state = { error: false };
+  static getDerivedStateFromError() { return { error: true }; }
+  render() {
+    if (this.state.error) return <div className="arena-error"><Hexagon size={40} /><h2>Graphics connection lost</h2><p>This arena needs WebGL 2. Enable hardware acceleration in your browser, then reconnect.</p><button className="primary-button" onClick={() => window.location.reload()}>RECONNECT <RotateCcw size={16} /></button></div>;
+    return this.props.children;
+  }
+}
+
+function Logo({ small = false }: { small?: boolean }) {
+  return <div className={`brand ${small ? 'brand-small' : ''}`}><span className="brand-symbol"><Hexagon size={35} strokeWidth={1.4} /><Zap size={17} strokeWidth={2.2} /></span><div>POLY<span className="brand-divider">/</span>VORTEX<small>NEON PROTOCOL</small></div></div>;
+}
+
+function Toggle({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
+  return <button className={`toggle ${active ? 'active' : ''}`} role="switch" aria-checked={active} aria-label={label} onClick={onClick}><span /></button>;
+}
+
+function Menu({ open, start }: { open: (panel: Panel) => void; start: () => void }) {
+  const sound = useGame(s => s.sound), profile = useGame(s => s.profile), difficulty = useGame(s => s.difficulty), loadout = useGame(s => s.loadout);
+  const [fullscreen, setFullscreen] = useState(false);
+  useEffect(() => { const update = () => setFullscreen(!!document.fullscreenElement); document.addEventListener('fullscreenchange', update); return () => document.removeEventListener('fullscreenchange', update); }, []);
+  const expand = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); } catch { /* The game remains playable when embedding disables fullscreen. */ } };
+  return <motion.div className="menu" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+    <header className="header">
+      <Logo />
+      <nav aria-label="Main navigation"><button onClick={() => open('protocol')}>THE PROTOCOL</button><button onClick={() => open('controls')}>HOW TO PLAY</button><button onClick={() => open('armory')}>ARMORY <ArrowUpRight size={13} /></button></nav>
+      <div className="header-actions"><span className="online-status"><i /> SYSTEM ONLINE</span><button className="icon-button" title={sound ? 'Mute audio' : 'Enable audio'} aria-label={sound ? 'Mute audio' : 'Enable audio'} onClick={() => { useGame.setState({ sound: !sound }); void audio.unlock().catch(() => undefined); }}>{sound ? <Volume2 size={18} /> : <VolumeX size={18} />}</button><button className="icon-button" aria-label="Settings" title="Settings" onClick={() => open('settings')}><SlidersHorizontal size={18} /></button></div>
+    </header>
+    <main className="menu-main">
+      <div className="hero-copy">
+        <motion.div className="eyebrow" initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}><span className="tiny-cross">+</span> A GEOMETRIC ROGUELITE <span className="version">V.01</span></motion.div>
+        <motion.h1 initial={{ y: 18, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.18, duration: 0.6 }}>SHAPE<br />THE <span className="title-star">✳</span><br /><span>CHAOS.</span></motion.h1>
+        <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.28 }}>
+          <p className="hero-description">One core. Infinite chaos.<br />Outlast the swarm. Evolve your arsenal.<br /><span>Break the protocol.</span></p>
+          <button className="primary-button enter-button" onClick={start}><span><Play size={15} fill="currentColor" /> ENTER THE VORTEX</span><ArrowUpRight size={24} /></button>
+          <div className="start-meta"><span><i /> NO DOWNLOAD. JUST SURVIVE.</span><button onClick={() => open('controls')}>CONTROLS <Keyboard size={14} /></button></div>
+        </motion.div>
+      </div>
+      <div className="preview-chrome">
+        <div className="preview-top"><span><Radio size={13} /> LIVE SIMULATION</span><span>SECTOR_07 <span className="muted">//</span> THE VORTEX</span></div>
+        <div className="preview-coordinate coord-one">X: 00.000<br />Y: 00.000<br /><span>CORE SIGNAL: STABLE</span></div>
+        <div className="core-label"><span className="label-line" /><div><span className="micro">YOUR ONLY CONSTANT</span><strong>THE POLY-CORE</strong><small>MK.01 <span>·</span> PHASE-SHIFT ENABLED</small></div></div>
+        <div className="arena-spec"><div><span className="signal-bars"><i /><i /><i /><i /><i /></span> REACTOR OUTPUT <strong>98.4%</strong></div><button className="icon-button" aria-label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} onClick={expand}><Expand size={18} /></button></div>
+      </div>
+      <div className="mission-strip">
+        <div className="mission-strip-title"><span className="micro">THE LOOP</span><strong>SURVIVE. EVOLVE. REPEAT.</strong><ArrowDown size={15} /></div>
+        <div className="feature"><span className="feature-icon"><Layers3 size={22} /></span><div><h3>INFINITE PRESSURE</h3><p>Relentless swarms. No two runs alike.</p></div></div>
+        <div className="feature"><span className="feature-icon"><Zap size={22} /></span><div><h3>UNLIMITED POTENTIAL</h3><p>Four weapon systems. Your evolution.</p></div></div>
+        <div className="feature"><span className="feature-icon"><Orbit size={24} /></span><div><h3>PURE NEON ENERGY</h3><p>Procedural worlds. Unfiltered chaos.</p></div></div>
+      </div>
+      <div className="deployment-bar"><span><CircleDot size={14} /> READY FOR DEPLOYMENT</span><button onClick={() => open('settings')}>MODE <strong>{difficulty === 'standard' ? 'STANDARD' : 'OVERDRIVE'}</strong><ChevronRight size={13} /></button><button onClick={() => open('armory')}>LOADOUT <strong>{WEAPONS[loadout].name.toUpperCase()}</strong><ChevronRight size={13} /></button><button onClick={() => open('core')}>CORE CREDITS <strong>{number(profile.credits)}</strong><ArrowUpRight size={13} /></button></div>
+    </main>
+    <footer className="footer"><span>DESIGNED TO BE OUTNUMBERED.</span><span className="footer-center"><i /> ALL SYSTEMS PROCEDURAL</span><button onClick={() => open('core')}>PERSONAL BEST <strong>{number(profile.best).padStart(6, '0')}</strong><Trophy size={13} /></button><span className="build-number">BUILD 001 / 2026</span></footer>
+  </motion.div>;
+}
+
+function PanelContent({ panel }: { panel: Exclude<Panel, null> }) {
+  const profile = useGame(s => s.profile), sound = useGame(s => s.sound), quality = useGame(s => s.quality), difficulty = useGame(s => s.difficulty), loadout = useGame(s => s.loadout);
+  if (panel === 'controls') return <>
+    <p className="panel-intro">Your weapons fire automatically. Keep moving, collect prisms, and make every phase shift count.</p>
+    <div className="control-row"><span><Keyboard /> MOVEMENT</span><div className="keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><em>or arrow keys</em></div></div>
+    <div className="control-row"><span><MousePointer2 /> AIM DIRECTION</span><div className="keys"><kbd>MOUSE</kbd></div></div>
+    <div className="control-row"><span><Wind /> PHASE SHIFT</span><div className="keys"><kbd>SPACE</kbd><em>or right-click</em></div></div>
+    <div className="control-row"><span><Pause /> PAUSE</span><div className="keys"><kbd>ESC</kbd></div></div>
+    <div className="control-row"><span><Layers3 /> CHOOSE UPGRADE</span><div className="keys"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd></div></div>
+    <div className="tip"><Sparkles size={18} /><p><strong>A little advice</strong>Dash through danger: phase shift makes you briefly invulnerable. Collect cyan prisms to level up. Touch controls appear on mobile.</p></div>
+  </>;
+  if (panel === 'protocol') return <>
+    <p className="panel-intro">You are the last stable core in a collapsing geometric system. The protocol wants you erased. Rewrite it.</p>
+    {[['01', 'Survive the swarm', 'Move through an infinite arena as chasers, orbiters, and heavy goliaths close in. Your core fires on its own.'], ['02', 'Evolve in real time', 'Collect XP prisms. Choose one of three randomized upgrades. Stack rare and overclocked modules into devastating builds.'], ['03', 'Break the protocol', 'Survive three minutes to awaken the Vortex Sentinel. Destroy it to extract. Every run earns credits for permanent core upgrades.']].map(([n, title, copy]) => <div className="brief-step" key={n}><span>{n}</span><div><h3>{title}</h3><p>{copy}</p></div></div>)}
+    <div className="protocol-bottom"><Hexagon size={20} /><span>ONE CORE. ONE CHANCE. <strong>MAKE IT COUNT.</strong></span></div>
+  </>;
+  if (panel === 'armory') return <>
+    <p className="panel-intro">Select your starting module. The pulse cannon is always equipped. Find and evolve every system during your run.</p>
+    <div className="armory-list">{(Object.keys(WEAPONS) as WeaponId[]).map(id => { const w = WEAPONS[id], Icon = weaponIcons[id]; return <button className={`weapon-option ${loadout === id ? 'selected' : ''}`} style={{ '--weapon-color': w.color } as React.CSSProperties} key={id} onClick={() => useGame.setState({ loadout: id })}><span className="weapon-option-icon"><Icon size={27} /></span><div><span className="micro">{w.code}</span><h3>{w.name}</h3><p>{w.description}</p></div><span className="select-indicator">{loadout === id && <Check size={13} />}</span></button>; })}</div>
+    <div className="panel-footnote"><CircleDot size={13} /> CHANGES APPLY TO YOUR NEXT DEPLOYMENT</div>
+    <a className="fleet-link" href="/hangar" target="_blank" rel="noreferrer">INSPECT THE FLEET <ArrowUpRight size={15} /></a>
+  </>;
+  if (panel === 'settings') return <>
+    <p className="panel-intro">Tune your connection to the vortex.</p>
+    <div className="setting-row"><div><h3>Procedural audio</h3><p>Synth bassline, laser pulses, and reactive effects.</p></div><Toggle label="Procedural audio" active={sound} onClick={() => { useGame.setState({ sound: !sound }); void audio.unlock().catch(() => undefined); }} /></div>
+    <div className="setting-row"><div><h3>Render quality</h3><p>{quality === 'high' ? 'Enhanced resolution and multisampled effects.' : 'Reduced resolution. Optimized for lighter hardware.'}</p></div><div className="segmented"><button className={quality === 'high' ? 'active' : ''} onClick={() => useGame.setState({ quality: 'high' })}>HIGH</button><button className={quality === 'performance' ? 'active' : ''} onClick={() => useGame.setState({ quality: 'performance' })}>PERFORMANCE</button></div></div>
+    <div className="setting-label">DEPLOYMENT DIFFICULTY</div>
+    <div className="difficulty-options"><button className={difficulty === 'standard' ? 'selected' : ''} onClick={() => useGame.setState({ difficulty: 'standard' })}><Shield size={23} /><strong>STANDARD</strong><p>The original protocol.<br />A fair fight against impossible odds.</p>{difficulty === 'standard' && <Check size={16} />}</button><button className={difficulty === 'overdrive' ? 'selected' : ''} onClick={() => useGame.setState({ difficulty: 'overdrive' })}><Zap size={23} /><strong>OVERDRIVE</strong><p>Faster swarms. Stronger enemies.<br />For cores that crave chaos.</p>{difficulty === 'overdrive' && <Check size={16} />}</button></div>
+    <div className="panel-footnote"><CircleDot size={13} /> DIFFICULTY APPLIES TO YOUR NEXT RUN</div>
+  </>;
+  const mods: { id: keyof Profile['upgrades']; title: string; copy: string; icon: typeof Shield }[] = [
+    { id: 'armor', title: 'Reinforced core', copy: '+15 starting integrity per level', icon: Shield },
+    { id: 'reactor', title: 'Charged reactor', copy: '+8% starting weapon damage per level', icon: Cpu },
+    { id: 'thrusters', title: 'Vector thrusters', copy: '+6% starting movement speed per level', icon: Wind },
+  ];
+  return <>
+    <div className="credit-card"><span><Cpu size={17} /> AVAILABLE CORE CREDITS</span><strong>{number(profile.credits)} <small>CR</small></strong></div>
+    <p className="panel-intro">Death is data. Invest your run credits in permanent improvements. Modifications persist between sessions.</p>
+    {mods.map(({ id, title, copy, icon: Icon }) => { const level = profile.upgrades[id], cost = 50 + level * 50; return <div className="mod-row" key={id}><Icon size={24} /><div><h3>{title}</h3><p>{copy}</p><div className="mod-pips">{Array.from({ length: 5 }, (_, i) => <i className={i < level ? 'filled' : ''} key={i} />)}<span>LV. {level}/5</span></div></div><button disabled={level === 5 || profile.credits < cost} onClick={() => useGame.getState().purchase(id)}>{level === 5 ? 'MAXED' : `${cost} CR`}{level < 5 && <ArrowUpRight size={13} />}</button></div>; })}
+    <div className="profile-stats"><div><span>DEPLOYMENTS</span><strong>{profile.runs}</strong></div><div><span>EXTRACTIONS</span><strong>{profile.wins}</strong></div><div><span>PERSONAL BEST</span><strong>{number(profile.best)}</strong></div></div>
+  </>;
+}
+
+function Modal({ panel, close }: { panel: Exclude<Panel, null>; close: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement; ref.current?.focus();
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopImmediatePropagation(); close(); }
+      if (e.key === 'Tab') {
+        const buttons = ref.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], [tabindex="0"]'); if (!buttons?.length) return;
+        const first = buttons[0], last = buttons[buttons.length - 1];
+        if (e.shiftKey && (document.activeElement === first || document.activeElement === ref.current)) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    window.addEventListener('keydown', key, true); return () => { window.removeEventListener('keydown', key, true); previous?.focus(); };
+  }, [close]);
+  return <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={close}><motion.div ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="panel-title" className="panel" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }} onClick={e => e.stopPropagation()}><div className="panel-header"><div><span className="micro">POLY-VORTEX / SYSTEM INTERFACE</span><h2 id="panel-title">{panelTitles[panel]}</h2></div><button className="icon-button" aria-label="Close dialog" onClick={close}><X size={20} /></button></div><PanelContent panel={panel} /></motion.div></motion.div>;
+}
+
+function HUD() {
+  const s = useGame();
+  const [notice, setNotice] = useState(true);
+  useEffect(() => { setNotice(true); const t = setTimeout(() => setNotice(false), 6500); return () => clearTimeout(t); }, [s.runId]);
+  const boss = s.time >= RUN_DURATION;
+  const bossEnemy = engine.enemies.find(e => e.kind === 3);
+  return <div className="hud">
+    <div className="hud-top"><div className="hud-core"><Logo small /><div className="integrity-label"><span>CORE INTEGRITY</span><strong>{Math.ceil(s.hp)}<small> / {s.maxHp}</small></strong></div><div className={`integrity-bar ${s.hp / s.maxHp < 0.3 ? 'critical' : ''}`}><i style={{ width: `${s.hp / s.maxHp * 100}%` }} /></div></div><div className="hud-timer"><span>{boss ? 'SENTINEL AWAKENED' : 'SURVIVE THE PROTOCOL'}</span><strong>{time(s.time)}</strong><small>{boss ? 'DESTROY TO EXTRACT' : `SENTINEL IN ${time(Math.max(0, RUN_DURATION - s.time))}`}</small></div><div className="hud-right"><button className="icon-button" aria-label={s.sound ? 'Mute audio' : 'Enable audio'} onClick={() => useGame.setState({ sound: !s.sound })}>{s.sound ? <Volume2 size={18} /> : <VolumeX size={18} />}</button><button className="icon-button" aria-label="Pause game" onClick={() => s.setPhase('paused')}><Pause size={18} /></button><div className="score"><span>SCORE</span><strong>{number(s.score).padStart(6, '0')}</strong><small>{number(s.kills)} ELIMINATED</small></div></div></div>
+    {boss && bossEnemy && <div className="boss-bar"><span>VORTEX SENTINEL</span><div><i style={{ width: `${bossEnemy.hp / bossEnemy.maxHp * 100}%` }} /></div></div>}
+    <AnimatePresence>{notice && s.phase === 'playing' && <motion.div className="deploy-notice" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}><span>PROTOCOL INITIATED</span><h2>KEEP. MOVING.</h2><p>Your weapons know what to do.</p></motion.div>}</AnimatePresence>
+    {s.combo >= 2 && <div className="combo"><strong>×{Math.floor(s.combo)}</strong><span>CHAIN MULTIPLIER</span></div>}
+    <div className="hud-bottom"><div className="weapon-slots">{(Object.keys(WEAPONS) as WeaponId[]).map(id => { const Icon = weaponIcons[id], lv = s.weapons[id]; return <div key={id} className={`weapon-slot ${lv ? 'equipped' : ''}`} style={{ '--weapon-color': WEAPONS[id].color } as React.CSSProperties} title={`${WEAPONS[id].name} · ${lv ? `Level ${lv}` : 'Not equipped'}`}><Icon size={23} /><span>{lv ? `LV ${lv}` : '—'}</span></div>; })}<div className={`dash-slot ${s.dash <= 0 ? 'ready' : ''}`}><Wind size={22} /><div><span>PHASE SHIFT</span><strong>{s.dash <= 0 ? 'READY' : `${s.dash.toFixed(1)}s`}</strong></div><kbd>SPACE</kbd></div></div><div className="hud-performance"><span><i /> SECTOR_07</span><small>{s.enemies} HOSTILES <span>/</span> {s.fps} FPS</small></div></div>
+    <div className="xp-container"><span>LV. {s.level}</span><div className="xp-bar"><i style={{ width: `${Math.min(100, s.xp / s.nextXp * 100)}%` }} /></div><small>{Math.floor(s.xp)} / {s.nextXp} XP</small></div>
+    <TouchControls />
+  </div>;
+}
+
+function TouchControls() {
+  const base = useRef<HTMLDivElement>(null), [stick, setStick] = useState({ x: 0, y: 0 });
+  const move = (e: React.PointerEvent) => {
+    const rect = base.current?.getBoundingClientRect(); if (!rect) return;
+    const dx = e.clientX - rect.left - rect.width / 2, dy = e.clientY - rect.top - rect.height / 2, d = Math.max(35, Math.hypot(dx, dy));
+    setStick({ x: dx / d * 35, y: dy / d * 35 }); engine.input.moveX = dx / d; engine.input.moveZ = dy / d; engine.input.aiming = false;
+  };
+  const stop = () => { setStick({ x: 0, y: 0 }); engine.input.moveX = 0; engine.input.moveZ = 0; };
+  const phase = useGame(s => s.phase);
+  useEffect(() => { if (phase !== 'playing') stop(); }, [phase]);
+  return <div className="touch-controls"><div className="joystick" ref={base} onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); move(e); }} onPointerMove={e => { if (e.currentTarget.hasPointerCapture(e.pointerId)) move(e); }} onPointerUp={stop} onPointerCancel={stop} role="button" aria-label="Touch movement joystick" tabIndex={0}><span style={{ transform: `translate(${stick.x}px, ${stick.y}px)` }}><Crosshair size={20} /></span></div><button className="touch-dash" onPointerDown={() => { engine.input.dash = true; }} aria-label="Phase shift"><Wind size={26} /><span>DASH</span></button></div>;
+}
+
+function UpgradeOverlay() {
+  const choices = useGame(s => s.choices), level = useGame(s => s.level);
+  useEffect(() => { const key = (e: KeyboardEvent) => { const i = Number(e.key) - 1; if (i >= 0 && i < 3 && choices[i]) engine.applyUpgrade(choices[i]); }; window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key); }, [choices]);
+  const select = (u: Upgrade) => engine.applyUpgrade(u);
+  return <motion.div className="game-overlay upgrade-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} role="dialog" aria-modal="true" aria-labelledby="upgrade-title"><div className="upgrade-heading"><span className="eyebrow"><Sparkles size={15} /> CORE LEVEL {level}</span><h2 id="upgrade-title">EVOLVE YOUR <em>ARSENAL.</em></h2><p>The swarm can wait. Choose your next advantage.</p></div><div className="upgrade-cards">{choices.map((u, i) => { const Icon = u.id in weaponIcons ? weaponIcons[u.id as WeaponId] : u.id === 'repair' ? Shield : u.id === 'speed' ? Wind : u.id === 'magnet' ? Orbit : Cpu; return <motion.button initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }} className={`upgrade-card rarity-${u.rarity.toLowerCase()}`} key={u.id} onClick={() => select(u)}><div className="upgrade-card-top"><span>{u.rarity}</span><kbd>{i + 1}</kbd></div><span className="upgrade-icon"><Icon size={42} strokeWidth={1.3} /></span><h3>{u.title}</h3><p>{u.description}</p><div className="upgrade-power">POWER +{u.power}<span>INSTALL MODULE <ArrowUpRight size={15} /></span></div></motion.button>; })}</div><span className="upgrade-hint">SELECT A MODULE OR PRESS 1 / 2 / 3</span></motion.div>;
+}
+
+function PauseOverlay({ open }: { open: (p: Panel) => void }) {
+  return <motion.div className="game-overlay pause-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><div className="pause-card"><span className="eyebrow"><Pause size={14} /> SIGNAL SUSPENDED</span><h2>TAKE A<br /><em>BREATHER.</em></h2><p>Your core is safe. The chaos can wait.</p><button className="primary-button" onClick={() => useGame.getState().setPhase('playing')}>RESUME PROTOCOL <Play size={17} fill="currentColor" /></button><button className="secondary-button" onClick={() => open('settings')}>SYSTEM SETTINGS <SlidersHorizontal size={15} /></button><button className="text-button" onClick={() => { engine.publish(); useGame.getState().saveRun(engine.score, engine.kills, false); }}>END RUN <ArrowUpRight size={13} /></button><small>PRESS ESC TO RESUME</small></div></motion.div>;
+}
+
+function ResultOverlay({ start, open }: { start: () => void; open: (p: Panel) => void }) {
+  const s = useGame(), won = s.phase === 'won';
+  return <motion.div className="game-overlay result-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><div className="result-card"><span className="result-symbol">{won ? <Trophy size={40} /> : <Hexagon size={40} />}</span><span className="eyebrow">{won ? 'EXTRACTION SUCCESSFUL' : 'CORE CONNECTION TERMINATED'}</span><h2>{won ? <>PROTOCOL<br /><em>BROKEN.</em></> : <>DEATH IS<br /><em>JUST DATA.</em></>}</h2><p>{won ? 'You rewrote the rules. The vortex remembers.' : 'Every run makes you stronger. Deploy again.'}</p><div className="result-stats"><div><span>FINAL SCORE</span><strong>{number(s.score)}</strong></div><div><span>SURVIVED</span><strong>{time(s.time)}</strong></div><div><span>ELIMINATED</span><strong>{number(s.kills)}</strong></div></div><div className="credits-earned"><Cpu size={18} /><span>CORE CREDITS EARNED</span><strong>+{s.earned} CR</strong></div><button className="primary-button" onClick={start}>DEPLOY AGAIN <RotateCcw size={18} /></button><div className="result-actions"><button className="secondary-button" onClick={() => open('core')}>UPGRADE CORE <ArrowUpRight size={14} /></button><button className="secondary-button" onClick={() => s.setPhase('menu')}>COMMAND CENTER <ArrowRight size={14} /></button></div></div></motion.div>;
+}
+
+export default function GameShell() {
+  const phase = useGame(s => s.phase), sound = useGame(s => s.sound);
+  const [panel, setPanel] = useState<Panel>(null);
+  const closePanel = useRef(() => setPanel(null));
+  useEffect(() => { useGame.getState().hydrate(); return () => audio.stopMusic(); }, []);
+  useEffect(() => { audio.setEnabled(sound); }, [sound]);
+  useEffect(() => { if (phase === 'playing') audio.startMusic(); else audio.stopMusic(); }, [phase]);
+  const start = () => { setPanel(null); void audio.unlock().catch(() => { useGame.setState({ sound: false }); }); useGame.getState().start(); };
+  return <div className={`app-shell ${phase === 'menu' ? 'is-menu' : 'is-game'}`}>
+    <div className="arena-canvas"><ArenaBoundary><Arena /></ArenaBoundary></div>
+    <AnimatePresence mode="wait">{phase === 'menu' ? <Menu key="menu" open={setPanel} start={start} /> : <motion.div key="game" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="game-interface"><HUD /><AnimatePresence>{phase === 'upgrade' && <UpgradeOverlay key="upgrade" />}{phase === 'paused' && <PauseOverlay key="pause" open={setPanel} />}{(phase === 'dead' || phase === 'won') && <ResultOverlay key="result" start={start} open={setPanel} />}</AnimatePresence></motion.div>}</AnimatePresence>
+    <AnimatePresence>{panel && <Modal key={panel} panel={panel} close={closePanel.current} />}</AnimatePresence>
+  </div>;
+}
