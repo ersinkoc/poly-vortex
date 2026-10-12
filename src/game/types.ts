@@ -20,7 +20,7 @@ export type Input = { keys: Set<string>; aimX: number; aimZ: number; aiming: boo
 
 export const WEAPONS: Record<WeaponId, { name: string; code: string; description: string; color: string }> = {
   pulse: { name: 'Pulse laser', code: 'PL-01', description: 'Rapid-fire homing bolts. Precision, at the speed of light.', color: '#bbff57' },
-  glaive: { name: 'Orbital glaives', code: 'OG-02', description: 'Rotating blades that turn your perimeter into a kill zone.', color: '#6ee7ff' },
+  glaive: { name: 'Escort drones', code: 'ED-02', description: 'Armored ducted-fan escorts. Orbit your core and intercept nearby hostiles.', color: '#6ee7ff' },
   cryo: { name: 'Cryo-singularity', code: 'CS-03', description: 'A gravitational anomaly. Pull them in. Tear them apart.', color: '#a48bfa' },
   tesla: { name: 'Tesla arc', code: 'TA-04', description: 'Chain lightning that jumps through up to five targets.', color: '#ffbf6a' },
 };

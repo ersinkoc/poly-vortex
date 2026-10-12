@@ -50,15 +50,10 @@ function Projectiles() {
 }
 
 function Effects() {
-  const glaives = useRef<THREE.Group>(null), reticle = useRef<THREE.Group>(null);
+  const reticle = useRef<THREE.Group>(null);
   const vortex = useRef<THREE.InstancedMesh>(null), arcs = useRef<THREE.LineSegments>(null);
   const arcPositions = useMemo(() => new Float32Array(600), []);
   useFrame(({ clock }) => {
-    const p = engine.player;
-    if (glaives.current) {
-      glaives.current.position.set(p.x, 0.65, p.z); glaives.current.rotation.y = -engine.time * 2.3;
-      glaives.current.children.forEach((blade, i) => { blade.visible = engine.weapons.glaive > 0 && i < engine.weapons.glaive + 1; const a = i / (engine.weapons.glaive + 1) * Math.PI * 2; blade.position.set(Math.cos(a) * 3, 0, Math.sin(a) * 3); blade.rotation.y = clock.elapsedTime * 5; });
-    }
     if (reticle.current) { reticle.current.position.set(engine.input.aimX, 0.04, engine.input.aimZ); reticle.current.visible = useGame.getState().phase === 'playing' && engine.input.aiming; reticle.current.rotation.y = clock.elapsedTime * 0.5; }
     if (vortex.current) {
       let n = 0;
@@ -80,7 +75,6 @@ function Effects() {
     }
   });
   return <>
-    <group ref={glaives}>{Array.from({ length: 7 }, (_, i) => <mesh key={i} scale={[0.3, 0.18, 0.85]}><octahedronGeometry args={[1]} /><meshBasicMaterial color={[0.5, 2.7, 3]} toneMapped={false} /></mesh>)}</group>
     <group ref={reticle}>
       <mesh rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[0.42, 0.46, 4]} /><meshBasicMaterial color="#baff62" transparent opacity={0.8} side={THREE.DoubleSide} /></mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[0.07, 0.11, 12]} /><meshBasicMaterial color="#baff62" /></mesh>

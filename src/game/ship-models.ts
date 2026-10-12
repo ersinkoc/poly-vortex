@@ -96,6 +96,45 @@ export function buildPlayerShip(): ShipModel {
   return b.finish();
 }
 
+export function buildEscortDrone(): ShipModel {
+  const b = new ShipBuilder();
+  // A compact ducted-fan quadrotor, distinct from the winged hostile interceptors.
+  b.box('hull', [0.48, 0.22, 0.76], [0, 0, 0], [0, 0, 0], 0.075);
+  b.plate('armor', [[-0.18, 0.39], [-0.25, 0.07], [-0.2, -0.34], [0.2, -0.34], [0.25, 0.07], [0.18, 0.39]], 0.055, 0.14);
+  b.box('metal', [0.32, 0.1, 0.3], [0, -0.17, 0.28], [0.08, 0, 0], 0.04);
+  b.add('glass', new THREE.SphereGeometry(0.14, 12, 8), [0, -0.16, 0.4], [0, 0, 0], [1, 0.85, 0.6]);
+  b.ring('signal', 0.115, 0.012, [0, -0.16, 0.46]);
+  b.vents([0, 0.175, -0.14], 0.19, 4, 0.06);
+  b.box('signal', [0.1, 0.02, 0.035], [0, 0.19, 0.17], [0, 0, 0], 0.005);
+  for (const side of [-1, 1]) {
+    b.gun(side * 0.27, -0.04, 0.32, 0.55);
+    for (const end of [-1, 1]) {
+      const x = side * 0.55, z = end * 0.37;
+      b.box('metal', [0.36, 0.07, 0.1], [side * 0.37, 0.015, z], [0, side * end * -0.25, 0], 0.018);
+      b.ring('hull', 0.215, 0.045, [x, 0.035, z], [Math.PI / 2, 0, 0], 16);
+      b.ring('metal', 0.23, 0.018, [x, 0.08, z], [Math.PI / 2, 0, 0], 16);
+      b.cylinder('metal', 0.045, 0.055, 0.11, [x, 0.01, z], [0, 0, 0], 8);
+      b.cylinder('engine', 0.095, 0.065, 0.025, [x, -0.08, z], [0, 0, 0], 10);
+      b.box('armor', [0.09, 0.04, 0.27], [x, 0.07, z], [0, 0, 0], 0.012);
+      b.bolts([[side * 0.19, 0.2, end * 0.25]]);
+    }
+    b.box('signal', [0.025, 0.025, 0.15], [side * 0.75, 0.075, 0.36], [0, 0, 0], 0.005);
+  }
+  b.cylinder('metal', 0.012, 0.018, 0.22, [0.13, 0.27, -0.29], [0, 0, -0.1], 6);
+  b.add('signal', new THREE.SphereGeometry(0.025, 8, 6), [0.15, 0.39, -0.29]);
+  return b.finish();
+}
+
+export function buildDroneRotor(): THREE.BufferGeometry {
+  const parts = [0, Math.PI / 2].map(a => {
+    const source = new THREE.BoxGeometry(0.32, 0.015, 0.035), blade = source.toNonIndexed();
+    source.dispose(); blade.rotateY(a); return blade;
+  });
+  const merged = mergeGeometries(parts); parts.forEach(g => g.dispose());
+  if (!merged) throw new Error('Could not merge drone rotor');
+  merged.computeBoundingBox(); merged.computeBoundingSphere(); return merged;
+}
+
 function chaser(): ShipModel {
   const b = new ShipBuilder();
   b.plate('hull', [[0, 1.22], [-0.32, 0.36], [-0.37, -0.66], [0, -0.95], [0.37, -0.66], [0.32, 0.36]], 0.23);

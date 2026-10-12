@@ -12,6 +12,7 @@ import { RewardReel } from './reward-reel';
 import { UPGRADE_LIMITS, previewUpgrade } from './upgrade-preview';
 import { shieldContact, shieldImpact, SHIELD_IMPACT, type HitSource, type ShieldHit } from './shield-impact';
 import { EXPEDITION, doctrineAt, dockStatus, fleetScale, type RunMode, type ServiceDock } from './expedition';
+import { droneCount, dronePose } from './orbital-drones';
 import type { Arc, Bolt, Cache, DamageText, Entity, Gem, Hazard, Input, Particle, Rocket, Shockwave, Supply, Upgrade, UpgradeId, Vortex, WeaponId } from './types';
 
 export const LIMITS = { enemies: 280, bolts: 500, rockets: 16, particles: 1000, gems: 400, shockwaves: 40, damageTexts: 40, hazards: 12, supplies: 10, caches: 8 };
@@ -20,7 +21,7 @@ const colors = ['#ff567f', '#b58aff', '#ffab56', '#ff466d'];
 const distance = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.hypot(a.x - b.x, a.z - b.z);
 const defs: Record<UpgradeId, [string, string]> = {
   pulse: ['Pulse laser', 'Add a homing bolt. Increase pulse damage and fire rate.'],
-  glaive: ['Orbital glaives', 'Deploy another orbiting blade. Cut through nearby enemies.'],
+  glaive: ['Escort drones', 'Deploy another armored escort drone. Intercept hostiles at your perimeter.'],
   cryo: ['Cryo-singularity', 'Create a gravity well that pulls in and shatters the swarm.'],
   tesla: ['Tesla arc', 'Arc between nearby targets. More voltage. More damage.'],
   damage: ['Reactor overclock', 'Increase all weapon damage by 20% per power level.'],
@@ -413,6 +414,8 @@ export class GameEngine {
     const bins = new Map<string, Entity[]>();
     const motionScale = this.runMode === 'expedition' ? fleetScale(this.chapter, this.chapterTime).speed : 1 + this.time / 360;
     const chaserScale = this.runMode === 'expedition' ? doctrineAt(this.chapter).speed : 1;
+    const droneTotal = droneCount(this.weapons.glaive);
+    const drones = Array.from({ length: droneTotal }, (_, i) => dronePose(this.time, i, droneTotal, p));
     for (const e of this.enemies) {
       const key = `${Math.floor(e.x / 2)},${Math.floor(e.z / 2)}`; const bin = bins.get(key);
       if (bin) bin.push(e); else bins.set(key, [e]);
@@ -454,12 +457,7 @@ export class GameEngine {
           this.bolts.push({ x: e.x, z: e.z, vx: Math.sin(a) * velocity, vz: Math.cos(a) * velocity, enemy: true, age: 0, target: 0, damage: e.elite ? 14 : 10 });
         }
       }
-      if (this.weapons.glaive) {
-        for (let j = 0; j < this.weapons.glaive + 1; j++) {
-          const a = this.time * 2.3 + j / (this.weapons.glaive + 1) * Math.PI * 2;
-          if (Math.hypot(e.x - p.x - Math.cos(a) * 3, e.z - p.z - Math.sin(a) * 3) < e.radius + 0.7) this.hitEnemy(e, dt * 65 * this.damage);
-        }
-      }
+      for (const drone of drones) if (Math.hypot(e.x - drone.x, e.z - drone.z) < e.radius + 0.7) this.hitEnemy(e, dt * 65 * this.damage);
     }
     if (useGame.getState().phase !== 'playing') return;
     const friendlies = this.missions.mission?.kind === 'rescue' && this.missions.mission.status === 'active' ? this.missions.mission.targets.filter(t => !t.done) : [];

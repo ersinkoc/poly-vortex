@@ -5,7 +5,8 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { engine, LIMITS } from '@/game/engine';
 import { useGame } from '@/game/store';
-import { buildEnemyShip, buildPlayerShip, buildShadowTexture, buildShipMaterials, buildSurfaceTextures, SURFACES, type ShipModel } from '@/game/ship-models';
+import { buildDroneRotor, buildEnemyShip, buildEscortDrone, buildPlayerShip, buildShadowTexture, buildShipMaterials, buildSurfaceTextures, SURFACES, type ShipModel } from '@/game/ship-models';
+import { DRONE_ORBIT, droneCount, dronePose } from '@/game/orbital-drones';
 import { terrainHeight } from '@/game/terrain';
 import { attachDamageMaterial, buildDamageUniforms, damageHeat, hullDamage } from '@/game/ship-damage';
 
@@ -77,19 +78,53 @@ function EnemyShips({ kind, asset, shadow }: { kind: 0 | 1 | 2 | 3; asset: Actor
   </>;
 }
 
+function EscortDrones({ asset, rotor, shadow }: { asset: ActorAsset; rotor: THREE.BufferGeometry; shadow: THREE.Texture }) {
+  const layers = useRef<(THREE.InstancedMesh | null)[]>([]), fans = useRef<THREE.InstancedMesh>(null), footprints = useRef<THREE.InstancedMesh>(null);
+  const objects = useMemo(() => ({ body: new THREE.Object3D(), fan: new THREE.Object3D(), fanWorld: new THREE.Matrix4(), footprint: new THREE.Object3D() }), []);
+  useEffect(() => {
+    const owned = [...layers.current, fans.current, footprints.current];
+    for (const mesh of owned) mesh?.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    return () => { owned.forEach(mesh => mesh?.dispose()); };
+  }, []);
+  useFrame(() => {
+    const count = useGame.getState().phase === 'menu' ? 0 : droneCount(engine.weapons.glaive);
+    for (let i = 0; i < count; i++) {
+      const pose = dronePose(engine.time, i, count, engine.player), { body, fan, fanWorld, footprint } = objects;
+      body.position.set(pose.x, pose.y, pose.z); body.rotation.set(pose.pitch, pose.yaw, pose.bank); body.scale.setScalar(DRONE_ORBIT.scale); body.updateMatrix();
+      for (const layer of layers.current) layer?.setMatrixAt(i, body.matrix);
+      let j = 0;
+      for (const side of [-1, 1]) for (const end of [-1, 1]) {
+        fan.position.set(side * 0.55, 0.065, end * 0.37); fan.rotation.set(0, engine.time * 54 * side * end + i * 0.8, 0); fan.updateMatrix();
+        fanWorld.multiplyMatrices(body.matrix, fan.matrix); fans.current?.setMatrixAt(i * 4 + j++, fanWorld);
+      }
+      footprint.position.set(pose.x, terrainHeight(pose.x, pose.z) + 0.03, pose.z); footprint.rotation.set(-Math.PI / 2, 0, -pose.yaw); footprint.scale.set(1.7, 1.9, 1); footprint.updateMatrix();
+      footprints.current?.setMatrixAt(i, footprint.matrix);
+    }
+    for (const mesh of [...layers.current, footprints.current]) if (mesh) { mesh.count = count; mesh.instanceMatrix.needsUpdate = true; }
+    if (fans.current) { fans.current.count = count * 4; fans.current.instanceMatrix.needsUpdate = true; }
+  });
+  return <>
+    {SURFACES.map((surface, i) => <instancedMesh key={surface} ref={mesh => { layers.current[i] = mesh; }} args={[asset.model[surface], asset.materials[surface], DRONE_ORBIT.capacity]} count={0} frustumCulled={false} dispose={null} castShadow={surface === 'hull' || surface === 'armor'} receiveShadow />)}
+    <instancedMesh ref={fans} args={[rotor, asset.materials.metal, DRONE_ORBIT.capacity * 4]} count={0} frustumCulled={false} dispose={null} />
+    <instancedMesh ref={footprints} args={[undefined, undefined, DRONE_ORBIT.capacity]} count={0} frustumCulled={false}><planeGeometry args={[1, 1]} /><meshBasicMaterial map={shadow} transparent opacity={0.32} depthWrite={false} /></instancedMesh>
+  </>;
+}
+
 export default function ShipFleet() {
   const assets = useMemo(() => {
     const textures = buildSurfaceTextures(), shadow = buildShadowTexture();
     const player = { model: buildPlayerShip(), materials: buildShipMaterials('#bdff6f', true, textures), damage: buildDamageUniforms() };
     for (const surface of ['hull', 'armor', 'metal', 'glass'] as const) attachDamageMaterial(player.materials[surface], player.damage);
     const enemies = ([0, 1, 2, 3] as const).map(kind => ({ model: buildEnemyShip(kind), materials: buildShipMaterials(accents[kind], false, textures) }));
-    return { textures, shadow, player, enemies };
+    const drone = { model: buildEscortDrone(), materials: buildShipMaterials('#6ee7ff', false, textures) };
+    const rotor = buildDroneRotor();
+    return { textures, shadow, player, enemies, drone, rotor };
   }, []);
   useEffect(() => () => {
-    for (const actor of [assets.player, ...assets.enemies]) {
+    for (const actor of [assets.player, ...assets.enemies, assets.drone]) {
       Object.values(actor.model).forEach(geometry => geometry.dispose()); Object.values(actor.materials).forEach(material => material.dispose());
     }
-    Object.values(assets.textures).forEach(texture => texture.dispose()); assets.shadow.dispose();
+    Object.values(assets.textures).forEach(texture => texture.dispose()); assets.shadow.dispose(); assets.rotor.dispose();
   }, [assets]);
-  return <><PlayerShip asset={assets.player} shadow={assets.shadow} />{([0, 1, 2, 3] as const).map(kind => <EnemyShips key={kind} kind={kind} asset={assets.enemies[kind]} shadow={assets.shadow} />)}</>;
+  return <><PlayerShip asset={assets.player} shadow={assets.shadow} /><EscortDrones asset={assets.drone} rotor={assets.rotor} shadow={assets.shadow} />{([0, 1, 2, 3] as const).map(kind => <EnemyShips key={kind} kind={kind} asset={assets.enemies[kind]} shadow={assets.shadow} />)}</>;
 }

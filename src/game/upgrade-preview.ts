@@ -11,7 +11,7 @@ export function previewUpgrade(s: BuildStats, u: Upgrade): StatChange[] {
     const w = id as WeaponId, a = s.weapons[w], b = Math.min(6, a + power);
     const rows = row(a ? 'MODULE LEVEL' : 'NEW WEAPON', a ? `LV ${a}` : 'OFFLINE', `LV ${b}`);
     if (w === 'pulse') rows.push(...row('BOLT DAMAGE', fixed((15 + a * 4) * s.damage), fixed((15 + b * 4) * s.damage)), ...row('VOLLEY', `${Math.ceil(a / 2)} bolts`, `${Math.ceil(b / 2)} bolts`));
-    else if (w === 'glaive') rows.push(...row('ORBITAL BLADES', `${a ? a + 1 : 0}`, `${b + 1}`));
+    else if (w === 'glaive') rows.push(...row('ESCORT DRONES', `${a ? a + 1 : 0}`, `${b + 1}`));
     else if (w === 'cryo') rows.push(...row('VORTEX RADIUS', a ? `${fixed(3.5 + a * 0.3)}m` : '—', `${fixed(3.5 + b * 0.3)}m`));
     else rows.push(...row('CHAIN TARGETS', a ? `${Math.min(5, 2 + a)}` : '—', `${Math.min(5, 2 + b)}`));
     return rows;

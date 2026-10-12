@@ -42,7 +42,13 @@ The custom domain is `poly-vortex.oxog.dev`, configured in `public/CNAME` and Gi
 - **Module reel:** XP and elite salvage install upgrades automatically; keep moving.
 - **Touch:** Use the on-screen movement joystick and dash button.
 
-Collect cyan XP prisms. A compact side reel automatically installs one randomized common, rare, or overclocked upgrade without pausing combat. Mix pulse lasers, orbital glaives, cryo-singularities, and Tesla arcs. At three minutes the Vortex Sentinel arrives. Classic extracts immediately on its defeat; Expedition opens a service and extraction window, then continues into another front. Standard and Overdrive difficulties are available. Every run awards core credits, saved in browser local storage, for permanent armor, damage, and speed upgrades. There are no accounts or server dependencies.
+Collect cyan XP prisms. A compact side reel automatically installs one randomized common, rare, or overclocked upgrade without pausing combat. Mix pulse lasers, escort drones, cryo-singularities, and Tesla arcs. At three minutes the Vortex Sentinel arrives. Classic extracts immediately on its defeat; Expedition opens a service and extraction window, then continues into another front. Standard and Overdrive difficulties are available. Every run awards core credits, saved in browser local storage, for permanent armor, damage, and speed upgrades. There are no accounts or server dependencies.
+
+## Escort drone update — 1.11
+
+The orbital diamond blades are replaced by detailed procedural ducted-fan drones: armored central chassis, four fan housings and rotating propellers, glass sensor, antenna, twin interception emitters, cooling grilles and cyan friendly identification lights. Each equipped level adds an escort, from two at level one to seven at the cap. Models reuse the fleet's locally generated PBR surface textures, emissive materials and shared shadow map. Six instanced body surfaces, one rotor batch and one ground-shadow batch render the entire escort formation; no downloaded model or texture is needed.
+
+World-space orbit positions are shared by rendering and close-range damage detection, keeping their three-metre perimeter and original interception damage. Bodies bank into their orbit and all drone motion, hover and propeller rotation freezes with simulation time on pause or hit-stop. Escorts disappear in the command-center preview and are cleared on a new deployment. The display name is **Escort drones**; the internal `glaive` module identifier remains compatible with existing saved loadouts. They intercept nearby hostiles rather than adding unrestricted long-range auto-fire.
 
 ## Expedition update — 1.10
 
