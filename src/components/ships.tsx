@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { engine, LIMITS } from '@/game/engine';
 import { useGame } from '@/game/store';
 import { buildEnemyShip, buildPlayerShip, buildShadowTexture, buildShipMaterials, buildSurfaceTextures, SURFACES, type ShipModel } from '@/game/ship-models';
+import { terrainHeight } from '@/game/terrain';
 
 type ActorAsset = { model: ShipModel; materials: ReturnType<typeof buildShipMaterials> };
 const accents = ['#ff5774', '#a685ff', '#ffae50', '#ff3a5d'];
@@ -20,16 +21,18 @@ function PlayerShip({ asset, shadow }: { asset: ActorAsset; shadow: THREE.Textur
       group.current.position.set(p.x, 0.95 + Math.sin(clock.elapsedTime * 2.5) * 0.045, p.z);
       group.current.rotation.set(menu ? -0.04 : p.vz * 0.009, menu ? clock.elapsedTime * 0.1 + 0.7 : p.angle, menu ? Math.sin(clock.elapsedTime * 0.7) * 0.025 : -p.vx * 0.025);
       group.current.scale.setScalar(menu ? 2.25 : 0.83);
-      group.current.visible = menu || p.invulnerable <= 0 || Math.floor(clock.elapsedTime * 18) % 2 === 0;
+      group.current.visible = true;
     }
     const flame = asset.materials.engine as THREE.MeshBasicMaterial;
     flame.color.copy(idleFlame).multiplyScalar((p.dashTime > 0 ? 6 : 2.4) + Math.sin(clock.elapsedTime * 35) * 0.28 + Math.hypot(p.vx, p.vz) * 0.08);
-    if (footprint.current) { footprint.current.position.set(p.x, 0.005, p.z); footprint.current.rotation.set(-Math.PI / 2, 0, -(menu ? clock.elapsedTime * 0.1 + 0.7 : p.angle)); footprint.current.scale.set(menu ? 5.5 : 2.4, menu ? 7 : 3, 1); }
+    const armor = asset.materials.armor as THREE.MeshPhysicalMaterial;
+    armor.emissive.set(p.invulnerable > 0 && !menu ? '#83c6e1' : '#000000'); armor.emissiveIntensity = 0.16;
+    if (footprint.current) { footprint.current.position.set(p.x, terrainHeight(p.x, p.z) + 0.035, p.z); footprint.current.rotation.set(-Math.PI / 2, 0, -(menu ? clock.elapsedTime * 0.1 + 0.7 : p.angle)); footprint.current.scale.set(menu ? 5.5 : 2.4, menu ? 7 : 3, 1); }
     if (light.current) light.current.position.set(p.x, 1.8, p.z);
   });
   return <>
-    <group ref={group} dispose={null}>{SURFACES.map(surface => <mesh key={surface} geometry={asset.model[surface]} material={asset.materials[surface]} />)}</group>
-    <mesh ref={footprint}><planeGeometry args={[1, 1]} /><meshBasicMaterial map={shadow} transparent opacity={0.8} depthWrite={false} /></mesh>
+    <group ref={group} dispose={null}>{SURFACES.map(surface => <mesh key={surface} geometry={asset.model[surface]} material={asset.materials[surface]} castShadow={surface === 'hull' || surface === 'armor'} receiveShadow />)}</group>
+    <mesh ref={footprint}><planeGeometry args={[1, 1]} /><meshBasicMaterial map={shadow} transparent opacity={0.4} depthWrite={false} /></mesh>
     <pointLight ref={light} color="#9cdbff" intensity={9} distance={6} decay={2} />
   </>;
 }
@@ -54,15 +57,15 @@ function EnemyShips({ kind, asset, shadow }: { kind: 0 | 1 | 2 | 3; asset: Actor
       matrixObject.scale.setScalar(scale); matrixObject.updateMatrix();
       for (const mesh of layers.current) mesh?.setMatrixAt(count, matrixObject.matrix);
       if (footprints.current) {
-        matrixObject.position.set(x, 0.003 + kind * 0.001, z); matrixObject.rotation.set(-Math.PI / 2, 0, -yaw); matrixObject.scale.set(scale * 2.5, scale * 2.9, 1); matrixObject.updateMatrix(); footprints.current.setMatrixAt(count, matrixObject.matrix);
+        matrixObject.position.set(x, terrainHeight(x, z) + 0.025 + kind * 0.001, z); matrixObject.rotation.set(-Math.PI / 2, 0, -yaw); matrixObject.scale.set(scale * 2.5, scale * 2.9, 1); matrixObject.updateMatrix(); footprints.current.setMatrixAt(count, matrixObject.matrix);
       }
       count++;
     }
     for (const mesh of [...layers.current, footprints.current]) if (mesh) { mesh.count = count; mesh.instanceMatrix.needsUpdate = true; }
   });
   return <>
-    {SURFACES.map((surface, i) => <instancedMesh key={surface} ref={mesh => { layers.current[i] = mesh; }} args={[asset.model[surface], asset.materials[surface], LIMITS.enemies]} frustumCulled={false} dispose={null} />)}
-    <instancedMesh ref={footprints} args={[undefined, undefined, LIMITS.enemies]} frustumCulled={false}><planeGeometry args={[1, 1]} /><meshBasicMaterial map={shadow} transparent opacity={0.6} depthWrite={false} /></instancedMesh>
+    {SURFACES.map((surface, i) => <instancedMesh key={surface} ref={mesh => { layers.current[i] = mesh; }} args={[asset.model[surface], asset.materials[surface], LIMITS.enemies]} frustumCulled={false} dispose={null} castShadow={surface === 'hull' || surface === 'armor'} receiveShadow />)}
+    <instancedMesh ref={footprints} args={[undefined, undefined, LIMITS.enemies]} frustumCulled={false}><planeGeometry args={[1, 1]} /><meshBasicMaterial map={shadow} transparent opacity={0.3} depthWrite={false} /></instancedMesh>
   </>;
 }
 

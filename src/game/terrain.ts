@@ -39,15 +39,21 @@ export function buildTerrainTextures(size = 256) {
   const albedo = new Uint8Array(size * size * 4), normals = new Uint8Array(size * size * 4), roughness = new Uint8Array(size * size * 4);
   const sample = (x: number, z: number) => {
     x = (x + size) % size; z = (z + size) % size;
-    return hash(x, z, 71) * 0.55 + hash(Math.floor(x / 6), Math.floor(z / 6), 31) * 0.45;
+    const smooth = (cells: number, salt: number) => {
+      const gx = x / size * cells, gz = z / size * cells, ix = Math.floor(gx), iz = Math.floor(gz);
+      const u = (gx - ix) ** 2 * (3 - 2 * (gx - ix)), v = (gz - iz) ** 2 * (3 - 2 * (gz - iz));
+      const a = hash(ix % cells, iz % cells, salt), b = hash((ix + 1) % cells, iz % cells, salt), c = hash(ix % cells, (iz + 1) % cells, salt), d = hash((ix + 1) % cells, (iz + 1) % cells, salt);
+      return (a + (b - a) * u) * (1 - v) + (c + (d - c) * u) * v;
+    };
+    return smooth(8, 71) * 0.5 + smooth(32, 31) * 0.3 + hash(x, z, 19) * 0.2;
   };
   for (let z = 0; z < size; z++) for (let x = 0; x < size; x++) {
     const i = (z * size + x) * 4, v = sample(x, z);
-    const crack = Math.abs(Math.sin(x * 0.07 + Math.sin(z * 0.035) * 5)) < 0.035;
-    const value = crack ? 36 : 78 + v * 86;
-    albedo.set([value * 0.82, value * 0.9, value, 255], i);
-    normals.set([128 + (sample(x - 1, z) - sample(x + 1, z)) * 85, 128 + (sample(x, z - 1) - sample(x, z + 1)) * 85, 235, 255], i);
-    roughness.set([210 + v * 42, 210 + v * 42, 210 + v * 42, 255], i);
+    const crack = Math.abs(Math.sin(x / size * Math.PI * 6 + Math.sin(z / size * Math.PI * 2) * 2)) < 0.025;
+    const mineral = hash(x, z, 29) > 0.992, value = crack ? 32 : mineral ? 162 : 70 + v * 86;
+    albedo.set([value, value * 0.93, value * 0.81, 255], i);
+    normals.set([128 + (sample(x - 1, z) - sample(x + 1, z)) * 145, 128 + (sample(x, z - 1) - sample(x, z + 1)) * 145, 240, 255], i);
+    roughness.set([175 + v * 65, 175 + v * 65, 175 + v * 65, 255], i);
   }
   const texture = (data: Uint8Array) => { const t = new THREE.DataTexture(data, size, size); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter; t.generateMipmaps = true; t.needsUpdate = true; return t; };
   const map = texture(albedo); map.colorSpace = THREE.SRGBColorSpace; return { map, normal: texture(normals), roughness: texture(roughness) };

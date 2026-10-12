@@ -55,6 +55,16 @@ Collect cyan XP prisms. Choose randomized common, rare, or overclocked upgrades.
 
 The pacing design is informed by [Valve's AI Systems of Left 4 Dead](https://cdn.akamai.steamstatic.com/apps/valve/2009/ai_systems_of_l4d_mike_booth.pdf). Objective guidance and optional camera motion draw on Microsoft's [XAG 109](https://learn.microsoft.com/en-us/xbox/accessibility/xbox-accessibility-guidelines/109) and [XAG 117](https://learn.microsoft.com/en-us/xbox/accessibility/xbox-accessibility-guidelines/117). These are design references, not accessibility certification.
 
+## Visual overhaul — 1.6
+
+- A player-following directional shadow rig grounds the fleet, rocks, and industrial ruins. Warm key light, cool fill light, and a procedural reflection studio bring out chipped armor, brushed metal, and coated cockpit glass. Invulnerability retains the visible ship and adds an armor glow instead of rapidly hiding the entire model.
+- The ground combines deterministic mineral/crack textures, stronger normal detail, macro weathering, varying roughness and reflective patches. The reactive neon grid follows the existing height geometry at a lower base intensity. Up to 324 instanced, decorative stone chips add depth without changing collision or firing lanes.
+- Thruster nozzles emit crossed shader ribbons with hot cores and animated exhaust cells. The player's three engines respond to movement and extend during phase shift; Chaser and Goliath plumes follow their actual nozzle positions. Laser cores are rounded and gain soft tracer halos.
+- Enemy deaths, rocket impacts and ion/EMP bursts create bounded layered effects. Fire blooms fade into rising smoke; metal fragments tumble and fall; larger fire explosions leave temporary ground scars. Up to three nearby explosion lights briefly illuminate ships and terrain. Energy bursts do not leave fire scorch marks.
+- Visual state has separate budgets and identifiers: at most 24 active blasts, 48 scars, 144 puffs per layer and 192 debris fragments. Sprite textures and random detail are generated locally without consuming gameplay RNG. Effects freeze with the simulation and clear on redeployment.
+- High mode enables shadows, smoke, debris, rubble and explosion lights. Performance mode retains the gameplay cues with smaller fire/exhaust layers and disables the expensive extras. Reduced effects limits fire brightness and disables explosion lighting and rapid exhaust modulation.
+- The shader clamps interpolated UVs before fractional powers so invalid edge values cannot propagate through Bloom. All geometry, maps and GPU pools are reused and disposed on unmount. Frame rate still depends on hardware, resolution and horde density.
+
 ## Combat systems
 
 - Five escalating sectors with distinct grid colors and timed ion-strike warnings.

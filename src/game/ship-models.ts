@@ -196,9 +196,10 @@ export function buildSurfaceTextures(size = 128) {
     const seam = x % 32 < 1 || y % 64 < 1;
     const scratch = x % 23 === 0 && y % 41 > 7 && y % 41 < 25;
     const brushed = Math.sin(x * 2.1) * 5 + noise() * 13;
-    const value = seam ? 70 : scratch ? 185 : 225 + brushed;
+    const wear = noise(), chipped = wear > 0.985, grime = wear < 0.055;
+    const value = seam ? 58 : chipped ? 145 : grime ? 178 : scratch ? 193 : 222 + brushed;
     paint[i] = paint[i + 1] = paint[i + 2] = value; paint[i + 3] = 255;
-    rough[i] = rough[i + 1] = rough[i + 2] = seam ? 245 : 105 + brushed * 2; rough[i + 3] = 255;
+    rough[i] = rough[i + 1] = rough[i + 2] = seam || grime ? 226 : chipped ? 175 : 120 + brushed * 2; rough[i + 3] = 255;
     normal[i] = seam ? 102 : 128 + noise() * 7 - 3; normal[i + 1] = scratch ? 146 : 128; normal[i + 2] = 253; normal[i + 3] = 255;
   }
   const texture = (data: Uint8Array, srgb = false) => {
@@ -211,12 +212,12 @@ export function buildSurfaceTextures(size = 128) {
 }
 
 export function buildShipMaterials(accent: string, player: boolean, textures: ReturnType<typeof buildSurfaceTextures>): Record<Surface, THREE.Material> {
-  const shared = { map: textures.paint, roughnessMap: textures.roughness, normalMap: textures.normal, normalScale: new THREE.Vector2(0.12, 0.12), envMapIntensity: 1.15 };
+  const shared = { map: textures.paint, roughnessMap: textures.roughness, normalMap: textures.normal, normalScale: new THREE.Vector2(0.22, 0.22), envMapIntensity: 1.3 };
   return {
-    hull: new THREE.MeshStandardMaterial({ ...shared, color: '#27313c', metalness: 0.82, roughness: 0.68 }),
-    armor: new THREE.MeshPhysicalMaterial({ ...shared, color: player ? '#9da9af' : '#64717a', metalness: 0.56, roughness: 0.55, clearcoat: 0.3, clearcoatRoughness: 0.28 }),
-    metal: new THREE.MeshStandardMaterial({ ...shared, color: '#c1cbd0', metalness: 0.94, roughness: 0.37 }),
-    glass: new THREE.MeshPhysicalMaterial({ color: '#102b38', metalness: 0.28, roughness: 0.075, clearcoat: 1, clearcoatRoughness: 0.035, envMapIntensity: 2.5 }),
+    hull: new THREE.MeshStandardMaterial({ ...shared, color: '#29343e', metalness: 0.78, roughness: 0.64 }),
+    armor: new THREE.MeshPhysicalMaterial({ ...shared, color: player ? '#b5c2c3' : new THREE.Color('#869598').lerp(new THREE.Color(accent), 0.13), metalness: 0.6, roughness: 0.48, clearcoat: 0.45, clearcoatRoughness: 0.25 }),
+    metal: new THREE.MeshStandardMaterial({ ...shared, color: '#aeb9bf', metalness: 0.94, roughness: 0.32 }),
+    glass: new THREE.MeshPhysicalMaterial({ color: '#163648', metalness: 0.3, roughness: 0.055, clearcoat: 1, clearcoatRoughness: 0.025, envMapIntensity: 2.7 }),
     signal: new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 3.1, roughness: 0.35, metalness: 0.25 }),
     engine: new THREE.MeshBasicMaterial({ color: new THREE.Color(player ? '#8adfff' : accent).multiplyScalar(3.4), toneMapped: false }),
   };

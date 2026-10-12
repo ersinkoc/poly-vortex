@@ -15,6 +15,7 @@ import Terrain from './terrain';
 import MissionActors from './mission-actors';
 import { TargetMarker } from './target-lock';
 import { navigationSignals } from '@/game/navigation';
+import CinematicEffects from './cinematic-effects';
 
 const dummy = new THREE.Object3D();
 const color = new THREE.Color();
@@ -41,7 +42,7 @@ function Projectiles() {
     }
   });
   return <>
-    <instancedMesh ref={bolts} args={[undefined, undefined, LIMITS.bolts]} frustumCulled={false}><boxGeometry args={[1, 1, 1]} /><meshBasicMaterial toneMapped={false} /></instancedMesh>
+    <instancedMesh ref={bolts} args={[undefined, undefined, LIMITS.bolts]} frustumCulled={false}><sphereGeometry args={[1, 8, 6]} /><meshBasicMaterial toneMapped={false} /></instancedMesh>
     <instancedMesh ref={gems} args={[undefined, undefined, LIMITS.gems]} frustumCulled={false}><octahedronGeometry args={[1]} /><meshBasicMaterial color={[0.4, 2.7, 2.1]} toneMapped={false} /></instancedMesh>
     <instancedMesh ref={particles} args={[undefined, undefined, LIMITS.particles]} frustumCulled={false}><tetrahedronGeometry args={[1]} /><meshBasicMaterial toneMapped={false} /></instancedMesh>
   </>;
@@ -169,7 +170,7 @@ function SceneController() {
     if (frames.current.time >= 1) { useGame.setState({ fps: Math.round(frames.current.count / frames.current.time) }); frames.current = { count: 0, time: 0 }; }
     const menu = s.phase === 'menu';
     const px = menu ? 0 : engine.player.x, pz = menu ? 0 : engine.player.z;
-    target.set(px + (menu ? 12 : 0), menu ? 18 : 28, pz + (menu ? 17 : 18));
+    target.set(px + (menu ? 12 : 0), menu ? 18 : 25, pz + (menu ? 17 : 19));
     camera.position.lerp(target, 1 - Math.exp(-4 * Math.min(delta, 0.1)));
     const shake = s.reducedEffects ? 0 : engine.trauma ** 2 * 0.4;
     camera.position.x += Math.sin(state.clock.elapsedTime * 91) * shake; camera.position.z += Math.cos(state.clock.elapsedTime * 77) * shake;
@@ -197,7 +198,7 @@ function PostFX() {
   const offset = useMemo(() => new THREE.Vector2(0.0003, 0.0003), []);
   useFrame(() => { const v = useGame.getState().reducedEffects ? 0 : 0.0003 + engine.hitFlash * 0.009; offset.set(v, v); });
   return <EffectComposer multisampling={quality === 'high' ? 4 : 0}>
-    <Bloom intensity={0.9} luminanceThreshold={0.75} luminanceSmoothing={0.5} mipmapBlur />
+    <Bloom intensity={0.82} luminanceThreshold={1} luminanceSmoothing={0.65} mipmapBlur />
     <ChromaticAberration offset={offset} radialModulation modulationOffset={0.2} />
     <Vignette offset={0.15} darkness={0.72} eskil={false} />
     <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
@@ -206,12 +207,12 @@ function PostFX() {
 
 export default function Arena() {
   const quality = useGame(s => s.quality);
-  return <Canvas camera={{ position: [16, 23, 20], fov: 46, near: 0.1, far: 160 }} dpr={quality === 'high' ? [1, 1.5] : 1} gl={{ antialias: false, powerPreference: 'high-performance', alpha: false }}>
-    <color attach="background" args={['#080d0d']} />
-    <fog attach="fog" args={['#080d0d', 36, 78]} />
-    <ShipLighting />
+  return <Canvas shadows={quality === 'high' ? 'percentage' : false} camera={{ position: [16, 23, 20], fov: 46, near: 0.1, far: 160 }} dpr={quality === 'high' ? [1, 1.5] : 1} gl={{ antialias: false, powerPreference: 'high-performance', alpha: false }}>
+    <color attach="background" args={['#080e15']} />
+    <fog attach="fog" args={['#080e15', 28, 72]} />
+    <ShipLighting followPlayer />
     <SceneController /><Terrain /><MissionActors /><TargetMarker /><ProtocolRing /><ShipFleet />
-    <Projectiles /><Effects /><CombatEffects /><Stars radius={65} depth={35} count={600} factor={1.3} saturation={0} fade speed={0.1} />
+    <Projectiles /><Effects /><CombatEffects /><CinematicEffects /><Stars radius={65} depth={35} count={600} factor={1.3} saturation={0} fade speed={0.1} />
     <PostFX />
   </Canvas>;
 }

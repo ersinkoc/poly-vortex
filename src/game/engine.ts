@@ -7,6 +7,7 @@ import { angleDifference, friendlyInLine, PULSE_RANGE, selectTarget, turnTowards
 import { ROCKET_CAPACITY, SUPPLY_RULES, supplyLifetime } from './supplies';
 import { EncounterDirector } from './director';
 import { inspectLauncher, LAUNCHER_COPY, ROCKET_RULES } from './launcher';
+import { VISUAL_LIMITS, type Blast, type Scorch } from './visuals';
 import type { Arc, Bolt, Cache, DamageText, Entity, Gem, Hazard, Input, Particle, Rocket, Shockwave, Supply, Upgrade, UpgradeId, Vortex, WeaponId } from './types';
 
 export const LIMITS = { enemies: 280, bolts: 500, rockets: 16, particles: 1000, gems: 400, shockwaves: 40, damageTexts: 40, hazards: 12, supplies: 10, caches: 8 };
@@ -29,6 +30,7 @@ const defs: Record<UpgradeId, [string, string]> = {
 };
 
 export class GameEngine {
+  blasts: Blast[] = []; scorches: Scorch[] = []; private visualId = 0;
   director = new EncounterDirector();
   missions = new MissionDirector();
   targetId = 0;
@@ -53,6 +55,7 @@ export class GameEngine {
   constructor(seed = Date.now()) { this.seed = seed >>> 0; }
   random() { this.seed = (Math.imul(1664525, this.seed) + 1013904223) >>> 0; return this.seed / 4294967296; }
   reset() {
+    this.blasts = []; this.scorches = []; this.visualId = 0;
     this.director.reset();
     useGame.setState({ navigation: [] });
     this.missions.reset();
@@ -106,10 +109,16 @@ export class GameEngine {
   wave(x: number, z: number, radius: number, color: string, life = 0.7) {
     if (this.shockwaves.length < LIMITS.shockwaves) this.shockwaves.push({ x, z, radius, color, life, maxLife: life });
   }
+  blast(x: number, z: number, size: number, color = '#ff9a51', energy = false) {
+    if (this.blasts.length >= VISUAL_LIMITS.blasts) this.blasts.shift();
+    this.blasts.push({ id: ++this.visualId, x, z, size, color, age: 0, energy });
+    if (!energy && size >= 1.1) { if (this.scorches.length >= VISUAL_LIMITS.scorches) this.scorches.shift(); this.scorches.push({ x, z, size: size * 1.1, age: 0 }); }
+  }
   activateSurge() {
     if (useGame.getState().phase !== 'playing' || this.surge < 100) return false;
     this.surge = 0; this.player.invulnerable = Math.max(this.player.invulnerable, 0.65);
     const p = this.player; this.wave(p.x, p.z, 11, '#74ecff', 0.9); this.burst(p.x, p.z, '#9cf6ff', 55);
+    this.blast(p.x, p.z, 2.2, '#84ddff', true);
     for (const e of [...this.enemies]) if (distance(e, p) < 11) { this.hitEnemy(e, (48 + this.level * 5) * this.damage); const d = distance(e, p) || 1; e.x += (e.x - p.x) / d * 2; e.z += (e.z - p.z) / d * 2; }
     this.bolts = this.bolts.filter(b => !b.enemy || distance(b, p) > 13);
     // Kills caused by the discharge cannot instantly recharge that discharge.
@@ -154,6 +163,7 @@ export class GameEngine {
   }
   explodeRocket(rocket: Rocket, directHit = 0) {
     if (rocket.age >= 10) return; rocket.age = 10;
+    this.blast(rocket.x, rocket.z, 2.1);
     this.wave(rocket.x, rocket.z, ROCKET_RULES.blastRadius, '#ffb876', 0.85); this.wave(rocket.x, rocket.z, 1.7, '#fff1c4', 0.4); this.burst(rocket.x, rocket.z, '#ff9b57', 48);
     this.trauma = Math.min(1, this.trauma + 0.55); this.hitStop = 0.05; audio.explosion();
     for (const enemy of [...this.enemies]) {
@@ -208,6 +218,7 @@ export class GameEngine {
     if (enemy.elite) { this.eliteKills++; if (this.caches.length < LIMITS.caches) this.caches.push({ x: enemy.x, z: enemy.z, age: 0 }); this.wave(enemy.x, enemy.z, 5, '#ffcf6c'); }
     else if (this.kills % 45 === 0 && this.time - this.lastCombatSupply >= 25 && this.dropSupply(this.kills % 90 ? 'magnet' : 'overdrive', enemy.x, enemy.z)) this.lastCombatSupply = this.time;
     this.burst(enemy.x, enemy.z, colors[enemy.kind], enemy.kind >= 2 ? 40 : 13);
+    this.blast(enemy.x, enemy.z, [0.7, 1.05, 1.8, 3.5][enemy.kind], enemy.kind === 1 ? '#ca95ff' : '#ffab65', enemy.kind === 1);
     if (this.gems.length < LIMITS.gems) this.gems.push({ x: enemy.x, z: enemy.z, value: [3, 7, 18, 100][enemy.kind], age: 0 });
     this.pulse = { x: enemy.x, z: enemy.z, time: this.time };
     this.wave(enemy.x, enemy.z, enemy.kind >= 2 ? 4 : 1.8, colors[enemy.kind], enemy.kind >= 2 ? 0.8 : 0.4);
@@ -484,7 +495,7 @@ export class GameEngine {
     this.gems = this.gems.filter(g => g.value > 0 && g.age < 60);
     for (const h of this.hazards) {
       h.age += dt;
-      if (!h.detonated && h.age >= h.delay) { h.detonated = true; this.wave(h.x, h.z, h.radius * 1.5, '#ff658d'); this.burst(h.x, h.z, '#ff6488', 35); if (distance(h, p) < h.radius) this.hurt(24); }
+      if (!h.detonated && h.age >= h.delay) { h.detonated = true; this.blast(h.x, h.z, h.radius * 0.7, '#ff6b9c', true); this.wave(h.x, h.z, h.radius * 1.5, '#ff658d'); this.burst(h.x, h.z, '#ff6488', 35); if (distance(h, p) < h.radius) this.hurt(24); }
     }
     this.hazards = this.hazards.filter(h => h.age < h.delay + h.duration);
     for (const s of this.supplies) { s.age += dt; if (distance(s, p) < 1.1) this.collectSupply(s); }
@@ -509,6 +520,8 @@ export class GameEngine {
     for (const v of this.vortices) v.life -= dt; this.vortices = this.vortices.filter(v => v.life > 0);
     for (const w of this.shockwaves) w.life -= dt; this.shockwaves = this.shockwaves.filter(w => w.life > 0);
     for (const d of this.damageTexts) d.life -= dt; this.damageTexts = this.damageTexts.filter(d => d.life > 0);
+    for (const b of this.blasts) b.age += dt; this.blasts = this.blasts.filter(b => b.age < 2.4);
+    for (const s of this.scorches) s.age += dt; this.scorches = this.scorches.filter(s => s.age < 22);
     audio.combo = this.combo;
     this.hudTimer += dt; if (this.hudTimer > 0.1) { this.hudTimer = 0; this.publish(); }
   }
