@@ -45,6 +45,14 @@ The custom domain is `poly-vortex.oxog.dev`, configured in `public/CNAME` and Gi
 
 Collect cyan XP prisms. A compact side reel automatically installs one randomized common, rare, or overclocked upgrade without pausing combat. Mix pulse lasers, escort drones, cryo-singularities, and Tesla arcs. At three minutes the Vortex Sentinel arrives. Classic extracts immediately on its defeat; Expedition opens a service and extraction window, then continues into another front. Standard and Overdrive difficulties are available. Every run awards core credits, saved in browser local storage, for permanent armor, damage, and speed upgrades. There are no accounts or server dependencies.
 
+## Destructible escorts � 1.18
+
+Each installed escort has 40 hull, independent of core armor and shield. Hostile projectiles use swept three-dimensional collision against its flight volume: low rounds pass underneath, elevated rounds can hit it, and one round hits at most one escort. Orbiter and Sentinel volleys can replace one existing round with a straight shot aimed at a visible escort within 12m, no more than once per four seconds per hostile. These shots aim at the drone's position when fired, respect cover and can be evaded through movement. Goliath cadence is unchanged.
+
+Hits produce sparks at flight height and briefly light the damaged armor; worn hulls darken. At zero hull, the drone breaks into airborne debris, stops firing and disappears from the instanced fleet. Survivors keep their identities, gun locks and cooldowns while moving into the smaller formation with existing collision clearance. The escort weapon slot shows active/installed count and individual hull pips; red slots indicate losses. Drone destruction awards no enemy kills, XP, combo, credits or loot.
+
+Casualties persist until explicit replacement. Medical crates repair surviving escorts by 20 hull without reviving wrecks or increasing pickup frequency. Completing a service dock repairs all survivors and rebuilds **one** missing escort, once per dock. Module upgrades commission only the newly added capacity; they do not silently restore old casualties. A new deployment restores its selected starting escort fleet. Simulation time drives hit feedback; pause, hit-stop and ended runs freeze incoming attacks and drone state.
+
 ## Goliath firing positions — 1.17
 
 Heavy Goliaths approach to a 9–12m engagement band, hold position there and slowly reverse if the core gets closer. Crowd separation cannot push them into a deliberate charge; cryo gravity still pulls them normally. Chaser, Orbiter and Sentinel attack patterns retain their own behavior.

@@ -12,7 +12,7 @@ import { RewardReel } from './reward-reel';
 import { UPGRADE_LIMITS, previewUpgrade } from './upgrade-preview';
 import { shieldContact, shieldImpact, SHIELD_IMPACT, type HitSource, type ShieldHit } from './shield-impact';
 import { EXPEDITION, doctrineAt, dockStatus, fleetScale, type RunMode, type ServiceDock } from './expedition';
-import { DRONE_FIRE, DroneFormation, createDroneGuns, droneCount, droneDamage, droneInLine, droneMuzzle, dronePose } from './orbital-drones';
+import { DRONE_FIRE, DroneFormation, DroneRack, createDroneGuns, droneContact, droneDamage, droneInLine, droneMuzzle, dronePose } from './orbital-drones';
 import { CHARGE_RULES, chargeRemaining, type GroundCharge } from './ground-charges';
 import { RoverBay, ROVER_RULES, type GroundRover } from './ground-rovers';
 import { GOLIATH, goliathMuzzle, goliathRadial } from './goliath-ai';
@@ -24,7 +24,7 @@ const colors = ['#ff567f', '#b58aff', '#ffab56', '#ff466d'];
 const distance = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.hypot(a.x - b.x, a.z - b.z);
 const defs: Record<UpgradeId, [string, string]> = {
   pulse: ['Pulse laser', 'Add a homing bolt. Increase pulse damage and fire rate.'],
-  glaive: ['Escort drones', 'Add an elevated escort and increase its laser damage. The formation spreads for combat and contracts in fast flight or tight terrain.'],
+  glaive: ['Escort drones', 'Commission new escort capacity and increase laser damage. Drones have 40 hull; lost units require field service.'],
   cryo: ['Cryo-singularity', 'Create a gravity well that pulls in and shatters the swarm.'],
   tesla: ['Tesla arc', 'Arc between nearby targets. More voltage. More damage.'],
   damage: ['Reactor overclock', 'Increase all weapon damage by 20% per power level.'],
@@ -42,6 +42,7 @@ export class GameEngine {
   charges: GroundCharge[] = []; chargeAmmo: number = CHARGE_RULES.capacity; chargeCooldown = 0; chargeNotice = ''; chargeNoticeTime = 0; private chargeUid = 0;
   droneGuns = createDroneGuns();
   readonly droneFormation = new DroneFormation();
+  readonly droneRack = new DroneRack();
   runMode: RunMode = 'expedition'; chapter = 1; sentinels = 0; chapterStarted = 0; service: ServiceDock | null = null;
   get chapterTime() { return Math.max(0, this.time - this.chapterStarted); }
   get canExtract() {
@@ -113,7 +114,8 @@ export class GameEngine {
     this.damage = 1 + s.profile.upgrades.reactor * 0.08; this.speed = 1 + s.profile.upgrades.thrusters * 0.06;
     this.magnet = 1; this.haste = 1; this.overdrive = s.difficulty === 'overdrive';
     this.uid = 0; this.spawnTimer = 0; this.shotTimer = 0; this.cryoTimer = 2; this.teslaTimer = 1; this.hudTimer = 0; this.comboTimer = 0;
-    this.droneFormation.reset(this.player, droneCount(this.weapons.glaive));
+    this.droneRack.reset(this.weapons.glaive);
+    this.droneFormation.reset(this.player, this.droneRack.slots.length);
     this.input.keys.clear(); this.input.dash = false; this.input.moveX = 0; this.input.moveZ = 0; this.input.aiming = false;
     this.input.surge = false;
     this.input.rocket = false;
@@ -219,8 +221,9 @@ export class GameEngine {
       this.announce('ORDNANCE RECHARGED', detail); this.rocketFeedback(`AMMO RELOADED · ${detail}.`, 'success'); this.publish();
     }
     if (supply.type === 'repair') {
+      this.droneRack.repair();
       this.player.hp = Math.min(this.player.maxHp, this.player.hp + 28); this.shield = Math.min(this.maxShield, this.shield + 15); this.repairTime = 8;
-      this.announce('FIELD REPAIR ACTIVE', '+28 integrity · +15 shield · 4 integrity/sec for 8 seconds.');
+      this.announce('FIELD REPAIR ACTIVE', '+28 integrity · +15 shield · +20 surviving escort hull · 8s nanites.');
       this.burst(supply.x, supply.z, '#ff5768', 20);
     }
     if (supply.type === 'magnet') { for (const gem of this.gems) { this.xp += gem.value; gem.value = 0; } }
@@ -235,10 +238,10 @@ export class GameEngine {
     this.wave(cache.x, cache.z, 4, '#ffd073'); audio.salvage();
     this.rewards.enqueue('salvage', this.level); this.publishRewards(); this.publish();
   }
-  burst(x: number, z: number, color: string, count = 14) {
+  burst(x: number, z: number, color: string, count = 14, y = 0.7) {
     for (let i = 0; i < count && this.particles.length < LIMITS.particles; i++) {
       const a = this.random() * Math.PI * 2, v = 2 + this.random() * 6, life = 0.3 + this.random() * 0.6;
-      this.particles.push({ x, z, y: 0.7, vx: Math.cos(a) * v, vz: Math.sin(a) * v, vy: 2 + this.random() * 4, life, maxLife: life, color, size: 0.06 + this.random() * 0.13 });
+      this.particles.push({ x, z, y, vx: Math.cos(a) * v, vz: Math.sin(a) * v, vy: 2 + this.random() * 4, life, maxLife: life, color, size: 0.06 + this.random() * 0.13 });
     }
   }
   hitEnemy(enemy: Entity, damage: number, critical = false) {
@@ -315,6 +318,7 @@ export class GameEngine {
     else if (id === 'critical') this.criticalChance = Math.min(0.75, this.criticalChance + 0.07 * power);
     else if (id === 'pierce') this.piercing = Math.min(6, this.piercing + power);
     else if (id === 'repair') { this.player.maxHp += 10 * power; this.player.hp = Math.min(this.player.maxHp, this.player.hp + 35 * power); }
+    if (id === 'glaive') this.droneRack.install(this.weapons.glaive);
     audio.level(); return changes;
   }
   checkLevel() {
@@ -331,6 +335,7 @@ export class GameEngine {
     const target = this.enemies.find(e => e.id === this.targetId && e.hp > 0);
     const lock = this.launcherLock();
     useGame.setState({
+      droneHull: this.droneRack.units.slice(0, this.droneRack.capacity).map(u => u.hp),
       roverMoving: this.roverBay.units.filter(r => r.state === 'rolling').length, roverArmed: this.roverBay.units.filter(r => r.state === 'armed' || r.state === 'primed').length, roverNextWave: this.roverBay.nextWave, roverWaves: this.roverBay.waves,
       charges: this.charges.filter(c => !c.detonated).map(c => ({ ...c })), chargeAmmo: this.chargeAmmo, chargeCooldown: this.chargeCooldown, chargeNotice: this.chargeNotice, chargeNoticeTime: this.chargeNoticeTime,
       activeMode: this.runMode, chapter: this.chapter, sentinels: this.sentinels, sentinelIn: Math.max(0, RUN_DURATION - this.chapterTime), service: this.service ? { ...this.service } : null, dockDistance: this.service ? distance(this.player, this.service) : 0, canExtract: this.canExtract, dockStatus: dockStatus(this.player, this.service, this.enemies, this.shieldDelay),
@@ -401,7 +406,8 @@ export class GameEngine {
     else this.burst(p.x, p.z, '#9effcf', 2);
     p.x += p.vx * dt; p.z += p.vz * dt;
     clearTerrainPosition(p, 0.7);
-    this.droneFormation.tick(dt, this.time, p, droneCount(this.weapons.glaive), this.enemies);
+    this.droneRack.install(this.weapons.glaive); this.droneRack.tick(dt);
+    this.droneFormation.tick(dt, this.time, p, this.droneRack.slots.length, this.enemies, this.droneRack.slots);
     for (const charge of this.charges) {
       if (charge.detonated) continue;
       charge.age += dt;
@@ -434,10 +440,11 @@ export class GameEngine {
         dock.progress = docking ? Math.min(EXPEDITION.dockDuration, dock.progress + dt) : 0;
         if (dock.progress >= EXPEDITION.dockDuration && dock.remaining > 0) {
           dock.serviced = true; p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.35); this.shield = this.maxShield;
+          this.droneRack.service();
           this.rocketAmmo = Math.min(ROCKET_CAPACITY, this.rocketAmmo + 3); this.surge = Math.min(100, this.surge + 50);
           this.chargeAmmo = Math.min(CHARGE_RULES.capacity, this.chargeAmmo + CHARGE_RULES.reload);
           this.wave(dock.x, dock.z, 5, '#82ffc5'); audio.salvage();
-          this.announce('FIELD SERVICE COMPLETE', '+35% hull · shield restored · +3 rockets · +1 charge · +50 EMP. Extract now or keep your build.');
+          this.announce('FIELD SERVICE COMPLETE', 'Hull & escorts repaired · one lost escort rebuilt · +3 rockets · +1 charge · +50 EMP.');
         }
       }
       if (dock.remaining <= 0) {
@@ -498,16 +505,27 @@ export class GameEngine {
       if ((e.kind === 1 || e.kind === 3) && e.timer <= 0 && d < 26) {
         e.timer = e.kind === 3 ? this.bossPhase === 3 ? 0.65 : this.bossPhase === 2 ? 0.5 : 1.5 : e.elite ? 2.2 : 3.5;
         const count = e.kind === 3 ? this.bossPhase === 2 ? 7 : this.bossPhase === 3 ? 11 : 18 : 8;
+        // Replace one existing ring round with a straight, height-aware escort shot.
+        // No extra barrage or homing; anti-air acquisition is limited to once per 4s.
+        const antiAir = e.age >= (e.escortShotAt ?? 0) + 4 ? this.droneRack.slots
+          .map(id => ({ id, pose: this.droneFormation.poses[id] }))
+          .filter(({ pose }) => distance(e, pose) < 12 && !terrainImpact(e, pose))
+          .sort((a, b) => distance(e, a.pose) - distance(e, b.pose))[0] : undefined;
         for (let j = 0; j < count && this.bolts.length < LIMITS.bolts; j++) {
           const a = e.kind === 3 && this.bossPhase === 3 ? Math.atan2(dx, dz) + (j - 5) * 0.105 : j / count * Math.PI * 2 + e.age * (this.bossPhase === 2 ? 1.8 : 0.4);
           const velocity = e.kind === 3 && this.bossPhase > 1 ? 6 : 4.5;
+          if (j === 0 && antiAir) {
+            const pose = antiAir.pose, flight = Math.max(0.1, distance(e, pose) / velocity), angle = Math.atan2(pose.x - e.x, pose.z - e.z);
+            this.bolts.push({ x: e.x, y: 0.95, z: e.z, vx: Math.sin(angle) * velocity, vz: Math.cos(angle) * velocity, vy: (pose.y - 0.95) / flight, enemy: true, age: 0, target: 0, damage: e.elite ? 14 : 10 });
+            e.escortShotAt = e.age; continue;
+          }
           this.bolts.push({ x: e.x, z: e.z, vx: Math.sin(a) * velocity, vz: Math.cos(a) * velocity, enemy: true, age: 0, target: 0, damage: e.elite ? 14 : 10 });
         }
       }
     }
     if (useGame.getState().phase !== 'playing') return;
     // Recheck clearance after hostile motion, before rendering and firing use it.
-    this.droneFormation.tick(0, this.time, p, this.droneFormation.count, this.enemies);
+    this.droneFormation.tick(0, this.time, p, this.droneRack.slots.length, this.enemies, this.droneRack.slots);
     const friendlies = this.missions.mission?.kind === 'rescue' && this.missions.mission.status === 'active' ? this.missions.mission.targets.filter(t => !t.done) : [];
     const primary = selectTarget(this.enemies, p, this.input, this.targetId, friendlies, PULSE_RANGE, useGame.getState().aimMode); this.targetId = primary?.id ?? 0;
     if (primary && !this.input.aiming) p.angle = turnTowards(p.angle, Math.atan2(primary.x - p.x, primary.z - p.z), dt * 6);
@@ -590,15 +608,19 @@ export class GameEngine {
           if (Math.abs(angleDifference(desired, heading)) < Math.PI * 0.55) { const angle = turnTowards(heading, desired, dt * 2.2); b.vx = Math.sin(angle) * speed; b.vz = Math.cos(angle) * speed; } else b.target = 0;
         }
       }
-      const oldX = b.x, oldZ = b.z, oldY = b.y ?? 0.95; b.x += b.vx * dt; b.z += b.vz * dt;
+      const oldX = b.x, oldZ = b.z, oldY = b.y ?? 0.7; b.x += b.vx * dt; b.z += b.vz * dt;
       if (b.y !== undefined) b.y += (b.vy ?? 0) * dt;
       b.traveled = (b.traveled ?? 0) + Math.hypot(b.x - oldX, b.z - oldZ);
       const impact = terrainImpact({ x: oldX, z: oldZ }, b);
       if (impact) { b.x = impact.x; b.z = impact.z; b.age = 10; this.burst(b.x, b.z, '#e0d2ad', 3); continue; }
       if (!b.enemy && (friendlyInLine({ x: oldX, z: oldZ }, b, b.drone !== undefined ? droneProtectedBodies : friendlies) || b.drone !== undefined && distance(b, p) < 1.15)) { b.age = 10; this.burst(b.x, b.z, '#89eadd', 3); continue; }
-      if (b.drone !== undefined && droneInLine({ x: oldX, y: oldY, z: oldZ }, { x: b.x, y: b.y ?? 0.95, z: b.z }, this.droneFormation.poses, this.droneFormation.count, b.drone)) { b.age = 10; this.burst(b.x, b.z, '#89eadd', 3); continue; }
+      if (b.drone !== undefined && droneInLine({ x: oldX, y: oldY, z: oldZ }, { x: b.x, y: b.y ?? 0.95, z: b.z }, this.droneFormation.poses, this.droneFormation.count, b.drone, this.droneRack.slots)) { b.age = 10; this.burst(b.x, b.z, '#89eadd', 3); continue; }
       if (b.traveled > (b.range ?? Infinity)) { b.age = 10; continue; }
-      if (b.enemy) { if (distance(b, p) < 0.7) { this.hurt(b.damage, b); b.age = 10; } }
+      if (b.enemy) {
+        const contact = droneContact({ x: oldX, y: oldY, z: oldZ }, { x: b.x, y: b.y ?? 0.7, z: b.z }, this.droneFormation.poses, this.droneRack.slots);
+        if (contact) { this.hitDrone(contact.id, b.damage); b.age = 10; }
+        else if (distance(b, p) < 0.7 && Math.abs((b.y ?? 0.95) - 0.95) < 0.75) { this.hurt(b.damage, b); b.age = 10; }
+      }
       else for (const e of this.enemies) if (e.hp > 0 && !b.hits?.includes(e.id) && distance(b, e) < e.radius + 0.25) {
         const critical = this.random() < this.criticalChance; this.hitEnemy(e, b.damage * (critical ? 2 : 1), critical); (b.hits ??= []).push(e.id);
         if ((b.pierce ?? 0) <= 0) b.age = 10; else { b.pierce!--; b.target = 0; }
@@ -713,7 +735,7 @@ export class GameEngine {
     const protectedBodies = [...friendlies, { x: this.player.x, z: this.player.z, radius: 1.15 }];
     for (let i = 0; i < this.droneGuns.length; i++) {
       const gun = this.droneGuns[i];
-      if (i >= count) { gun.active = false; gun.targetId = 0; gun.flash = 0; continue; }
+      if (!this.droneRack.slots.includes(i)) { gun.active = false; gun.targetId = 0; gun.flash = 0; continue; }
       const pose = dronePose(this.time, i, count, this.player, this.droneFormation);
       if (!gun.active) { gun.active = true; gun.yaw = pose.yaw; gun.pitch = pose.pitch; gun.cooldown = i * 0.12; gun.acquisition = i * 0.025; }
       gun.cooldown = Math.max(0, gun.cooldown - dt); gun.acquisition = Math.max(0, gun.acquisition - dt); gun.flash = Math.max(0, gun.flash - dt);
@@ -736,13 +758,25 @@ export class GameEngine {
       if (gun.cooldown > 0 || Math.abs(angleDifference(gun.yaw, heading)) > DRONE_FIRE.alignment || Math.abs(gun.pitch - pitch) > 0.1 || this.bolts.length >= LIMITS.bolts) continue;
       const side = gun.shots % 2 === 0 ? -1 : 1, muzzle = droneMuzzle(pose, heading, side, gun.pitch);
       // Validate the actual barrel lane, not just the escort's center or its last lock.
-      if (terrainImpact(pose, muzzle) || terrainImpact(muzzle, aim) || friendlyInLine(pose, muzzle, protectedBodies) || friendlyInLine(muzzle, aim, protectedBodies) || droneInLine(muzzle, { ...aim, y: target.radius * 0.75 + 0.3 }, this.droneFormation.poses, count, i)) continue;
+      if (terrainImpact(pose, muzzle) || terrainImpact(muzzle, aim) || friendlyInLine(pose, muzzle, protectedBodies) || friendlyInLine(muzzle, aim, protectedBodies) || droneInLine(muzzle, { ...aim, y: target.radius * 0.75 + 0.3 }, this.droneFormation.poses, count, i, this.droneRack.slots)) continue;
       gun.yaw = heading; gun.barrel = side; gun.flash = DRONE_FIRE.flashDuration; gun.shots++;
       gun.cooldown = Math.max(DRONE_FIRE.minInterval, DRONE_FIRE.interval * this.haste * (this.overdriveTime > 0 ? 0.8 : 1));
       const flight = Math.max(0.06, distance(muzzle, aim) / DRONE_FIRE.speed);
       this.bolts.push({ ...muzzle, vx: Math.sin(heading) * DRONE_FIRE.speed, vz: Math.cos(heading) * DRONE_FIRE.speed, vy: (target.radius * 0.75 + 0.3 - muzzle.y) / flight, enemy: false, age: 0, target: target.id, damage: droneDamage(this.weapons.glaive) * this.damage * (this.overdriveTime > 0 ? 1.35 : 1), drone: i, traveled: 0, range: DRONE_FIRE.range });
       audio.droneShot();
     }
+  }
+  private hitDrone(id: number, damage: number) {
+    if (!this.droneRack.hurt(id, damage)) return;
+    const pose = this.droneFormation.poses[id], lost = this.droneRack.units[id].hp <= 0;
+    this.burst(pose.x, pose.z, lost ? '#ff9c57' : '#ffe6a1', lost ? 28 : 5, pose.y);
+    if (lost) {
+      const gun = this.droneGuns[id]; gun.active = false; gun.targetId = 0; gun.flash = 0;
+      this.trauma = Math.max(this.trauma, 0.18); audio.explosion();
+      this.announce('ESCORT LOST', `${this.droneRack.slots.length}/${this.droneRack.capacity} operational · field service can rebuild one escort.`);
+      this.droneFormation.tick(0, this.time, this.player, this.droneRack.slots.length, this.enemies, this.droneRack.slots);
+    } else audio.hit();
+    this.publish();
   }
 }
 export const engine = new GameEngine();

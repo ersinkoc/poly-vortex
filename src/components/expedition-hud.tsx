@@ -12,7 +12,7 @@ export default function ExpeditionHUD() {
     <div className="expedition-heading"><Navigation size={12} /><span>EXPEDITION {String(s.chapter).padStart(2, '0')}</span><strong>{s.sentinels} CLEARED</strong></div>
     {dock ? <>
       <div className="service-title"><ShieldCheck size={16} /><strong>{dock.serviced ? 'SERVICE COMPLETE' : 'FIELD SERVICE'}</strong><span>{Math.ceil(dock.remaining)}s</span></div>
-      <p>{dock.serviced ? 'Extract at the beacon, or keep your build for the next front.' : 'Reach the green beacon. Clear its perimeter, stop and hold for 3s.'}</p>
+      <p>{dock.serviced ? 'Extract at the beacon, or keep your build for the next front.' : 'Hold at the green beacon for 3s. Repairs escort hull and rebuilds one lost drone.'}</p>
       <div className="service-progress"><i style={{ width: `${dock.progress / EXPEDITION.dockDuration * 100}%` }} /></div>
       <strong className="doctrine-name">{DOCK_COPY[s.dockStatus]}</strong>
       <small>{Math.ceil(s.dockDistance)}m TO BEACON · {dock.serviced ? '+35% HULL · +3 ROCKETS · +1 CHARGE · SHIELD' : `${dock.progress.toFixed(1)} / 3.0s DOCKING`}</small>

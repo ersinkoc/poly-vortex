@@ -8,7 +8,7 @@ import { useGame } from '@/game/store';
 import { buildDroneRotor, buildEnemyShip, buildEscortDrone, buildGroundCharge, buildGroundRover, buildRoverWheels, buildPlayerShip, buildShadowTexture, buildShipMaterials, buildSurfaceTextures, SURFACES, type ShipModel } from '@/game/ship-models';
 import GroundCharges from './ground-charges';
 import GroundRovers from './ground-rovers';
-import { DRONE_FIRE, DRONE_FORMATION, DRONE_ORBIT, droneMuzzle, dronePose } from '@/game/orbital-drones';
+import { DRONE_HULL, DRONE_FIRE, DRONE_FORMATION, DRONE_ORBIT, droneMuzzle, dronePose } from '@/game/orbital-drones';
 import { terrainHeight } from '@/game/terrain';
 import { attachDamageMaterial, buildDamageUniforms, damageHeat, hullDamage } from '@/game/ship-damage';
 import { GOLIATH, goliathMuzzle, goliathPose } from '@/game/goliath-ai';
@@ -95,7 +95,7 @@ function EnemyShips({ kind, asset, shadow }: { kind: 0 | 1 | 2 | 3; asset: Actor
 
 function EscortDrones({ asset, rotor, shadow }: { asset: ActorAsset; rotor: THREE.BufferGeometry; shadow: THREE.Texture }) {
   const layers = useRef<(THREE.InstancedMesh | null)[]>([]), fans = useRef<THREE.InstancedMesh>(null), footprints = useRef<THREE.InstancedMesh>(null), flashes = useRef<THREE.InstancedMesh>(null);
-  const objects = useMemo(() => ({ body: new THREE.Object3D(), fan: new THREE.Object3D(), fanWorld: new THREE.Matrix4(), footprint: new THREE.Object3D() }), []);
+  const objects = useMemo(() => ({ body: new THREE.Object3D(), fan: new THREE.Object3D(), fanWorld: new THREE.Matrix4(), footprint: new THREE.Object3D(), wear: new THREE.Color() }), []);
   useEffect(() => {
     const owned = [...layers.current, fans.current, footprints.current, flashes.current];
     for (const mesh of owned) mesh?.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -103,26 +103,33 @@ function EscortDrones({ asset, rotor, shadow }: { asset: ActorAsset; rotor: THRE
   }, []);
   useFrame(() => {
     const state = useGame.getState(), count = state.phase === 'menu' ? 0 : engine.droneFormation.count; let flashCount = 0;
-    for (let i = 0; i < count; i++) {
+    for (let draw = 0; draw < count; draw++) {
+      const i = engine.droneFormation.slots[draw];
       const pose = dronePose(engine.time, i, count, engine.player, engine.droneFormation), { body, fan, fanWorld, footprint } = objects;
       const gun = engine.droneGuns[i], yaw = gun.active ? gun.yaw : pose.yaw, pitch = gun.active ? gun.pitch : pose.pitch;
       body.position.set(pose.x, pose.y, pose.z); body.rotation.set(pitch, yaw, pose.bank, 'YXZ'); body.scale.setScalar(DRONE_ORBIT.scale); body.updateMatrix();
-      for (const layer of layers.current) layer?.setMatrixAt(i, body.matrix);
+      const hull = engine.droneRack.units[i], integrity = hull.hp / DRONE_HULL.hp;
+      objects.wear.setRGB(0.35 + integrity * 0.65, 0.19 + integrity * 0.81, 0.13 + integrity * 0.87);
+      if (hull.hit > 0 && !state.reducedEffects) objects.wear.setRGB(1.8, 0.8, 0.35);
+      for (let surface = 0; surface < layers.current.length; surface++) {
+        const layer = layers.current[surface]; layer?.setMatrixAt(draw, body.matrix);
+        if (SURFACES[surface] === 'hull' || SURFACES[surface] === 'armor') layer?.setColorAt(draw, objects.wear);
+      }
       let j = 0;
       for (const side of [-1, 1]) for (const end of [-1, 1]) {
         fan.position.set(side * 0.55, 0.065, end * 0.37); fan.rotation.set(0, engine.time * 54 * side * end + i * 0.8, 0); fan.updateMatrix();
-        fanWorld.multiplyMatrices(body.matrix, fan.matrix); fans.current?.setMatrixAt(i * 4 + j++, fanWorld);
+        fanWorld.multiplyMatrices(body.matrix, fan.matrix); fans.current?.setMatrixAt(draw * 4 + j++, fanWorld);
       }
       const spread = Math.max(0, pose.y - DRONE_FORMATION.altitude) * 0.2;
       footprint.position.set(pose.x, terrainHeight(pose.x, pose.z) + 0.03, pose.z); footprint.rotation.set(-Math.PI / 2, 0, -yaw); footprint.scale.set(1.7 + spread, 1.9 + spread, 1); footprint.updateMatrix();
-      footprints.current?.setMatrixAt(i, footprint.matrix);
+      footprints.current?.setMatrixAt(draw, footprint.matrix);
       if (gun.flash > 0 && !state.reducedEffects) {
         const muzzle = droneMuzzle(pose, yaw, gun.barrel, pitch), size = Math.sqrt(gun.flash / DRONE_FIRE.flashDuration);
         footprint.position.set(muzzle.x, muzzle.y, muzzle.z); footprint.rotation.set(pitch, yaw, pose.bank, 'YXZ'); footprint.scale.set(0.11 * size, 0.11 * size, 0.22 * size); footprint.updateMatrix();
         flashes.current?.setMatrixAt(flashCount++, footprint.matrix);
       }
     }
-    for (const mesh of [...layers.current, footprints.current]) if (mesh) { mesh.count = count; mesh.instanceMatrix.needsUpdate = true; }
+    for (const mesh of [...layers.current, footprints.current]) if (mesh) { mesh.count = count; mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; }
     if (fans.current) { fans.current.count = count * 4; fans.current.instanceMatrix.needsUpdate = true; }
     if (flashes.current) { flashes.current.count = flashCount; flashes.current.instanceMatrix.needsUpdate = true; }
   });
