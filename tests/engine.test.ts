@@ -42,9 +42,9 @@ describe('combat simulation', () => {
     useGame.setState({ loadout: 'cryo' }); game.reset(); expect(game.weapons.cryo).toBe(1); expect(game.weapons.pulse).toBe(1);
     game.spawn(0, 0, 5); game.tick(1 / 60); expect(game.bolts.some(b => !b.enemy)).toBe(true);
   });
-  test('orbital blades damage enemies at their orbit', () => {
-    game.weapons.glaive = 1; game.spawn(2, 3, 0); const enemy = game.enemies[0], hp = enemy.hp;
-    for (let i = 0; i < 10; i++) game.tick(1 / 60); expect(enemy.hp).toBeLessThan(hp);
+  test('elevated escorts damage hostiles with aimed laser fire', () => {
+    useGame.setState({ aimMode: 'assisted' }); game.weapons.glaive = 1; game.weapons.pulse = 0; game.spawn(2, 0, 8); const enemy = game.enemies[0], hp = enemy.hp;
+    for (let i = 0; i < 90; i++) game.tick(1 / 60); expect(enemy.hp).toBeLessThan(hp); expect(game.droneGuns.some(g => g.shots > 0)).toBe(true);
   });
   test('cryo generates gravity wells and damages enemies within them', () => {
     game.weapons.cryo = 1; game.spawn(2, 0, 8); const enemy = game.enemies[0], hp = enemy.hp;

@@ -1,11 +1,19 @@
 import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
+import { DRONE_FORMATION, DRONE_ORBIT } from '../src/game/orbital-drones';
 import { buildEnemyShip, buildEscortDrone, buildGroundCharge, buildGroundRover, buildRoverWheels, buildPlayerShip, buildShadowTexture, buildShipMaterials, buildSurfaceTextures, SURFACES } from '../src/game/ship-models';
 
 const factories = [buildPlayerShip, ...([0, 1, 2, 3] as const).map(kind => () => buildEnemyShip(kind)), buildEscortDrone, buildGroundCharge, buildGroundRover];
 const names = ['poly-core', 'chaser', 'orbiter', 'goliath', 'sentinel', 'escort drone', 'ground charge', 'ground rover'];
 
 describe('procedural fleet GPU resources', () => {
+  test('the complete escort model fits inside the flight volume used for formation clearance', () => {
+    const model = buildEscortDrone(); let radius = 0;
+    try {
+      for (const g of Object.values(model)) { const p = g.getAttribute('position'); for (let i = 0; i < p.count; i++) radius = Math.max(radius, Math.hypot(p.getX(i), p.getY(i), p.getZ(i)) * DRONE_ORBIT.scale); }
+      expect(radius).toBeLessThanOrEqual(DRONE_FORMATION.bodyRadius); expect(DRONE_FORMATION.separation).toBeGreaterThan(radius * 2);
+    } finally { Object.values(model).forEach(g => g.dispose()); }
+  });
   test('rover tires and hubs have finite, shared geometry aligned with the axle', () => {
     const wheels = buildRoverWheels();
     try { for (const g of Object.values(wheels)) { g.computeBoundingBox(); expect(Array.from(g.getAttribute('position').array).every(Number.isFinite)).toBe(true); expect(g.boundingSphere!.radius).toBeLessThan(0.4); expect(g.boundingBox!.max.x - g.boundingBox!.min.x).toBeLessThan(0.22); expect(g.getAttribute('normal').count).toBe(g.getAttribute('position').count); } }

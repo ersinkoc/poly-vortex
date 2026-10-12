@@ -22,7 +22,7 @@ function firstShot() { for (let i = 0; i < 90; i++) { game.tick(1 / 60); const b
 
 test('escort turns toward a live hostile and fires a real damaging bolt from its visible barrel', () => {
   const e = target(), b = firstShot(), gun = game.droneGuns[b.drone!];
-  const muzzle = droneMuzzle(dronePose(game.time, b.drone!, 2, game.player), gun.yaw, gun.barrel);
+  const muzzle = droneMuzzle(dronePose(game.time, b.drone!, 2, game.player, game.droneFormation), gun.yaw, gun.barrel, gun.pitch);
   expect(b.enemy).toBe(false); expect(b.target).toBe(e.id); expect(b.range).toBe(12); expect(b.damage).toBe(11);
   expect(b.x - b.vx / 60).toBeCloseTo(muzzle.x, 9); expect(b.z - b.vz / 60).toBeCloseTo(muzzle.z, 9); expect(b.y! - b.vy! / 60).toBeCloseTo(muzzle.y, 9);
   expect(Math.hypot(b.vx, b.vz)).toBeCloseTo(22, 9); expect(gun.flash).toBe(DRONE_FIRE.flashDuration);
@@ -30,10 +30,10 @@ test('escort turns toward a live hostile and fires a real damaging bolt from its
   advance(0.45); expect(e.hp).toBeLessThan(e.maxHp);
 });
 test('muzzle positions match the complete model transform including bank, pitch and both barrels', () => {
-  for (const time of [0, 1, 12]) for (const yaw of [-2, 0, 1.8]) for (const side of [-1, 1] as const) {
+  for (const time of [0, 1, 12]) for (const yaw of [-2, 0, 1.8]) for (const pitch of [-0.3, 0.5, 1.1]) for (const side of [-1, 1] as const) {
     const pose = dronePose(time, 1, 4, { x: 7, z: -4 });
-    const v = new THREE.Vector3(side * DRONE_GUN.x, DRONE_GUN.y, DRONE_GUN.z + DRONE_GUN.tip * DRONE_GUN.scale).multiplyScalar(DRONE_ORBIT.scale).applyEuler(new THREE.Euler(pose.pitch, yaw, pose.bank, 'XYZ')).add(new THREE.Vector3(pose.x, pose.y, pose.z));
-    const actual = droneMuzzle(pose, yaw, side); expect(actual.x).toBeCloseTo(v.x, 10); expect(actual.y).toBeCloseTo(v.y, 10); expect(actual.z).toBeCloseTo(v.z, 10);
+    const v = new THREE.Vector3(side * DRONE_GUN.x, DRONE_GUN.y, DRONE_GUN.z + DRONE_GUN.tip * DRONE_GUN.scale).multiplyScalar(DRONE_ORBIT.scale).applyEuler(new THREE.Euler(pitch, yaw, pose.bank, 'YXZ')).add(new THREE.Vector3(pose.x, pose.y, pose.z));
+    const actual = droneMuzzle(pose, yaw, side, pitch); expect(actual.x).toBeCloseTo(v.x, 10); expect(actual.y).toBeCloseTo(v.y, 10); expect(actual.z).toBeCloseTo(v.z, 10);
   }
 });
 test('each drone has its own cooldown, alternates barrels and cannot accumulate a catch-up burst', () => {

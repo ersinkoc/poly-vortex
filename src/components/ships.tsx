@@ -8,7 +8,7 @@ import { useGame } from '@/game/store';
 import { buildDroneRotor, buildEnemyShip, buildEscortDrone, buildGroundCharge, buildGroundRover, buildRoverWheels, buildPlayerShip, buildShadowTexture, buildShipMaterials, buildSurfaceTextures, SURFACES, type ShipModel } from '@/game/ship-models';
 import GroundCharges from './ground-charges';
 import GroundRovers from './ground-rovers';
-import { DRONE_FIRE, DRONE_ORBIT, droneCount, droneMuzzle, dronePose } from '@/game/orbital-drones';
+import { DRONE_FIRE, DRONE_FORMATION, DRONE_ORBIT, droneMuzzle, dronePose } from '@/game/orbital-drones';
 import { terrainHeight } from '@/game/terrain';
 import { attachDamageMaterial, buildDamageUniforms, damageHeat, hullDamage } from '@/game/ship-damage';
 
@@ -89,22 +89,23 @@ function EscortDrones({ asset, rotor, shadow }: { asset: ActorAsset; rotor: THRE
     return () => { owned.forEach(mesh => mesh?.dispose()); };
   }, []);
   useFrame(() => {
-    const state = useGame.getState(), count = state.phase === 'menu' ? 0 : droneCount(engine.weapons.glaive); let flashCount = 0;
+    const state = useGame.getState(), count = state.phase === 'menu' ? 0 : engine.droneFormation.count; let flashCount = 0;
     for (let i = 0; i < count; i++) {
-      const pose = dronePose(engine.time, i, count, engine.player), { body, fan, fanWorld, footprint } = objects;
-      const gun = engine.droneGuns[i], yaw = gun.active ? gun.yaw : pose.yaw;
-      body.position.set(pose.x, pose.y, pose.z); body.rotation.set(pose.pitch, yaw, pose.bank); body.scale.setScalar(DRONE_ORBIT.scale); body.updateMatrix();
+      const pose = dronePose(engine.time, i, count, engine.player, engine.droneFormation), { body, fan, fanWorld, footprint } = objects;
+      const gun = engine.droneGuns[i], yaw = gun.active ? gun.yaw : pose.yaw, pitch = gun.active ? gun.pitch : pose.pitch;
+      body.position.set(pose.x, pose.y, pose.z); body.rotation.set(pitch, yaw, pose.bank, 'YXZ'); body.scale.setScalar(DRONE_ORBIT.scale); body.updateMatrix();
       for (const layer of layers.current) layer?.setMatrixAt(i, body.matrix);
       let j = 0;
       for (const side of [-1, 1]) for (const end of [-1, 1]) {
         fan.position.set(side * 0.55, 0.065, end * 0.37); fan.rotation.set(0, engine.time * 54 * side * end + i * 0.8, 0); fan.updateMatrix();
         fanWorld.multiplyMatrices(body.matrix, fan.matrix); fans.current?.setMatrixAt(i * 4 + j++, fanWorld);
       }
-      footprint.position.set(pose.x, terrainHeight(pose.x, pose.z) + 0.03, pose.z); footprint.rotation.set(-Math.PI / 2, 0, -yaw); footprint.scale.set(1.7, 1.9, 1); footprint.updateMatrix();
+      const spread = Math.max(0, pose.y - DRONE_FORMATION.altitude) * 0.2;
+      footprint.position.set(pose.x, terrainHeight(pose.x, pose.z) + 0.03, pose.z); footprint.rotation.set(-Math.PI / 2, 0, -yaw); footprint.scale.set(1.7 + spread, 1.9 + spread, 1); footprint.updateMatrix();
       footprints.current?.setMatrixAt(i, footprint.matrix);
       if (gun.flash > 0 && !state.reducedEffects) {
-        const muzzle = droneMuzzle(pose, yaw, gun.barrel), size = Math.sqrt(gun.flash / DRONE_FIRE.flashDuration);
-        footprint.position.set(muzzle.x, muzzle.y, muzzle.z); footprint.rotation.set(pose.pitch, yaw, pose.bank); footprint.scale.set(0.11 * size, 0.11 * size, 0.22 * size); footprint.updateMatrix();
+        const muzzle = droneMuzzle(pose, yaw, gun.barrel, pitch), size = Math.sqrt(gun.flash / DRONE_FIRE.flashDuration);
+        footprint.position.set(muzzle.x, muzzle.y, muzzle.z); footprint.rotation.set(pitch, yaw, pose.bank, 'YXZ'); footprint.scale.set(0.11 * size, 0.11 * size, 0.22 * size); footprint.updateMatrix();
         flashes.current?.setMatrixAt(flashCount++, footprint.matrix);
       }
     }
