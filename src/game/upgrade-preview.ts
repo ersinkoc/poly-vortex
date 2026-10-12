@@ -1,4 +1,5 @@
 import type { Upgrade, WeaponId } from './types';
+export const UPGRADE_LIMITS = { speed: 2.8, haste: 0.28 } as const;
 
 export type BuildStats = { weapons: Record<WeaponId, number>; damage: number; speed: number; magnet: number; haste: number; criticalChance: number; piercing: number; maxShield: number; hp: number; maxHp: number };
 export type StatChange = { label: string; before: string; after: string };
@@ -16,9 +17,9 @@ export function previewUpgrade(s: BuildStats, u: Upgrade): StatChange[] {
     return rows;
   }
   if (id === 'damage') return row('WEAPON DAMAGE', pct(s.damage), pct(s.damage + 0.2 * power));
-  if (id === 'speed') return row('TOP SPEED', `${fixed(7.5 * s.speed)}m/s`, `${fixed(7.5 * (s.speed + 0.12 * power))}m/s`);
+  if (id === 'speed') return row('TOP SPEED', `${fixed(7.5 * s.speed)}m/s`, `${fixed(7.5 * Math.min(UPGRADE_LIMITS.speed, s.speed + 0.12 * power))}m/s`);
   if (id === 'magnet') return row('PRISM REACH', `${fixed(4.5 * s.magnet)}m`, `${fixed(4.5 * (s.magnet + 0.3 * power))}m`);
-  if (id === 'haste') return row('DASH COOLDOWN', `${fixed(3 * s.haste)}s`, `${fixed(3 * s.haste * 0.9 ** power)}s`);
+  if (id === 'haste') return row('DASH COOLDOWN', `${fixed(3 * s.haste)}s`, `${fixed(3 * Math.max(UPGRADE_LIMITS.haste, s.haste * 0.9 ** power))}s`);
   if (id === 'critical') return row('CRITICAL CHANCE', pct(s.criticalChance), pct(Math.min(0.75, s.criticalChance + 0.07 * power)));
   if (id === 'pierce') return row('EXTRA PENETRATIONS', `${s.piercing}`, `${Math.min(6, s.piercing + power)}`);
   if (id === 'shield') return row('SHIELD CAPACITY', `${s.maxShield}`, `${s.maxShield + 15 * power}`);

@@ -18,12 +18,14 @@ export class EncounterDirector {
     if (this.phase === 'sentinel' || this.phase === 'recovery') return;
     this.phase = 'recovery'; this.elapsed = 0; this.reliefCooldown = 28;
   }
-  tick(dt: number, pressure: number, boss: boolean) {
+  tick(dt: number, pressure: number, boss: boolean, service = false) {
     this.stress += (Math.max(0, Math.min(1, pressure)) - this.stress) * (1 - Math.exp(-dt * 2));
     if (boss) { this.phase = 'sentinel'; this.elapsed = 0; return; }
+    if (service) { this.phase = 'recovery'; this.elapsed = 0; return; }
+    if (this.phase === 'sentinel') { this.phase = 'recovery'; this.elapsed = 0; this.reliefCooldown = 28; }
     this.elapsed += dt; this.reliefCooldown = Math.max(0, this.reliefCooldown - dt);
     if ((this.phase === 'assault' || this.phase === 'buildup') && this.elapsed >= 6 && this.stress > 0.78 && this.reliefCooldown <= 0) { this.recover(); return; }
-    while (this.phase !== 'sentinel' && this.elapsed >= ENCOUNTERS[this.phase].duration) {
+    while (this.elapsed >= ENCOUNTERS[this.phase].duration) {
       this.elapsed -= ENCOUNTERS[this.phase].duration;
       if (this.phase === 'insertion') this.phase = 'buildup';
       else if (this.phase === 'buildup') this.phase = 'assault';

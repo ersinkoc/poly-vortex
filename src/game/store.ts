@@ -7,8 +7,10 @@ import { ROCKET_CAPACITY } from './supplies';
 import type { EncounterPhase } from './director';
 import type { ScreenSignal } from './navigation';
 import type { LauncherStatus } from './launcher';
+import type { DockStatus, RunMode, ServiceDock } from './expedition';
 
 type GameStore = {
+  runMode: RunMode; activeMode: RunMode; chapter: number; sentinels: number; sentinelIn: number; service: ServiceDock | null; dockDistance: number; canExtract: boolean; dockStatus: DockStatus;
   launcherStatus: LauncherStatus; rocketPending: number; rocketLock: { kind: number; distance: number; alignment: number } | null;
   rocketNotice: string; rocketNoticeKind: 'success' | 'warning'; rocketNoticeTime: number;
   navigation: ScreenSignal[];
@@ -29,6 +31,7 @@ type GameStore = {
 };
 const save = (profile: Profile) => { try { localStorage.setItem('poly-vortex-profile-v1', JSON.stringify(profile)); } catch { /* Storage can be unavailable in private browsing. */ } };
 export const useGame = create<GameStore>((set, get) => ({
+  runMode: 'expedition', activeMode: 'expedition', chapter: 1, sentinels: 0, sentinelIn: 180, service: null, dockDistance: 0, canExtract: false, dockStatus: 'offline',
   launcherStatus: 'searching', rocketPending: 0, rocketLock: null, rocketNotice: '', rocketNoticeKind: 'success', rocketNoticeTime: 0,
   navigation: [],
   encounter: 'insertion', encounterRemaining: 12, encounterRound: 1, combatPressure: 0,
@@ -52,6 +55,7 @@ export const useGame = create<GameStore>((set, get) => ({
     try {
       const settings = JSON.parse(localStorage.getItem('poly-vortex-settings-v1') || 'null');
       if (settings && typeof settings === 'object') set({
+        runMode: settings.runMode === 'classic' ? 'classic' : 'expedition',
         sound: typeof settings.sound === 'boolean' ? settings.sound : true,
         quality: settings.quality === 'performance' ? 'performance' : 'high',
         difficulty: settings.difficulty === 'overdrive' ? 'overdrive' : 'standard',
@@ -74,7 +78,7 @@ export const useGame = create<GameStore>((set, get) => ({
     const s = get(); if (s.phase === 'dead' || s.phase === 'won') return;
     const earned = Math.floor(kills / 3) + (won ? 100 : 10) + Math.max(0, Math.floor(bonus));
     const totalKills = s.profile.totalKills + kills, runs = s.profile.runs + 1, wins = s.profile.wins + Number(won);
-    const unlocked = ['first-run', ...(totalKills >= 250 ? ['hunter'] : []), ...(won ? ['breaker'] : []), ...(s.peakCombo >= 5 ? ['chain'] : []), ...(s.level >= 10 ? ['evolution'] : []), ...(runs >= 10 ? ['veteran'] : []), ...(wins >= 3 ? ['ace'] : [])];
+    const unlocked = ['first-run', ...(totalKills >= 250 ? ['hunter'] : []), ...(won ? ['breaker'] : []), ...(s.peakCombo >= 5 ? ['chain'] : []), ...(s.level >= 10 ? ['evolution'] : []), ...(runs >= 10 ? ['veteran'] : []), ...(wins >= 3 ? ['ace'] : []), ...(s.sentinels >= 3 ? ['deep-run'] : []), ...(s.time >= 600 ? ['endurance'] : [])];
     const profile = { ...s.profile, credits: s.profile.credits + earned, best: Math.max(s.profile.best, score), runs, wins, totalKills, achievements: [...new Set([...s.profile.achievements, ...unlocked])] };
     save(profile); set({ profile, earned, phase: won ? 'won' : 'dead' });
   },
@@ -87,6 +91,6 @@ export const useGame = create<GameStore>((set, get) => ({
 }));
 
 useGame.subscribe((s, previous) => {
-  if (s.sound === previous.sound && s.quality === previous.quality && s.difficulty === previous.difficulty && s.loadout === previous.loadout && s.aimMode === previous.aimMode && s.reducedEffects === previous.reducedEffects) return;
-  try { localStorage.setItem('poly-vortex-settings-v1', JSON.stringify({ sound: s.sound, quality: s.quality, difficulty: s.difficulty, loadout: s.loadout, aimMode: s.aimMode, reducedEffects: s.reducedEffects })); } catch { /* Preferences are optional when storage is unavailable. */ }
+  if (s.runMode === previous.runMode && s.sound === previous.sound && s.quality === previous.quality && s.difficulty === previous.difficulty && s.loadout === previous.loadout && s.aimMode === previous.aimMode && s.reducedEffects === previous.reducedEffects) return;
+  try { localStorage.setItem('poly-vortex-settings-v1', JSON.stringify({ runMode: s.runMode, sound: s.sound, quality: s.quality, difficulty: s.difficulty, loadout: s.loadout, aimMode: s.aimMode, reducedEffects: s.reducedEffects })); } catch { /* Preferences are optional when storage is unavailable. */ }
 });

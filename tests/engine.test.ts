@@ -92,6 +92,7 @@ describe('run lifecycle and progression', () => {
     useGame.getState().saveRun(999, 999, false); expect(useGame.getState().profile.runs).toBe(1);
   });
   test('destroying the sentinel wins and earns extraction credits', () => {
+    useGame.setState({ runMode: 'classic' }); game.reset();
     game.spawn(3, 0, 12); game.hitEnemy(game.enemies[0], 100000);
     const s = useGame.getState(); expect(s.phase).toBe('won'); expect(s.profile.wins).toBe(1); expect(s.earned).toBe(100); expect(s.profile.best).toBe(10000);
   });

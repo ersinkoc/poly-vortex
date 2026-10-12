@@ -1,0 +1,15 @@
+.run-route { display: flex; width: min(320px,100%); gap: 8px; margin: 0 0 12px; }
+.run-route button { flex: 1; padding: 9px 12px; border: 1px solid #aec39a30; border-radius: 3px; background: #0b1712c9; color: #9bad95; font: 9px var(--mono); text-align: left; letter-spacing: .6px; }
+.run-route button[aria-pressed=true] { color: #d5fca9; border-color: #baff7266; background: #a4dd7114; }
+.run-route small { display: block; margin-top: 5px; color: #9aaa8f; font-size: 6px; letter-spacing: .5px; }
+.expedition-panel { position: absolute; left: 50%; top: auto; bottom: 210px; transform: translateX(-50%); width: 230px; padding: 10px 12px; border: 1px solid #99c29e25; border-radius: 4px; background: #091711e3; color: #c5d9ce; pointer-events: none; font-family: var(--mono); }
+.expedition-heading { display: flex; align-items: center; gap: 6px; font-size: 8px; color: #a6c8b7; }.expedition-heading strong { margin-left: auto; font-size: 7px; font-weight: 400; }
+.expedition-panel .doctrine-name { display: block; margin-top: 9px; font-size: 10px; letter-spacing: .5px; color: var(--fleet-color); }
+.expedition-panel p { margin: 6px 0; font-size: 8px; line-height: 1.6; color: #adbcaf; }.expedition-panel small { display: block; font-size: 6px; line-height: 1.7; color: #9eb4a7; }
+.expedition-panel.service-open { top: auto; bottom: 210px; width: 270px; border-color: #82ffc559; background: #071c16f2; }
+.service-title { display: flex; align-items: center; gap: 7px; margin-top: 13px; color: #93ffd1; font-size: 10px; }.service-title span { margin-left: auto; font-size: 18px; }
+.service-progress { height: 3px; background: #82ffc515; margin: 10px 0 7px; }.service-progress i { display: block; height: 100%; background: #82ffc5; }
+.expedition-panel button { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; margin: 12px 0 7px; padding: 12px; color: #d2ffe8; background: #4ee6a527; border: 1px solid #82ffc559; border-radius: 3px; pointer-events: auto; font: 8px var(--mono); }
+.expedition-panel button:disabled { opacity: .4; cursor: default; }.expedition-panel button:enabled:hover { background: #4ee6a54a; }
+@media(max-width:800px) { .expedition-panel { width: 210px; bottom: 230px; }.expedition-panel.service-open { bottom: 230px; width: min(250px,34vw); }.run-route { width: min(270px,100%); } }
+@media(max-width:600px) { .run-route { width: min(320px,100%); }.expedition-panel:not(.service-open) { top: 184px; bottom: auto; padding: 5px 8px; width: 192px; }.expedition-panel:not(.service-open)>strong,.expedition-panel:not(.service-open)>p,.expedition-panel:not(.service-open)>small { display: none; }.expedition-heading { font-size: 6px; }.expedition-heading strong { font-size: 6px; }.expedition-panel.service-open { bottom: 222px; width: 194px; padding: 9px 10px; }.expedition-panel p { font-size: 7px; }.service-title { margin-top: 8px; font-size: 9px; }.expedition-panel button { padding: 10px 7px; font-size: 7px; }.expedition-panel small { font-size: 5px; } }

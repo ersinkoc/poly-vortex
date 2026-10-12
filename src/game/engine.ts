@@ -9,12 +9,13 @@ import { EncounterDirector } from './director';
 import { inspectLauncher, LAUNCHER_COPY, ROCKET_RULES } from './launcher';
 import { VISUAL_LIMITS, type Blast, type Scorch } from './visuals';
 import { RewardReel } from './reward-reel';
-import { previewUpgrade } from './upgrade-preview';
+import { UPGRADE_LIMITS, previewUpgrade } from './upgrade-preview';
 import { shieldContact, shieldImpact, SHIELD_IMPACT, type HitSource, type ShieldHit } from './shield-impact';
+import { EXPEDITION, doctrineAt, dockStatus, fleetScale, type RunMode, type ServiceDock } from './expedition';
 import type { Arc, Bolt, Cache, DamageText, Entity, Gem, Hazard, Input, Particle, Rocket, Shockwave, Supply, Upgrade, UpgradeId, Vortex, WeaponId } from './types';
 
 export const LIMITS = { enemies: 280, bolts: 500, rockets: 16, particles: 1000, gems: 400, shockwaves: 40, damageTexts: 40, hazards: 12, supplies: 10, caches: 8 };
-export const RUN_DURATION = 180;
+export const RUN_DURATION = EXPEDITION.combatDuration;
 const colors = ['#ff567f', '#b58aff', '#ffab56', '#ff466d'];
 const distance = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.hypot(a.x - b.x, a.z - b.z);
 const defs: Record<UpgradeId, [string, string]> = {
@@ -33,6 +34,16 @@ const defs: Record<UpgradeId, [string, string]> = {
 };
 
 export class GameEngine {
+  runMode: RunMode = 'expedition'; chapter = 1; sentinels = 0; chapterStarted = 0; service: ServiceDock | null = null;
+  get chapterTime() { return Math.max(0, this.time - this.chapterStarted); }
+  get canExtract() {
+    const phase = useGame.getState().phase;
+    return (phase === 'playing' || phase === 'paused') && dockStatus(this.player, this.service, this.enemies, this.shieldDelay) === 'ready';
+  }
+  extract() {
+    if (!this.canExtract) return false;
+    this.cancelRocket(); this.publish(); useGame.getState().saveRun(this.score, this.kills, true, this.salvage); return true;
+  }
   shieldHits: ShieldHit[] = [];
   readonly rewards: RewardReel;
   blasts: Blast[] = []; scorches: Scorch[] = []; private visualId = 0;
@@ -74,6 +85,7 @@ export class GameEngine {
     this.rocketPending = 0; this.pendingRocketTarget = 0; this.rocketNotice = ''; this.rocketNoticeTime = 0; this.rocketNoticeKind = 'success';
     this.lastCombatSupply = -25;
     const s = useGame.getState();
+    this.runMode = s.runMode; this.chapter = 1; this.sentinels = 0; this.chapterStarted = 0; this.service = null;
     this.player = { x: 0, z: 0, vx: 0, vz: 0, angle: 0, hp: s.maxHp, maxHp: s.maxHp, hullHit: 0, invulnerable: 1.5, dashTime: 0, dashCooldown: 0 };
     this.enemies = []; this.bolts = []; this.particles = []; this.gems = []; this.arcs = []; this.vortices = [];
     this.shockwaves = []; this.damageTexts = []; this.hazards = []; this.supplies = []; this.caches = [];
@@ -112,7 +124,8 @@ export class GameEngine {
     }
     const angle = this.random() * Math.PI * 2, r = 19 + this.random() * 6;
     const isElite = elite && kind !== 3;
-    const hp = [16, 35, 100, 2200][kind] * (1 + this.time / 240) * (this.overdrive ? 1.3 : 1) * (isElite ? 2.8 : 1);
+    const scale = this.runMode === 'expedition' ? fleetScale(this.chapter, this.chapterTime).health : 1 + this.time / 240;
+    const hp = [16, 35, 100, 2200][kind] * scale * (this.overdrive ? 1.3 : 1) * (isElite ? 2.8 : 1);
     this.enemies.push({ id: ++this.uid, x: x ?? this.player.x + Math.sin(angle) * r, z: z ?? this.player.z + Math.cos(angle) * r, hp, maxHp: hp, kind, radius: [0.48, 0.62, 1.1, 2.3][kind] * (isElite ? 1.18 : 1), age: 0, timer: 1 + this.random() * 2, elite: isElite });
   }
   announce(title: string, detail: string) { this.announcement = title; this.announcementDetail = detail; this.announcementTime = 5; }
@@ -234,7 +247,21 @@ export class GameEngine {
       // Splash iterates a snapshot: chained goliath deaths must never mutate this traversal.
       for (const other of [...this.enemies]) if (other.id !== enemy.id && other.hp > 0 && distance(other, enemy) < 4) this.hitEnemy(other, 35 * this.damage);
     }
-    if (enemy.kind === 3) { this.publish(); useGame.getState().saveRun(this.score, this.kills, true, this.salvage); }
+    if (enemy.kind === 3) {
+      this.sentinels++;
+      if (this.runMode === 'classic') { this.publish(); useGame.getState().saveRun(this.score, this.kills, true, this.salvage); }
+      else {
+        // The wreck transmits a service beacon. Surviving enemies still need clearing.
+        const site = { x: enemy.x, z: enemy.z }; clearTerrainPosition(site, EXPEDITION.dockRadius + 0.7);
+        this.service = { ...site, remaining: EXPEDITION.serviceDuration, progress: 0, serviced: false };
+        this.salvage += 50 + Math.min(150, (this.chapter - 1) * 25);
+        this.hazards = []; for (const b of this.bolts) if (b.enemy) b.age = 10;
+        this.bolts = this.bolts.filter(b => !b.enemy); this.bossPhase = 0;
+        this.director.reset(); this.director.recover(); this.cancelRocket();
+        this.announce('SENTINEL DOWN // SERVICE WINDOW', 'Green beacon: stop for 3s to repair and rearm. Extract there, or continue in 30s.');
+        this.publish();
+      }
+    }
   }
   hurt(amount: number, source?: HitSource) {
     if (this.player.invulnerable > 0 || useGame.getState().phase !== 'playing') return;
@@ -242,6 +269,7 @@ export class GameEngine {
     const impact = absorbed > 0 ? shieldImpact(this.player, source, absorbed, this.shield === 0) : null;
     if (impact) { if (this.shieldHits.length >= SHIELD_IMPACT.capacity) this.shieldHits.shift(); this.shieldHits.push(impact); }
     const hullLoss = amount - absorbed;
+    if (this.service && !this.service.serviced) this.service.progress = 0;
     this.player.hp = Math.max(0, this.player.hp - hullLoss); this.player.invulnerable = 0.85;
     if (hullLoss > 0) this.player.hullHit = 0.65;
     this.streak = 0; this.combo = 1; this.hitFlash = 0.6; this.trauma = 0.7; this.hitStop = 0.05;
@@ -251,7 +279,7 @@ export class GameEngine {
     if (this.player.hp === 0) { this.publish(); useGame.getState().saveRun(this.score, this.kills, false, this.salvage); }
   }
   createChoices(salvage = false): Upgrade[] {
-    const pool = (Object.keys(defs) as UpgradeId[]).filter(id => (!(id in this.weapons) || this.weapons[id as WeaponId] < 6) && (id !== 'critical' || this.criticalChance < 0.75) && (id !== 'pierce' || this.piercing < 6));
+    const pool = (Object.keys(defs) as UpgradeId[]).filter(id => (!(id in this.weapons) || this.weapons[id as WeaponId] < 6) && (id !== 'critical' || this.criticalChance < 0.75) && (id !== 'pierce' || this.piercing < 6) && (id !== 'speed' || this.speed < UPGRADE_LIMITS.speed) && (id !== 'haste' || this.haste > UPGRADE_LIMITS.haste));
     const picks: Upgrade[] = [];
     while (picks.length < 3 && pool.length) {
       const id = pool.splice(Math.floor(this.random() * pool.length), 1)[0];
@@ -265,9 +293,9 @@ export class GameEngine {
     const { id, power } = choice;
     if (id in this.weapons) this.weapons[id as WeaponId] = Math.min(6, this.weapons[id as WeaponId] + power);
     else if (id === 'damage') this.damage += 0.2 * power;
-    else if (id === 'speed') this.speed += 0.12 * power;
+    else if (id === 'speed') this.speed = Math.min(UPGRADE_LIMITS.speed, this.speed + 0.12 * power);
     else if (id === 'magnet') this.magnet += 0.3 * power;
-    else if (id === 'haste') this.haste *= Math.pow(0.9, power);
+    else if (id === 'haste') this.haste = Math.max(UPGRADE_LIMITS.haste, this.haste * Math.pow(0.9, power));
     else if (id === 'shield') { this.maxShield += 15 * power; this.shield = this.maxShield; }
     else if (id === 'critical') this.criticalChance = Math.min(0.75, this.criticalChance + 0.07 * power);
     else if (id === 'pierce') this.piercing = Math.min(6, this.piercing + power);
@@ -288,6 +316,7 @@ export class GameEngine {
     const target = this.enemies.find(e => e.id === this.targetId && e.hp > 0);
     const lock = this.launcherLock();
     useGame.setState({
+      activeMode: this.runMode, chapter: this.chapter, sentinels: this.sentinels, sentinelIn: Math.max(0, RUN_DURATION - this.chapterTime), service: this.service ? { ...this.service } : null, dockDistance: this.service ? distance(this.player, this.service) : 0, canExtract: this.canExtract, dockStatus: dockStatus(this.player, this.service, this.enemies, this.shieldDelay),
       launcherStatus: lock.status, rocketPending: this.rocketPending, rocketLock: lock.target ? { kind: lock.target.kind, distance: distance(lock.target, this.player), alignment: lock.alignment } : null,
       rocketNotice: this.rocketNotice, rocketNoticeKind: this.rocketNoticeKind, rocketNoticeTime: this.rocketNoticeTime,
       encounter: this.director.phase, encounterRemaining: this.director.remaining, encounterRound: this.director.round, combatPressure: this.director.stress,
@@ -304,17 +333,17 @@ export class GameEngine {
     this.time += dt; const p = this.player;
     const nearby = this.enemies.reduce((count, e) => count + (e.hp > 0 && distance(e, p) < 7 ? e.kind >= 2 ? 3 : 1 : 0), 0);
     const pressure = Math.min(1, nearby / 18 * 0.6 + (1 - p.hp / p.maxHp) * 0.4 + (1 - this.shield / this.maxShield) * 0.2);
-    this.director.tick(dt, pressure, this.time >= RUN_DURATION);
+    this.director.tick(dt, pressure, !this.service && this.chapterTime >= RUN_DURATION, !!this.service);
     this.rocketCooldown = Math.max(0, this.rocketCooldown - dt);
     this.rocketNoticeTime = Math.max(0, this.rocketNoticeTime - dt);
     p.hp = Math.min(p.maxHp, p.hp + Math.min(dt, this.repairTime) * 4); this.repairTime = Math.max(0, this.repairTime - dt);
     this.announcementTime = Math.max(0, this.announcementTime - dt); this.overdriveTime = Math.max(0, this.overdriveTime - dt);
     this.shieldDelay -= dt; if (this.shieldDelay <= 0) this.shield = Math.min(this.maxShield, this.shield + dt * 7);
     this.surge = Math.min(100, this.surge + dt * 0.8);
-    const nextSector = sectorAt(this.time);
+    const nextSector = this.service ? this.sector : sectorAt(this.chapterTime);
     if (nextSector !== this.sector) { this.sector = nextSector; const zone = SECTORS[this.sector]; this.announce(zone.event, zone.description); audio.tone(240, 0.4, 'triangle', 0.2, 480); }
     this.hazardTimer -= dt;
-    if (this.hazardTimer <= 0 && this.director.phase !== 'recovery') { this.hazardTimer = this.sector >= 3 ? 6 : 11; this.addHazard(p.x + p.vx * 0.55, p.z + p.vz * 0.55); }
+    if (this.hazardTimer <= 0 && !this.service && this.director.phase !== 'recovery') { this.hazardTimer = this.sector >= 3 ? 6 : 11; this.addHazard(p.x + p.vx * 0.55, p.z + p.vz * 0.55); }
     this.supplyTimer -= dt;
     this.repairTimer -= dt;
     if (this.repairTimer <= 0) {
@@ -352,15 +381,38 @@ export class GameEngine {
     else this.burst(p.x, p.z, '#9effcf', 2);
     p.x += p.vx * dt; p.z += p.vz * dt;
     clearTerrainPosition(p, 0.7);
-    this.spawnTimer -= dt;
-    if (this.spawnTimer <= 0 && this.director.spawnRate > 0) {
-      const pressure = 1 + this.time / 45;
-      this.spawnTimer = Math.max(0.09, 0.75 / pressure) / (this.overdrive ? 1.4 : 1) / this.director.spawnRate;
-      const r = this.random(); this.spawn(this.time > 35 && r > 0.91 ? 2 : this.time > 14 && r > 0.72 ? 1 : 0, undefined, undefined, this.time > 25 && this.uid % (this.sector >= 2 ? 8 : 12) === 0);
+    if (this.service) {
+      const dock = this.service; dock.remaining = Math.max(0, dock.remaining - dt);
+      // Docking requires a slow approach, a clear perimeter, and no fresh hit.
+      const status = dockStatus(p, dock, this.enemies, this.shieldDelay);
+      const docking = status === 'holding' || status === 'ready';
+      if (!dock.serviced) {
+        dock.progress = docking ? Math.min(EXPEDITION.dockDuration, dock.progress + dt) : 0;
+        if (dock.progress >= EXPEDITION.dockDuration && dock.remaining > 0) {
+          dock.serviced = true; p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.35); this.shield = this.maxShield;
+          this.rocketAmmo = Math.min(ROCKET_CAPACITY, this.rocketAmmo + 3); this.surge = Math.min(100, this.surge + 50);
+          this.wave(dock.x, dock.z, 5, '#82ffc5'); audio.salvage();
+          this.announce('FIELD SERVICE COMPLETE', '+35% hull · shield restored · +3 rockets · +50 EMP. Extract now or keep your build.');
+        }
+      }
+      if (dock.remaining <= 0) {
+        this.service = null; this.chapter++; this.chapterStarted = this.time; this.bossSpawned = false; this.sector = 0;
+        this.director.reset(); this.hazardTimer = 37; this.spawnTimer = 1;
+        const doctrine = doctrineAt(this.chapter); this.announce(`EXPEDITION ${String(this.chapter).padStart(2, '0')} // ${doctrine.name}`, doctrine.detail);
+      }
     }
-    if (this.time >= RUN_DURATION && !this.bossSpawned) { this.bossSpawned = true; this.spawn(3, p.x, p.z - 18); audio.explosion(); }
+    this.spawnTimer -= dt;
+    if (this.spawnTimer <= 0 && !this.service && this.director.spawnRate > 0) {
+      const pressure = this.runMode === 'expedition' ? fleetScale(this.chapter, this.chapterTime).pressure : 1 + this.time / 45;
+      this.spawnTimer = Math.max(0.09, 0.75 / pressure) / (this.overdrive ? 1.4 : 1) / this.director.spawnRate;
+      const doctrine = doctrineAt(this.runMode === 'expedition' ? this.chapter : 1);
+      const r = this.random(); this.spawn(this.chapterTime > 35 && r > 1 - doctrine.heavy ? 2 : this.chapterTime > 14 && r > 1 - doctrine.heavy - doctrine.orbiter ? 1 : 0, undefined, undefined, this.chapterTime > 25 && this.uid % (this.sector >= 2 ? 8 : 12) === 0);
+    }
+    if (!this.service && this.chapterTime >= RUN_DURATION && !this.bossSpawned) { this.bossSpawned = true; this.spawn(3, p.x, p.z - 18); audio.explosion(); }
     // Spatial bins keep flocking local; avoid a quadratic whole-horde comparison.
     const bins = new Map<string, Entity[]>();
+    const motionScale = this.runMode === 'expedition' ? fleetScale(this.chapter, this.chapterTime).speed : 1 + this.time / 360;
+    const chaserScale = this.runMode === 'expedition' ? doctrineAt(this.chapter).speed : 1;
     for (const e of this.enemies) {
       const key = `${Math.floor(e.x / 2)},${Math.floor(e.z / 2)}`; const bin = bins.get(key);
       if (bin) bin.push(e); else bins.set(key, [e]);
@@ -369,7 +421,7 @@ export class GameEngine {
       if (e.hp <= 0) continue;
       e.age += dt; e.timer -= dt;
       const dx = p.x - e.x, dz = p.z - e.z, d = Math.hypot(dx, dz) || 0.01;
-      const speed = [2.8, 2.1, 1.4, 1.15][e.kind] * (1 + this.time / 360) * (this.overdrive ? 1.2 : 1) * (e.elite ? 1.14 : 1);
+      const speed = [2.8, 2.1, 1.4, 1.15][e.kind] * motionScale * (e.kind === 0 ? chaserScale : 1) * (this.overdrive ? 1.2 : 1) * (e.elite ? 1.14 : 1);
       let vx = dx / d * speed, vz = dz / d * speed;
       if (e.kind === 1 && d < 10) { const radial = d < 7 ? -0.7 : 0; vx = dx / d * radial - dz / d * 1.4; vz = dz / d * radial + dx / d * 1.4; }
       const bx = Math.floor(e.x / 2), bz = Math.floor(e.z / 2);
@@ -381,6 +433,7 @@ export class GameEngine {
         }
       }
       for (const v of this.vortices) { const vd = distance(e, v); if (vd < v.radius && vd > 0.1) { vx += (v.x - e.x) / vd * 5; vz += (v.z - e.z) / vd * 5; this.hitEnemy(e, dt * (12 + this.weapons.cryo * 7) * this.damage); } }
+      if (e.hp <= 0) continue;
       e.x += vx * dt; e.z += vz * dt;
       clearTerrainPosition(e, e.radius);
       if (d < e.radius + 0.6) this.hurt([10, 14, 24, 35][e.kind], e);
@@ -478,6 +531,7 @@ export class GameEngine {
     this.rockets = this.rockets.filter(r => r.age < 4);
     if (useGame.getState().phase !== 'playing') return;
     for (const b of this.bolts) {
+      if (b.age >= 4) continue; // A boss death can clear shots inside this traversal.
       b.age += dt;
       if (!b.enemy) {
         const target = byId.get(b.target);

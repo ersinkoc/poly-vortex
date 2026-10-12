@@ -7,6 +7,8 @@ export const SECTORS = [
 ] as const;
 export const sectorAt = (time: number) => Math.min(4, Math.max(0, Math.floor(time / 45)));
 export const ACHIEVEMENTS = [
+  { id: 'deep-run', name: 'Beyond the horizon', description: 'Destroy three Sentinels in one expedition.' },
+  { id: 'endurance', name: 'Long-range operator', description: 'Survive ten minutes in one deployment.' },
   { id: 'first-run', name: 'First contact', description: 'Complete your first deployment.' },
   { id: 'hunter', name: 'Swarm hunter', description: 'Eliminate 250 hostiles across all runs.' },
   { id: 'breaker', name: 'Protocol breaker', description: 'Destroy a Vortex Sentinel and extract.' },

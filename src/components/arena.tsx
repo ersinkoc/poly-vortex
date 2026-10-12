@@ -16,6 +16,7 @@ import MissionActors from './mission-actors';
 import { TargetMarker } from './target-lock';
 import { navigationSignals } from '@/game/navigation';
 import CinematicEffects from './cinematic-effects';
+import ServiceBeacon from './service-beacon';
 
 const dummy = new THREE.Object3D();
 const color = new THREE.Color();
@@ -179,7 +180,7 @@ function SceneController() {
     if (s.phase === 'playing' && navigationTimer.current >= 0.1) {
       navigationTimer.current = 0; camera.updateMatrixWorld();
       const { width, height } = state.size;
-      const navigation = navigationSignals(engine.player, engine.missions.mission, engine.supplies, engine.rocketAmmo).map(signal => {
+      const navigation = navigationSignals(engine.player, engine.missions.mission, engine.supplies, engine.rocketAmmo, engine.service).map(signal => {
         navigationPoint.set(signal.x, 1.8, signal.z).project(camera);
         const sign = navigationPoint.z > 1 ? -1 : 1;
         const x = navigationPoint.x * sign * width / 2, y = -navigationPoint.y * sign * height / 2;
@@ -211,7 +212,7 @@ export default function Arena() {
     <color attach="background" args={['#080e15']} />
     <fog attach="fog" args={['#080e15', 28, 72]} />
     <ShipLighting followPlayer />
-    <SceneController /><Terrain /><MissionActors /><TargetMarker /><ProtocolRing /><ShipFleet />
+    <SceneController /><Terrain /><MissionActors /><ServiceBeacon /><TargetMarker /><ProtocolRing /><ShipFleet />
     <Projectiles /><Effects /><CombatEffects /><CinematicEffects /><Stars radius={65} depth={35} count={600} factor={1.3} saturation={0} fade speed={0.1} />
     <PostFX />
   </Canvas>;

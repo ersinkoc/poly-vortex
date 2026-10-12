@@ -42,7 +42,15 @@ The custom domain is `poly-vortex.oxog.dev`, configured in `public/CNAME` and Gi
 - **Module reel:** XP and elite salvage install upgrades automatically; keep moving.
 - **Touch:** Use the on-screen movement joystick and dash button.
 
-Collect cyan XP prisms. A compact side reel automatically installs one randomized common, rare, or overclocked upgrade without pausing combat. Mix pulse lasers, orbital glaives, cryo-singularities, and Tesla arcs. At three minutes the Vortex Sentinel arrives; destroy it to extract. Standard and Overdrive difficulties are available. Every run awards core credits, saved in browser local storage, for permanent armor, damage, and speed upgrades. There are no accounts or server dependencies.
+Collect cyan XP prisms. A compact side reel automatically installs one randomized common, rare, or overclocked upgrade without pausing combat. Mix pulse lasers, orbital glaives, cryo-singularities, and Tesla arcs. At three minutes the Vortex Sentinel arrives. Classic extracts immediately on its defeat; Expedition opens a service and extraction window, then continues into another front. Standard and Overdrive difficulties are available. Every run awards core credits, saved in browser local storage, for permanent armor, damage, and speed upgrades. There are no accounts or server dependencies.
+
+## Expedition update — 1.10
+
+Expedition is the default route; Classic remains available beside the deploy button and in Settings. Each front brings a Sentinel after three minutes of simulation time. Defeating it opens a 30-second service window, suspends reinforcements and environmental strikes, clears its remaining projectiles, and creates a procedural field station at the wreck. Surviving hostiles remain active. Follow the green navigation signal, clear enemies within five metres, approach below two metres per second, and remain in the docking radius for three uninterrupted seconds with no recent damage. A hit, nearby hostile, fast movement or leaving the radius resets unfinished docking.
+
+Field service restores 35% of maximum hull, fills shields, and adds three rockets and 50 EMP charge, each capped at capacity. It works once per Sentinel. While docked and safe, **Extract & bank credits** ends the run successfully; the same option is available in Pause. Leaving or waiting out the window automatically starts the next front with the entire build, XP, reward queue, score, rescue missions and inventory intact. Extra Sentinel salvage starts at 50 credits and grows to a capped 200. Credits are recorded once at extraction or death. Changing the route during a run applies to the next deployment.
+
+Balanced patrols, faster interceptor packs, orbiter artillery lines and heavy armored columns cycle across fronts. Local front time drives escalation; reinforcement pressure and enemy speed are bounded, while hull strength grows logarithmically with expedition depth. Thruster and haste upgrades retain usable minimum/maximum values even in long runs. There is no fixed maximum run length, and pause freezes the next boss, service window and docking progress. Three Sentinels and ten minutes of survival unlock two new flight-record milestones. Survival still depends on piloting and upgrades; indefinite survival is not guaranteed.
 
 ## Directional honeycomb shield — 1.9
 
