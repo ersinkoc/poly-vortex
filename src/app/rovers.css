@@ -1,0 +1,4 @@
+.rover-readout { position: absolute; left: 32px; bottom: 126px; height: 14px; display: flex; align-items: center; gap: 8px; padding: 0 7px; border: 1px solid #9ef1dc25; border-radius: 3px; background: #081a15df; color: #9ef1dc; font: 6px var(--mono); pointer-events: none; }.rover-readout svg { width: 9px; height: 9px; }
+.rover-readout strong { font-weight: 400; color: #d2e5d8; }.rover-readout small { font-size: 6px; color: #9aafa4; }
+@media(max-width:800px) { .rover-readout { left: 20px; bottom: 120px; gap: 6px; } }
+@media(max-width:600px) { .rover-readout { left: 16px; bottom: 96px; gap: 5px; padding: 3px 5px; font-size: 5px; }.rover-readout small { font-size: 5px; }.rover-readout svg { width: 9px; height: 9px; } }

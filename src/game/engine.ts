@@ -14,6 +14,7 @@ import { shieldContact, shieldImpact, SHIELD_IMPACT, type HitSource, type Shield
 import { EXPEDITION, doctrineAt, dockStatus, fleetScale, type RunMode, type ServiceDock } from './expedition';
 import { DRONE_FIRE, createDroneGuns, droneCount, droneDamage, droneMuzzle, dronePose } from './orbital-drones';
 import { CHARGE_RULES, chargeRemaining, type GroundCharge } from './ground-charges';
+import { RoverBay, ROVER_RULES, type GroundRover } from './ground-rovers';
 import type { Arc, Bolt, Cache, DamageText, Entity, Gem, Hazard, Input, Particle, Rocket, Shockwave, Supply, Upgrade, UpgradeId, Vortex, WeaponId } from './types';
 
 export const LIMITS = { enemies: 280, bolts: 500, rockets: 16, particles: 1000, gems: 400, shockwaves: 40, damageTexts: 40, hazards: 12, supplies: 10, caches: 8 };
@@ -36,6 +37,7 @@ const defs: Record<UpgradeId, [string, string]> = {
 };
 
 export class GameEngine {
+  readonly roverBay: RoverBay;
   charges: GroundCharge[] = []; chargeAmmo: number = CHARGE_RULES.capacity; chargeCooldown = 0; chargeNotice = ''; chargeNoticeTime = 0; private chargeUid = 0;
   droneGuns = createDroneGuns();
   runMode: RunMode = 'expedition'; chapter = 1; sentinels = 0; chapterStarted = 0; service: ServiceDock | null = null;
@@ -74,10 +76,12 @@ export class GameEngine {
   private lastCombatSupply = -25;
   constructor(seed = Date.now()) {
     this.seed = seed >>> 0;
+    this.roverBay = new RoverBay(this.seed);
     this.rewards = new RewardReel(source => this.createChoices(source === 'salvage'), () => this.random(), choice => this.installUpgrade(choice));
   }
   random() { this.seed = (Math.imul(1664525, this.seed) + 1013904223) >>> 0; return this.seed / 4294967296; }
   reset() {
+    this.roverBay.reset(this.seed);
     this.charges = []; this.chargeAmmo = CHARGE_RULES.capacity; this.chargeCooldown = 0; this.chargeUid = 0; this.chargeNotice = ''; this.chargeNoticeTime = 0; this.input.bomb = false;
     this.droneGuns = createDroneGuns();
     this.shieldHits = [];
@@ -324,6 +328,7 @@ export class GameEngine {
     const target = this.enemies.find(e => e.id === this.targetId && e.hp > 0);
     const lock = this.launcherLock();
     useGame.setState({
+      roverMoving: this.roverBay.units.filter(r => r.state === 'rolling').length, roverArmed: this.roverBay.units.filter(r => r.state === 'armed' || r.state === 'primed').length, roverNextWave: this.roverBay.nextWave, roverWaves: this.roverBay.waves,
       charges: this.charges.filter(c => !c.detonated).map(c => ({ ...c })), chargeAmmo: this.chargeAmmo, chargeCooldown: this.chargeCooldown, chargeNotice: this.chargeNotice, chargeNoticeTime: this.chargeNoticeTime,
       activeMode: this.runMode, chapter: this.chapter, sentinels: this.sentinels, sentinelIn: Math.max(0, RUN_DURATION - this.chapterTime), service: this.service ? { ...this.service } : null, dockDistance: this.service ? distance(this.player, this.service) : 0, canExtract: this.canExtract, dockStatus: dockStatus(this.player, this.service, this.enemies, this.shieldDelay),
       launcherStatus: lock.status, rocketPending: this.rocketPending, rocketLock: lock.target ? { kind: lock.target.kind, distance: distance(lock.target, this.player), alignment: lock.alignment } : null,
@@ -404,6 +409,16 @@ export class GameEngine {
     this.charges = this.charges.filter(c => !c.detonated);
     if (useGame.getState().phase !== 'playing') { this.input.bomb = false; return; }
     if (this.input.bomb) this.placeCharge(); this.input.bomb = false;
+    const roverWaves = this.roverBay.waves;
+    this.roverBay.tick(dt, p, this.enemies, !this.service, rover => {
+      this.detonateRover(rover); return useGame.getState().phase === 'playing';
+    });
+    if (useGame.getState().phase !== 'playing') return;
+    if (this.roverBay.waves !== roverWaves) {
+      audio.roverDeploy();
+      if (this.announcementTime <= 0) this.announce(`${this.roverBay.lastBatch} GROUND ROVERS DEPLOYED`, 'Automatic fan-out · proximity mines at destination · friendly core protected.');
+      this.publish();
+    }
     if (this.service) {
       const dock = this.service; dock.remaining = Math.max(0, dock.remaining - dt);
       // Docking requires a slow approach, a clear perimeter, and no fresh hit.
@@ -640,6 +655,15 @@ export class GameEngine {
     this.trauma = Math.max(this.trauma, 0.65); this.hitStop = Math.max(this.hitStop, 0.05); audio.explosion();
     for (const enemy of [...this.enemies]) if (enemy.hp > 0 && distance(enemy, charge) <= CHARGE_RULES.radius && !terrainImpact(charge, enemy, 0)) this.hitEnemy(enemy, CHARGE_RULES.damage * this.damage);
     this.pulse = { x: charge.x, z: charge.z, time: this.time };
+  }
+
+  private detonateRover(rover: GroundRover) {
+    if (useGame.getState().phase !== 'playing') return;
+    this.blast(rover.x, rover.z, 2.8, '#ffb878'); this.burst(rover.x, rover.z, '#ffb36b', 36);
+    this.wave(rover.x, rover.z, ROVER_RULES.blastRadius, '#ffca89', 0.7);
+    this.trauma = Math.max(this.trauma, 0.35); this.hitStop = Math.max(this.hitStop, 0.05); audio.explosion();
+    for (const enemy of [...this.enemies]) if (enemy.hp > 0 && distance(enemy, rover) <= ROVER_RULES.blastRadius && !terrainImpact(rover, enemy, 0)) this.hitEnemy(enemy, ROVER_RULES.damage * this.damage);
+    this.pulse = { x: rover.x, z: rover.z, time: this.time };
   }
 
   private fireDrones(dt: number, friendlies: readonly { x: number; z: number }[]) {

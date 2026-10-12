@@ -1,11 +1,16 @@
 import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
-import { buildEnemyShip, buildEscortDrone, buildGroundCharge, buildPlayerShip, buildShadowTexture, buildShipMaterials, buildSurfaceTextures, SURFACES } from '../src/game/ship-models';
+import { buildEnemyShip, buildEscortDrone, buildGroundCharge, buildGroundRover, buildRoverWheels, buildPlayerShip, buildShadowTexture, buildShipMaterials, buildSurfaceTextures, SURFACES } from '../src/game/ship-models';
 
-const factories = [buildPlayerShip, ...([0, 1, 2, 3] as const).map(kind => () => buildEnemyShip(kind)), buildEscortDrone, buildGroundCharge];
-const names = ['poly-core', 'chaser', 'orbiter', 'goliath', 'sentinel', 'escort drone', 'ground charge'];
+const factories = [buildPlayerShip, ...([0, 1, 2, 3] as const).map(kind => () => buildEnemyShip(kind)), buildEscortDrone, buildGroundCharge, buildGroundRover];
+const names = ['poly-core', 'chaser', 'orbiter', 'goliath', 'sentinel', 'escort drone', 'ground charge', 'ground rover'];
 
 describe('procedural fleet GPU resources', () => {
+  test('rover tires and hubs have finite, shared geometry aligned with the axle', () => {
+    const wheels = buildRoverWheels();
+    try { for (const g of Object.values(wheels)) { g.computeBoundingBox(); expect(Array.from(g.getAttribute('position').array).every(Number.isFinite)).toBe(true); expect(g.boundingSphere!.radius).toBeLessThan(0.4); expect(g.boundingBox!.max.x - g.boundingBox!.min.x).toBeLessThan(0.22); expect(g.getAttribute('normal').count).toBe(g.getAttribute('position').count); } }
+    finally { Object.values(wheels).forEach(g => g.dispose()); }
+  });
   factories.forEach((build, i) => {
     test(`${names[i]} provides bounded, finite, complete instancing geometry`, () => {
       const model = build(); let triangles = 0;

@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { ArrowDown, ArrowRight, ArrowUpRight, Bomb, Check, ChevronRight, CircleDot, Cpu, Crosshair, Disc3, Expand, Hexagon, Keyboard, Layers3, MousePointer2, Orbit, Pause, Play, Radio, Rocket, RotateCcw, Shield, SlidersHorizontal, Snowflake, Sparkles, Trophy, Volume2, VolumeX, Wind, X, Zap } from 'lucide-react';
 import ChargeControl from './charge-control';
+import RoverReadout from './rover-readout';
 import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
 import { audio } from '@/game/audio';
 import { engine } from '@/game/engine';
@@ -53,7 +54,7 @@ function Menu({ open, start }: { open: (panel: Panel) => void; start: () => void
     </header>
     <main className="menu-main">
       <div className="hero-copy">
-        <motion.div className="eyebrow" initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}><span className="tiny-cross">+</span> A GEOMETRIC ROGUELITE <span className="version">V.16</span></motion.div>
+        <motion.div className="eyebrow" initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}><span className="tiny-cross">+</span> A GEOMETRIC ROGUELITE <span className="version">V.17</span></motion.div>
         <motion.h1 initial={{ y: 18, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.18, duration: 0.6 }}>SHAPE<br />THE <span className="title-star">✳</span><br /><span>CHAOS.</span></motion.h1>
         <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.28 }}>
           <p className="hero-description">One core. Infinite chaos.<br />Outlast the swarm. Evolve your arsenal.<br /><span>Break the protocol.</span></p>
@@ -76,7 +77,7 @@ function Menu({ open, start }: { open: (panel: Panel) => void; start: () => void
       </div>
       <div className="deployment-bar"><span><CircleDot size={14} /> READY FOR DEPLOYMENT</span><button onClick={() => open('settings')}>MODE <strong>{difficulty === 'standard' ? 'STANDARD' : 'OVERDRIVE'}</strong><ChevronRight size={13} /></button><button onClick={() => open('armory')}>LOADOUT <strong>{WEAPONS[loadout].name.toUpperCase()}</strong><ChevronRight size={13} /></button><button onClick={() => open('core')}>CORE CREDITS <strong>{number(profile.credits)}</strong><ArrowUpRight size={13} /></button></div>
     </main>
-    <footer className="footer"><span>DESIGNED TO BE OUTNUMBERED.</span><span className="footer-center"><i /> ALL SYSTEMS PROCEDURAL</span><button onClick={() => open('records')}>PERSONAL BEST <strong>{number(profile.best).padStart(6, '0')}</strong><Trophy size={13} /></button><span className="build-number">BUILD 016 / 2026</span></footer>
+    <footer className="footer"><span>DESIGNED TO BE OUTNUMBERED.</span><span className="footer-center"><i /> ALL SYSTEMS PROCEDURAL</span><button onClick={() => open('records')}>PERSONAL BEST <strong>{number(profile.best).padStart(6, '0')}</strong><Trophy size={13} /></button><span className="build-number">BUILD 017 / 2026</span></footer>
   </motion.div>;
 }
 
@@ -103,6 +104,7 @@ function PanelContent({ panel }: { panel: Exclude<Panel, null> }) {
     <div className="control-row"><span><Layers3 /> MODULE REEL</span><div className="keys"><em>Automatic / keep moving</em></div></div>
     <div className="control-row"><span><Shield /> FIELD SERVICE</span><div className="keys"><em>Green beacon / stop for 3s</em></div></div>
     <div className="tip"><Bomb size={18} /><p><strong>Leave a trap behind</strong>Press B or tap the charge icon to plant a bomb at your current position. Follow its countdown and lure pursuers into the amber circle. It explodes after three seconds. Rocks block the blast; your core and pilots are protected. Move clear before placing another. Blue crates refill one charge, up to three; there is no passive refill.</p></div>
+    <div className="tip"><Cpu size={18} /><p><strong>Automatic ground support</strong>The rover bay releases three or six four-wheel mines in random directions, starting at ten seconds and repeating every 24–36 seconds of combat. They drive 9–14m, stop before rocks, and arm at their destination. A nearby hostile triggers a brief red warning, then a blast. Idle mines self-detonate after twelve seconds. Your core and pilots are protected. The rover bay has its own automatic cycle and does not spend B charges or rockets; new launches wait during field service.</p></div>
     <div className="tip"><Radio size={18} /><p><strong>Long-range expedition</strong>Each Sentinel opens a 30-second service window. Clear the beacon perimeter and stop there for three seconds without taking damage. Service restores 35% hull, shields, three rockets, one charge and 50 EMP once. Extract at the beacon to bank credits, or keep playing into the next front automatically. Escape pauses all timers.</p></div>
     <div className="tip"><Sparkles size={18} /><p><strong>A little advice</strong>Dash through danger: phase shift makes you briefly invulnerable. Collect cyan prisms to level up. Gold elites drop rare salvage. Mouse aim focuses the pulse salvo on one hostile. Rocks stop bullets, and pilots in the firing line hold friendly fire. Q discharges your EMP, and blue shields regenerate after four seconds without a hit. Amber signals mark stranded pilots: stay in their perimeter for 1.5 seconds to extract. Follow the field-operation arrow for timed missions. E fires a limited rocket at your locked target. Blue crates refill up to three rockets and 20 EMP charge. Red first-aid cases are rare. Touch controls appear on mobile.</p></div>
   </>;
@@ -172,7 +174,7 @@ function HUD({ open }: { open: (panel: Panel) => void }) {
     {s.combo >= 2 && <div className="combo"><strong>×{Math.floor(s.combo)}</strong><span>CHAIN MULTIPLIER</span></div>}
     <div className="hud-bottom"><div className="weapon-slots">{(Object.keys(WEAPONS) as WeaponId[]).map(id => { const Icon = weaponIcons[id], lv = s.weapons[id]; return <div key={id} className={`weapon-slot ${lv ? 'equipped' : ''}`} style={{ '--weapon-color': WEAPONS[id].color } as React.CSSProperties} title={`${WEAPONS[id].name} · ${lv ? `Level ${lv}` : 'Not equipped'}`}><Icon size={23} /><span>{lv ? `LV ${lv}` : '—'}</span></div>; })}<div className={`dash-slot ${s.dash <= 0 ? 'ready' : ''}`}><Wind size={22} /><div><span>PHASE SHIFT</span><strong>{s.dash <= 0 ? 'READY' : `${s.dash.toFixed(1)}s`}</strong></div><kbd>SPACE</kbd></div><ChargeControl /></div><div className="hud-performance"><span><i /> SECTOR_{String(s.sector + 1).padStart(2, '0')}</span><small>{s.enemies} HOSTILES <span>/</span> {s.fps} FPS</small></div></div>
     <div className="xp-container"><span>LV. {s.level}</span><div className="xp-bar"><i style={{ width: `${Math.min(100, s.xp / s.nextXp * 100)}%` }} /></div><small>{Math.floor(s.xp)} / {s.nextXp} XP</small></div>
-    <RewardSlot /><ExpeditionHUD /><TacticalHUD onOrdnanceHelp={() => { if (useGame.getState().phase === 'playing') useGame.getState().setPhase('paused'); open('ordnance'); }} /><TouchControls />
+    <RewardSlot /><ExpeditionHUD /><RoverReadout /><TacticalHUD onOrdnanceHelp={() => { if (useGame.getState().phase === 'playing') useGame.getState().setPhase('paused'); open('ordnance'); }} /><TouchControls />
   </div>;
 }
 

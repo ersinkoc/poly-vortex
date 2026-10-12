@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { DRONE_GUN } from './orbital-drones';
+import { ROVER_RULES } from './ground-rovers';
 
 export const SURFACES = ['hull', 'armor', 'metal', 'glass', 'signal', 'engine'] as const;
 type Surface = typeof SURFACES[number];
@@ -142,6 +143,42 @@ export function buildGroundCharge(): ShipModel {
     b.bolts([[x * 0.22, 0.233, z * 0.22]]);
   }
   return b.finish();
+}
+
+export function buildGroundRover(): ShipModel {
+  const b = new ShipBuilder();
+  b.box('hull', [0.69, 0.23, 1.1], [0, 0.15, 0], [0, 0, 0], 0.045);
+  b.plate('armor', [[-0.3, 0.57], [-0.35, 0.35], [-0.31, -0.54], [0.31, -0.54], [0.35, 0.35], [0.3, 0.57]], 0.045, 0.29);
+  b.box('metal', [0.6, 0.075, 0.1], [0, 0.15, 0.61], [0, 0, 0], 0.018);
+  b.cylinder('metal', 0.065, 0.065, 0.28, [0, 0.4, -0.16], [0, 0, 0], 10);
+  b.box('hull', [0.25, 0.15, 0.3], [0, 0.55, -0.16], [0, 0, 0], 0.035);
+  b.box('glass', [0.19, 0.07, 0.022], [0, 0.565, 0.0], [0, 0, 0], 0.008);
+  b.box('signal', [0.15, 0.026, 0.025], [0, 0.565, 0.015], [0, 0, 0], 0.006);
+  b.box('engine', [0.3, 0.028, 0.24], [0, 0.332, 0.24], [0, 0, 0], 0.008);
+  b.vents([0, 0.325, -0.36], 0.25, 3, 0.055);
+  for (const side of [-1, 1]) {
+    b.box('signal', [0.1, 0.042, 0.028], [side * 0.21, 0.25, 0.565], [0, 0, 0], 0.01);
+    b.box('metal', [0.08, 0.07, 0.84], [side * 0.345, 0.05, 0], [0, 0, 0], 0.015);
+    for (const end of [-1, 1]) {
+      b.cylinder('metal', 0.045, 0.045, 0.32, [side * 0.34, 0.015, end * ROVER_RULES.wheelbase / 2], [0, 0, Math.PI / 2], 8);
+      b.box('armor', [0.22, 0.07, 0.42], [side * 0.43, 0.23, end * ROVER_RULES.wheelbase / 2], [0, 0, side * -0.08], 0.015);
+      b.bolts([[side * 0.24, 0.345, end * 0.43]]);
+    }
+    b.box('metal', [0.024, 0.065, 0.18], [side * 0.32, 0.34, 0.15], [0, 0, 0], 0.005);
+  }
+  return b.finish();
+}
+
+export function buildRoverWheels() {
+  const base = new THREE.CylinderGeometry(ROVER_RULES.wheelRadius, ROVER_RULES.wheelRadius, 0.17, 16).rotateZ(Math.PI / 2), rubber = [base.toNonIndexed()]; base.dispose();
+  for (let i = 0; i < 16; i++) {
+    const a = i / 16 * Math.PI * 2;
+    const tread = new THREE.BoxGeometry(0.19, 0.035, 0.065).rotateX(a).translate(0, Math.cos(a) * 0.198, Math.sin(a) * 0.198); rubber.push(tread.toNonIndexed()); tread.dispose();
+  }
+  const tire = mergeGeometries(rubber); rubber.forEach(g => g.dispose());
+  if (!tire) throw new Error('Could not merge rover tire');
+  const hub = new THREE.CylinderGeometry(0.12, 0.12, 0.182, 12).rotateZ(Math.PI / 2);
+  tire.computeBoundingSphere(); hub.computeBoundingSphere(); return { tire, hub };
 }
 
 export function buildDroneRotor(): THREE.BufferGeometry {

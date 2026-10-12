@@ -24,6 +24,7 @@ class Synth {
   shot() { this.tone(950, 0.085, 'triangle', 0.15, 220); }
   droneShot() { this.tone(1450, 0.055, 'triangle', 0.045, 440); }
   chargeTick(stage: number) { this.tone(500 + (3 - stage) * 180, 0.07, 'square', 0.045, 320); }
+  roverDeploy() { this.tone(240, 0.18, 'triangle', 0.09, 680); }
   rocket() { this.tone(250, 0.3, 'sawtooth', 0.28, 55); this.tone(55, 0.22, 'sine', 0.25, 120); }
   hit() { this.tone(160, 0.09, 'square', 0.12, 50); }
   explosion() { this.tone(90, 0.35, 'sawtooth', 0.45, 18); }
