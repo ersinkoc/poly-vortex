@@ -25,19 +25,19 @@ function Projectiles() {
   useFrame(({ clock }) => {
     if (bolts.current) {
       engine.bolts.forEach((b, i) => {
-        dummy.position.set(b.x, 0.7, b.z); dummy.rotation.set(0, Math.atan2(b.vx, b.vz), 0); dummy.scale.set(b.enemy ? 0.17 : 0.08, 0.08, b.enemy ? 0.17 : 0.6); dummy.updateMatrix();
-        bolts.current!.setMatrixAt(i, dummy.matrix); bolts.current!.setColorAt(i, color.set(b.enemy ? '#ff4088' : '#b5ff62').multiplyScalar(3));
+        dummy.position.set(b.x, b.y ?? 0.7, b.z); dummy.rotation.set(-Math.atan2(b.vy ?? 0, Math.hypot(b.vx, b.vz)), Math.atan2(b.vx, b.vz), 0, 'YXZ'); dummy.scale.set(b.enemy ? 0.17 : b.drone !== undefined ? 0.055 : 0.08, 0.08, b.enemy ? 0.17 : 0.6); dummy.updateMatrix();
+        bolts.current!.setMatrixAt(i, dummy.matrix); bolts.current!.setColorAt(i, color.set(b.enemy ? '#ff4088' : b.drone !== undefined ? '#78e8ff' : '#b5ff62').multiplyScalar(3));
       });
       bolts.current.count = engine.bolts.length; bolts.current.instanceMatrix.needsUpdate = true; if (bolts.current.instanceColor) bolts.current.instanceColor.needsUpdate = true;
     }
     if (gems.current) {
       engine.gems.forEach((g, i) => {
-        dummy.position.set(g.x, 0.3 + Math.sin(clock.elapsedTime * 4 + i) * 0.12, g.z); dummy.rotation.set(0, clock.elapsedTime, Math.PI / 4); dummy.scale.setScalar(g.value >= 18 ? 0.3 : 0.16); dummy.updateMatrix(); gems.current!.setMatrixAt(i, dummy.matrix);
+        dummy.position.set(g.x, 0.3 + Math.sin(clock.elapsedTime * 4 + i) * 0.12, g.z); dummy.rotation.set(0, clock.elapsedTime, Math.PI / 4, 'XYZ'); dummy.scale.setScalar(g.value >= 18 ? 0.3 : 0.16); dummy.updateMatrix(); gems.current!.setMatrixAt(i, dummy.matrix);
       }); gems.current.count = engine.gems.length; gems.current.instanceMatrix.needsUpdate = true;
     }
     if (particles.current) {
       engine.particles.forEach((p, i) => {
-        dummy.position.set(p.x, Math.max(0.05, p.y), p.z); dummy.rotation.set(p.life * 3, i, p.life); dummy.scale.setScalar(p.size * p.life / p.maxLife); dummy.updateMatrix();
+        dummy.position.set(p.x, Math.max(0.05, p.y), p.z); dummy.rotation.set(p.life * 3, i, p.life, 'XYZ'); dummy.scale.setScalar(p.size * p.life / p.maxLife); dummy.updateMatrix();
         particles.current!.setMatrixAt(i, dummy.matrix); particles.current!.setColorAt(i, color.set(p.color).multiplyScalar(2 * p.life / p.maxLife));
       }); particles.current.count = engine.particles.length; particles.current.instanceMatrix.needsUpdate = true; if (particles.current.instanceColor) particles.current.instanceColor.needsUpdate = true;
     }

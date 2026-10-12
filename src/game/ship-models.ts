@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { DRONE_GUN } from './orbital-drones';
 
 export const SURFACES = ['hull', 'armor', 'metal', 'glass', 'signal', 'engine'] as const;
 type Surface = typeof SURFACES[number];
@@ -107,7 +108,7 @@ export function buildEscortDrone(): ShipModel {
   b.vents([0, 0.175, -0.14], 0.19, 4, 0.06);
   b.box('signal', [0.1, 0.02, 0.035], [0, 0.19, 0.17], [0, 0, 0], 0.005);
   for (const side of [-1, 1]) {
-    b.gun(side * 0.27, -0.04, 0.32, 0.55);
+    b.gun(side * DRONE_GUN.x, DRONE_GUN.y, DRONE_GUN.z, DRONE_GUN.scale);
     for (const end of [-1, 1]) {
       const x = side * 0.55, z = end * 0.37;
       b.box('metal', [0.36, 0.07, 0.1], [side * 0.37, 0.015, z], [0, side * end * -0.25, 0], 0.018);

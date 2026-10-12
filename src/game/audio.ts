@@ -22,6 +22,7 @@ class Synth {
     o.onended = () => { o.disconnect(); g.disconnect(); };
   }
   shot() { this.tone(950, 0.085, 'triangle', 0.15, 220); }
+  droneShot() { this.tone(1450, 0.055, 'triangle', 0.045, 440); }
   rocket() { this.tone(250, 0.3, 'sawtooth', 0.28, 55); this.tone(55, 0.22, 'sine', 0.25, 120); }
   hit() { this.tone(160, 0.09, 'square', 0.12, 50); }
   explosion() { this.tone(90, 0.35, 'sawtooth', 0.45, 18); }

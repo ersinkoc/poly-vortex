@@ -142,8 +142,8 @@ function Tracers({ maps }: { maps: ReturnType<typeof buildVfxTextures> }) {
   useFrame(() => {
     if (!mesh.current) return; let count = 0;
     if (useGame.getState().phase !== 'menu') for (const b of engine.bolts) {
-      const a = Math.atan2(b.vx, b.vz); pose.position.set(b.x - Math.sin(a) * 0.15, 0.71, b.z - Math.cos(a) * 0.15); pose.rotation.set(-Math.PI / 2, a, 0, 'YXZ'); pose.scale.set(b.enemy ? 0.6 : 0.42, b.enemy ? 0.6 : 1.6, 1);
-      tint.set(b.enemy ? '#ff3973' : '#bdf796').multiplyScalar(2); setSprite(mesh.current, assets, count++, tint, 0.42);
+      const a = Math.atan2(b.vx, b.vz); pose.position.set(b.x - Math.sin(a) * 0.15, (b.y ?? 0.7) + 0.01, b.z - Math.cos(a) * 0.15); pose.rotation.set(-Math.PI / 2, a, 0, 'YXZ'); pose.scale.set(b.enemy ? 0.6 : b.drone !== undefined ? 0.3 : 0.42, b.enemy ? 0.6 : b.drone !== undefined ? 1.2 : 1.6, 1);
+      tint.set(b.enemy ? '#ff3973' : b.drone !== undefined ? '#78e8ff' : '#bdf796').multiplyScalar(2); setSprite(mesh.current, assets, count++, tint, 0.42);
     }
     flush(mesh.current, count, assets);
   });

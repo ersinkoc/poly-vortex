@@ -12,7 +12,7 @@ import { RewardReel } from './reward-reel';
 import { UPGRADE_LIMITS, previewUpgrade } from './upgrade-preview';
 import { shieldContact, shieldImpact, SHIELD_IMPACT, type HitSource, type ShieldHit } from './shield-impact';
 import { EXPEDITION, doctrineAt, dockStatus, fleetScale, type RunMode, type ServiceDock } from './expedition';
-import { droneCount, dronePose } from './orbital-drones';
+import { DRONE_FIRE, createDroneGuns, droneCount, droneDamage, droneMuzzle, dronePose } from './orbital-drones';
 import type { Arc, Bolt, Cache, DamageText, Entity, Gem, Hazard, Input, Particle, Rocket, Shockwave, Supply, Upgrade, UpgradeId, Vortex, WeaponId } from './types';
 
 export const LIMITS = { enemies: 280, bolts: 500, rockets: 16, particles: 1000, gems: 400, shockwaves: 40, damageTexts: 40, hazards: 12, supplies: 10, caches: 8 };
@@ -21,7 +21,7 @@ const colors = ['#ff567f', '#b58aff', '#ffab56', '#ff466d'];
 const distance = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.hypot(a.x - b.x, a.z - b.z);
 const defs: Record<UpgradeId, [string, string]> = {
   pulse: ['Pulse laser', 'Add a homing bolt. Increase pulse damage and fire rate.'],
-  glaive: ['Escort drones', 'Deploy another armored escort drone. Intercept hostiles at your perimeter.'],
+  glaive: ['Escort drones', 'Add an armed escort and increase its laser damage. Drones follow your aim and hold fire behind cover or pilots.'],
   cryo: ['Cryo-singularity', 'Create a gravity well that pulls in and shatters the swarm.'],
   tesla: ['Tesla arc', 'Arc between nearby targets. More voltage. More damage.'],
   damage: ['Reactor overclock', 'Increase all weapon damage by 20% per power level.'],
@@ -35,6 +35,7 @@ const defs: Record<UpgradeId, [string, string]> = {
 };
 
 export class GameEngine {
+  droneGuns = createDroneGuns();
   runMode: RunMode = 'expedition'; chapter = 1; sentinels = 0; chapterStarted = 0; service: ServiceDock | null = null;
   get chapterTime() { return Math.max(0, this.time - this.chapterStarted); }
   get canExtract() {
@@ -75,6 +76,7 @@ export class GameEngine {
   }
   random() { this.seed = (Math.imul(1664525, this.seed) + 1013904223) >>> 0; return this.seed / 4294967296; }
   reset() {
+    this.droneGuns = createDroneGuns();
     this.shieldHits = [];
     this.rewards.reset(); this.publishRewards();
     this.blasts = []; this.scorches = []; this.visualId = 0;
@@ -437,7 +439,7 @@ export class GameEngine {
       }
       for (const v of this.vortices) { const vd = distance(e, v); if (vd < v.radius && vd > 0.1) { vx += (v.x - e.x) / vd * 5; vz += (v.z - e.z) / vd * 5; this.hitEnemy(e, dt * (12 + this.weapons.cryo * 7) * this.damage); } }
       if (e.hp <= 0) continue;
-      e.x += vx * dt; e.z += vz * dt;
+      e.x += vx * dt; e.z += vz * dt; e.vx = vx; e.vz = vz;
       clearTerrainPosition(e, e.radius);
       if (d < e.radius + 0.6) this.hurt([10, 14, 24, 35][e.kind], e);
       if (e.kind === 3) {
@@ -497,6 +499,8 @@ export class GameEngine {
       }
       this.arcs.push({ points, life: 0.24 }); audio.tone(1600, 0.14, 'sawtooth', 0.18, 100);
     }
+    if (useGame.getState().phase !== 'playing') return;
+    this.fireDrones(dt, friendlies);
     const byId = new Map(this.enemies.map(e => [e.id, e]));
     for (const rocket of this.rockets) {
       if (rocket.age >= 10) continue; rocket.age += dt;
@@ -528,10 +532,11 @@ export class GameEngine {
     }
     this.rockets = this.rockets.filter(r => r.age < 4);
     if (useGame.getState().phase !== 'playing') return;
+    const droneProtectedBodies = [...friendlies, { x: p.x, z: p.z, radius: 1.15 }];
     for (const b of this.bolts) {
       if (b.age >= 4) continue; // A boss death can clear shots inside this traversal.
       b.age += dt;
-      if (!b.enemy) {
+      if (!b.enemy && b.drone === undefined) {
         const target = byId.get(b.target);
         if (target && target.hp > 0) {
           const dx = target.x - b.x, dz = target.z - b.z, d = Math.hypot(dx, dz) || 1;
@@ -540,10 +545,11 @@ export class GameEngine {
         }
       }
       const oldX = b.x, oldZ = b.z; b.x += b.vx * dt; b.z += b.vz * dt;
+      if (b.y !== undefined) b.y += (b.vy ?? 0) * dt;
       b.traveled = (b.traveled ?? 0) + Math.hypot(b.x - oldX, b.z - oldZ);
       const impact = terrainImpact({ x: oldX, z: oldZ }, b);
       if (impact) { b.x = impact.x; b.z = impact.z; b.age = 10; this.burst(b.x, b.z, '#e0d2ad', 3); continue; }
-      if (!b.enemy && friendlyInLine({ x: oldX, z: oldZ }, b, friendlies)) { b.age = 10; this.burst(b.x, b.z, '#89eadd', 3); continue; }
+      if (!b.enemy && (friendlyInLine({ x: oldX, z: oldZ }, b, b.drone !== undefined ? droneProtectedBodies : friendlies) || b.drone !== undefined && distance(b, p) < 1.15)) { b.age = 10; this.burst(b.x, b.z, '#89eadd', 3); continue; }
       if (b.traveled > (b.range ?? Infinity)) { b.age = 10; continue; }
       if (b.enemy) { if (distance(b, p) < 0.7) { this.hurt(b.damage, b); b.age = 10; } }
       else for (const e of this.enemies) if (e.hp > 0 && !b.hits?.includes(e.id) && distance(b, e) < e.radius + 0.25) {
@@ -593,6 +599,41 @@ export class GameEngine {
     for (const s of this.scorches) s.age += dt; this.scorches = this.scorches.filter(s => s.age < 22);
     audio.combo = this.combo;
     this.hudTimer += dt; if (this.hudTimer > 0.1) { this.hudTimer = 0; this.publish(); }
+  }
+
+  private fireDrones(dt: number, friendlies: readonly { x: number; z: number }[]) {
+    const count = droneCount(this.weapons.glaive), mode = useGame.getState().aimMode;
+    const protectedBodies = [...friendlies, { x: this.player.x, z: this.player.z, radius: 1.15 }];
+    for (let i = 0; i < this.droneGuns.length; i++) {
+      const gun = this.droneGuns[i];
+      if (i >= count) { gun.active = false; gun.targetId = 0; gun.flash = 0; continue; }
+      const pose = dronePose(this.time, i, count, this.player);
+      if (!gun.active) { gun.active = true; gun.yaw = pose.yaw; gun.cooldown = i * 0.12; gun.acquisition = i * 0.025; }
+      gun.cooldown = Math.max(0, gun.cooldown - dt); gun.acquisition = Math.max(0, gun.acquisition - dt); gun.flash = Math.max(0, gun.flash - dt);
+      let target = this.enemies.find(e => e.id === gun.targetId && e.hp > 0);
+      if (gun.targetId && !target) { gun.targetId = 0; gun.acquisition = 0; }
+      if (target && !selectTarget([target], pose, this.input, target.id, protectedBodies, DRONE_FIRE.range, mode)) { target = undefined; gun.targetId = 0; gun.acquisition = 0; }
+      if (!target && gun.acquisition <= 0) {
+        target = selectTarget(this.enemies, pose, this.input, 0, protectedBodies, DRONE_FIRE.range, mode);
+        gun.targetId = target?.id ?? 0; gun.acquisition = DRONE_FIRE.acquisitionInterval;
+      }
+      if (!target) { gun.yaw = turnTowards(gun.yaw, pose.yaw, dt * 6); continue; }
+      // Small, bounded motion lead keeps straight laser shots useful against moving interceptors.
+      const lead = Math.min(0.4, distance(pose, target) / DRONE_FIRE.speed);
+      let lx = (target.vx ?? 0) * lead, lz = (target.vz ?? 0) * lead; const leadLength = Math.hypot(lx, lz);
+      if (leadLength > 2.4) { lx *= 2.4 / leadLength; lz *= 2.4 / leadLength; }
+      const aim = { x: target.x + lx, z: target.z + lz }, heading = Math.atan2(aim.x - pose.x, aim.z - pose.z);
+      gun.yaw = turnTowards(gun.yaw, heading, dt * DRONE_FIRE.turnSpeed);
+      if (gun.cooldown > 0 || Math.abs(angleDifference(gun.yaw, heading)) > DRONE_FIRE.alignment || this.bolts.length >= LIMITS.bolts) continue;
+      const side = gun.shots % 2 === 0 ? -1 : 1, muzzle = droneMuzzle(pose, heading, side);
+      // Validate the actual barrel lane, not just the escort's center or its last lock.
+      if (terrainImpact(pose, muzzle) || terrainImpact(muzzle, aim) || friendlyInLine(pose, muzzle, protectedBodies) || friendlyInLine(muzzle, aim, protectedBodies)) continue;
+      gun.yaw = heading; gun.barrel = side; gun.flash = DRONE_FIRE.flashDuration; gun.shots++;
+      gun.cooldown = Math.max(DRONE_FIRE.minInterval, DRONE_FIRE.interval * this.haste * (this.overdriveTime > 0 ? 0.8 : 1));
+      const flight = Math.max(0.06, distance(muzzle, aim) / DRONE_FIRE.speed);
+      this.bolts.push({ ...muzzle, vx: Math.sin(heading) * DRONE_FIRE.speed, vz: Math.cos(heading) * DRONE_FIRE.speed, vy: Math.max(-6, Math.min(6, (target.radius * 0.75 + 0.3 - muzzle.y) / flight)), enemy: false, age: 0, target: target.id, damage: droneDamage(this.weapons.glaive) * this.damage * (this.overdriveTime > 0 ? 1.35 : 1), drone: i, traveled: 0, range: DRONE_FIRE.range });
+      audio.droneShot();
+    }
   }
 }
 export const engine = new GameEngine();

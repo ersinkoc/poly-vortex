@@ -38,7 +38,7 @@ test('the rendered orbit position intercepts a nearby hostile with the original 
   game.time = 10; const dt = 1 / 60, pose = dronePose(game.time + dt, 0, 2, game.player);
   game.spawn(2, pose.x, pose.z); const enemy = game.enemies[0], hp = enemy.hp;
   game.tick(dt); expect(hp - enemy.hp).toBeCloseTo(65 * dt, 8);
-  expect(game.bolts.filter(b => !b.enemy)).toHaveLength(0); // No new unrestricted ranged attack.
+  expect(game.bolts.filter(b => !b.enemy)).toHaveLength(0); // Precision holds drone fire without pointer aim.
 });
 test('unarmed cores do not gain perimeter damage', () => {
   game.weapons.glaive = 0; game.spawn(2, 3, 0); const enemy = game.enemies[0], hp = enemy.hp;
