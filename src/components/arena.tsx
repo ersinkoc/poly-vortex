@@ -12,6 +12,7 @@ import ShipFleet from './ships';
 import ShipLighting from './ship-lighting';
 import CombatEffects from './combat-effects';
 import Terrain from './terrain';
+import WorldLifeActors from './world-life';
 import MissionActors from './mission-actors';
 import { TargetMarker } from './target-lock';
 import { navigationSignals } from '@/game/navigation';
@@ -209,7 +210,7 @@ export default function Arena() {
     <color attach="background" args={['#080e15']} />
     <fog attach="fog" args={['#080e15', 28, 72]} />
     <ShipLighting followPlayer />
-    <SceneController /><Terrain /><MissionActors /><ServiceBeacon /><TargetMarker /><ProtocolRing /><ShipFleet />
+    <SceneController /><Terrain /><MissionActors /><WorldLifeActors /><ServiceBeacon /><TargetMarker /><ProtocolRing /><ShipFleet />
     <Projectiles /><EnemyWeaponSignals /><Effects /><CombatEffects /><CinematicEffects /><Stars radius={65} depth={35} count={600} factor={1.3} saturation={0} fade speed={0.1} />
     <PostFX />
   </Canvas>;

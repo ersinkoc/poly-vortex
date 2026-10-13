@@ -1,6 +1,7 @@
 import { audio } from './audio';
 import { useGame } from './store';
 import { SECTORS, sectorAt } from './progression';
+import { WorldLife } from './world-life';
 import { MissionDirector } from './missions';
 import { clearTerrainPosition, terrainHeight, terrainImpact } from './terrain';
 import { angleDifference, friendlyInLine, PULSE_RANGE, selectTarget, turnTowards } from './targeting';
@@ -60,6 +61,7 @@ export class GameEngine {
   blasts: Blast[] = []; scorches: Scorch[] = []; private visualId = 0;
   director = new EncounterDirector();
   missions = new MissionDirector();
+  readonly worldLife = new WorldLife();
   targetId = 0;
   rockets: Rocket[] = []; rocketAmmo = ROCKET_CAPACITY; rocketCooldown = 0;
   rocketPending = 0; private pendingRocketTarget = 0;
@@ -87,6 +89,7 @@ export class GameEngine {
   random() { this.seed = (Math.imul(1664525, this.seed) + 1013904223) >>> 0; return this.seed / 4294967296; }
   reset() {
     this.roverBay.reset(this.seed);
+    this.worldLife.reset(this.seed);
     this.charges = []; this.chargeAmmo = CHARGE_RULES.capacity; this.chargeCooldown = 0; this.chargeUid = 0; this.chargeNotice = ''; this.chargeNoticeTime = 0; this.input.bomb = false;
     this.droneGuns = createDroneGuns();
     this.shieldHits = [];
@@ -252,6 +255,7 @@ export class GameEngine {
     this.peakCombo = Math.max(this.peakCombo, this.combo);
     if (damage >= 3 && this.damageTexts.length < LIMITS.damageTexts) this.damageTexts.push({ x: enemy.x, z: enemy.z, value: Math.round(damage), critical, life: 0.75 });
     if (enemy.hp > 0) { this.burst(enemy.x, enemy.z, '#e8ffc6', 3); return; }
+    this.worldLife.escapeCrew(enemy, this.player);
     this.kills++; this.score += Math.round([100, 200, 500, 10000][enemy.kind] * this.combo);
     this.surge = Math.min(100, this.surge + (enemy.elite ? 12 : 3));
     if (enemy.elite) { this.eliteKills++; if (this.caches.length < LIMITS.caches) this.caches.push({ x: enemy.x, z: enemy.z, age: 0 }); this.wave(enemy.x, enemy.z, 5, '#ffcf6c'); }
@@ -667,6 +671,7 @@ export class GameEngine {
       }
       if (event === 'failed') this.announce('SIGNAL LOST', 'The window closed. A new operation will follow.');
     }
+    if (useGame.getState().phase === 'playing') this.worldLife.tick(dt, p, this.enemies, this.blasts, !this.bossSpawned && !this.service);
     for (const q of this.particles) { q.life -= dt; q.x += q.vx * dt; q.y += q.vy * dt; q.z += q.vz * dt; q.vy -= dt * 8; }
     this.particles = this.particles.filter(q => q.life > 0);
     for (const a of this.arcs) a.life -= dt; this.arcs = this.arcs.filter(a => a.life > 0);
