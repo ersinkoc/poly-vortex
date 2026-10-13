@@ -171,11 +171,11 @@ function SceneController() {
     if (frames.current.time >= 1) { useGame.setState({ fps: Math.round(frames.current.count / frames.current.time) }); frames.current = { count: 0, time: 0 }; }
     const menu = s.phase === 'menu';
     const px = menu ? 0 : engine.player.x, pz = menu ? 0 : engine.player.z;
-    target.set(px + (menu ? 9 : 0), menu ? 8 : 25, pz + (menu ? 12 : 19));
+    target.set(px + (menu ? 12 : 0), menu ? 13 : 25, pz + (menu ? 17 : 19));
     camera.position.lerp(target, 1 - Math.exp(-4 * Math.min(delta, 0.1)));
     const shake = menu || s.reducedEffects ? 0 : engine.trauma ** 2 * 0.4;
     camera.position.x += Math.sin(state.clock.elapsedTime * 91) * shake; camera.position.z += Math.cos(state.clock.elapsedTime * 77) * shake;
-    camera.lookAt(px - (menu && state.size.width > 760 ? 3.7 : 0), menu ? 1 : 0, pz);
+    camera.lookAt(px - (menu && state.size.width > 760 ? 5.5 : 0), menu ? 1 : 0, pz);
     navigationTimer.current += delta;
     if (s.phase === 'playing' && navigationTimer.current >= 0.1) {
       navigationTimer.current = 0; camera.updateMatrixWorld();

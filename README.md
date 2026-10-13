@@ -45,9 +45,13 @@ The custom domain is `poly-vortex.oxog.dev`, configured in `public/CNAME` and Gi
 
 Collect cyan XP prisms. A compact side reel automatically installs one randomized common, rare, or overclocked upgrade without pausing combat. Mix pulse lasers, escort drones, cryo-singularities, and Tesla arcs. At three minutes the Vortex Sentinel arrives. Classic extracts immediately on its defeat; Expedition opens a service and extraction window, then continues into another front. Standard and Overdrive difficulties are available. Every run awards core credits, saved in browser local storage, for permanent armor, damage, and speed upgrades. There are no accounts or server dependencies.
 
+## Live fleet intro — 1.28.0
+
+The desktop launch screen again shows the selected warship surrounded by the original slowly rotating enemy formation: interceptors, ranged craft and heavy armored vehicles. The camera opens out to show both sides while keeping the direct ship-selection cards and deployment controls. The existing instanced fleet renderer handles the thirty preview actors; menu actors do not fire, run combat AI or advance the run. Mobile keeps the lightweight portrait-based launch screen.
+
 ## Visual command center and focused HUD — 1.27.0
 
-The launch screen now starts with three directly selectable warship image cards, followed by starting weapon and flight plan. Hull/shield/speed values and the deployment button reflect the selected frame immediately. The desktop preview shows the selected ship without decorative enemies or fake reactor/coordinate telemetry. Small-screen menus use the three local portraits without mounting a 3D canvas. The portraits are 420×300 JPEG captures of the project's own procedural models, about 20 KB combined, and require no external image service at runtime.
+The launch screen starts with three directly selectable warship image cards, followed by starting weapon and flight plan. Hull/shield/speed values and the deployment button reflect the selected frame immediately. The desktop preview follows the selected ship. Small-screen menus use the three local portraits without mounting a 3D canvas. The portraits are 420×300 JPEG captures of the project's own procedural models, about 20 KB combined, and require no external image service at runtime.
 
 The visual flight manual illustrates movement/dash, aim/autofire, rockets/bombs/reload and prisms/pilot rescue in four small local SVG scenes. Extra boss, drone, rover and service rules live in an expandable section; the rocket manual includes a lock/launch/impact/reload picture sequence. Pause and results use direct actions, including choosing the next ship.
 

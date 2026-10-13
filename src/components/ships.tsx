@@ -94,7 +94,6 @@ function EnemyShips({ kind, asset, shadow }: { kind: 0 | 1 | 2 | 3; asset: Actor
     const state = useGame.getState(), menu = state.phase === 'menu'; let count = 0, lightCount = 0;
     for (const e of engine.enemies) {
       if (e.kind !== kind) continue;
-      if (menu) continue;
       const orbit = menu ? clock.elapsedTime * 0.035 : 0;
       const x = e.x * Math.cos(orbit) - e.z * Math.sin(orbit), z = e.x * Math.sin(orbit) + e.z * Math.cos(orbit);
       const heavy = !menu ? kind === 2 ? goliathPose(e, engine.player) : kind === 1 ? rangedPose(e, engine.player) : null : null;
@@ -215,5 +214,14 @@ export default function ShipFleet() {
     Object.values(assets.wheels).forEach(geometry => geometry.dispose());
     Object.values(assets.radar).forEach(geometry => geometry.dispose());
   }, [assets]);
-  return <><PlayerShip asset={player} shadow={assets.shadow} />{!menu && <><EscortDrones asset={assets.drone} rotor={assets.rotor} shadow={assets.shadow} /><GroundCharges asset={assets.charge} /><GroundRovers asset={assets.rover} wheels={assets.wheels} radar={assets.radar} shadow={assets.shadow} />{([0, 1, 2, 3] as const).map(kind => <EnemyShips key={kind} kind={kind} asset={assets.enemies[kind]} shadow={assets.shadow} />)}</>}</>;
+  return <>
+    <PlayerShip asset={player} shadow={assets.shadow} />
+    {([0, 1, 2] as const).map(kind => <EnemyShips key={kind} kind={kind} asset={assets.enemies[kind]} shadow={assets.shadow} />)}
+    {!menu && <>
+      <EscortDrones asset={assets.drone} rotor={assets.rotor} shadow={assets.shadow} />
+      <GroundCharges asset={assets.charge} />
+      <GroundRovers asset={assets.rover} wheels={assets.wheels} radar={assets.radar} shadow={assets.shadow} />
+      <EnemyShips kind={3} asset={assets.enemies[3]} shadow={assets.shadow} />
+    </>}
+  </>;
 }
