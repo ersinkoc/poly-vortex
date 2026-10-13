@@ -45,6 +45,10 @@ The custom domain is `poly-vortex.oxog.dev`, configured in `public/CNAME` and Gi
 
 Collect cyan XP prisms. A compact side reel automatically installs one randomized common, rare, or overclocked upgrade without pausing combat. Mix pulse lasers, escort drones, cryo-singularities, and Tesla arcs. At three minutes the Vortex Sentinel arrives. Classic extracts immediately on its defeat; Expedition opens a service and extraction window, then continues into another front. Standard and Overdrive difficulties are available. Every run awards core credits, saved in browser local storage, for permanent armor, damage, and speed upgrades. There are no accounts or server dependencies.
 
+## Smaller ground rovers — 1.20.1
+
+Four-wheel vehicles now render at 60% of their previous linear size. Chassis, tires, hubs and ground shadows share the scale; wheel spacing, terrain sampling, body clearance and rolling speed use the corresponding physical dimensions. Travel, deployment cadence, sensor radius, fuse and explosion damage remain unchanged.
+
 ## Escort battery and carrier bay — 1.20
 
 Each drone now carries an independent 100-point battery. Flying drains five points per second and a successful laser shot spends one more; held or blocked shots spend nothing. Initial charge is staggered by eight points per slot to spread the first recall. At 20% reserve, that unit stops targeting/fire and queues for the core's single aft hatch. It visibly approaches and descends over two seconds, stows inside the carrier, recharges at 12.5 points per second and takes off over 1.4 seconds only after reaching 100%. Full batteries support about 16 seconds of quiet flight; combat shortens sorties. A normal reserve-to-full refill takes 6.4 seconds, excluding approach, takeoff and the hatch queue.

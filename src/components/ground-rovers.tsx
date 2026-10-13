@@ -4,7 +4,7 @@ import { useFrame } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { engine } from '@/game/engine';
-import { ROVER_RULES, roverPose, roverWheelSite } from '@/game/ground-rovers';
+import { ROVER_MODEL, ROVER_RULES, roverPose, roverWheelSite } from '@/game/ground-rovers';
 import { SURFACES, type ShipModel, type buildShipMaterials, type buildRoverWheels } from '@/game/ship-models';
 import { terrainHeight } from '@/game/terrain';
 import { useGame } from '@/game/store';
@@ -23,15 +23,15 @@ export default function GroundRovers({ asset, wheels, shadow }: { asset: { model
     let sensorCount = 0;
     for (let i = 0; i < count; i++) {
       const rover = units[i], pose = roverPose(rover);
-      body.position.set(rover.x, pose.y, rover.z); body.rotation.set(pose.pitch, rover.yaw, pose.bank, 'YXZ'); body.scale.setScalar(1); body.updateMatrix();
+      body.position.set(rover.x, pose.y, rover.z); body.rotation.set(pose.pitch, rover.yaw, pose.bank, 'YXZ'); body.scale.setScalar(ROVER_MODEL.scale); body.updateMatrix();
       layers.current.forEach(m => m?.setMatrixAt(i, body.matrix));
       let index = i * 4;
       for (const side of [-1, 1]) for (const end of [-1, 1]) {
         const p = roverWheelSite(rover, side, end);
-        wheel.position.set(p.x, terrainHeight(p.x, p.z) + ROVER_RULES.wheelRadius, p.z); wheel.quaternion.copy(body.quaternion); wheel.rotateX(rover.traveled / ROVER_RULES.wheelRadius); wheel.scale.setScalar(1); wheel.updateMatrix();
+        wheel.position.set(p.x, terrainHeight(p.x, p.z) + ROVER_RULES.wheelRadius, p.z); wheel.quaternion.copy(body.quaternion); wheel.rotateX(rover.traveled / ROVER_RULES.wheelRadius); wheel.scale.setScalar(ROVER_MODEL.scale); wheel.updateMatrix();
         tires.current?.setMatrixAt(index, wheel.matrix); hubs.current?.setMatrixAt(index++, wheel.matrix);
       }
-      marker.position.set(rover.x, terrainHeight(rover.x, rover.z) + 0.025, rover.z); marker.rotation.set(-Math.PI / 2, 0, -rover.yaw); marker.scale.set(1.35, 1.8, 1); marker.updateMatrix(); footprints.current?.setMatrixAt(i, marker.matrix);
+      marker.position.set(rover.x, terrainHeight(rover.x, rover.z) + 0.025, rover.z); marker.rotation.set(-Math.PI / 2, 0, -rover.yaw); marker.scale.set(1.35 * ROVER_MODEL.scale, 1.8 * ROVER_MODEL.scale, 1); marker.updateMatrix(); footprints.current?.setMatrixAt(i, marker.matrix);
       if (rover.state !== 'rolling') {
         const primed = rover.state === 'primed', pulse = state.reducedEffects ? 1 : 0.8 + 0.2 * Math.sin(engine.time * (primed ? 28 : 5));
         for (let j = 0; j < MARKERS; j++) {

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { DRONE_GUN } from './orbital-drones';
-import { ROVER_RULES } from './ground-rovers';
+import { ROVER_MODEL } from './ground-rovers';
 
 export const SURFACES = ['hull', 'armor', 'metal', 'glass', 'signal', 'engine'] as const;
 type Surface = typeof SURFACES[number];
@@ -160,8 +160,8 @@ export function buildGroundRover(): ShipModel {
     b.box('signal', [0.1, 0.042, 0.028], [side * 0.21, 0.25, 0.565], [0, 0, 0], 0.01);
     b.box('metal', [0.08, 0.07, 0.84], [side * 0.345, 0.05, 0], [0, 0, 0], 0.015);
     for (const end of [-1, 1]) {
-      b.cylinder('metal', 0.045, 0.045, 0.32, [side * 0.34, 0.015, end * ROVER_RULES.wheelbase / 2], [0, 0, Math.PI / 2], 8);
-      b.box('armor', [0.22, 0.07, 0.42], [side * 0.43, 0.23, end * ROVER_RULES.wheelbase / 2], [0, 0, side * -0.08], 0.015);
+      b.cylinder('metal', 0.045, 0.045, 0.32, [side * 0.34, 0.015, end * ROVER_MODEL.wheelbase / 2], [0, 0, Math.PI / 2], 8);
+      b.box('armor', [0.22, 0.07, 0.42], [side * 0.43, 0.23, end * ROVER_MODEL.wheelbase / 2], [0, 0, side * -0.08], 0.015);
       b.bolts([[side * 0.24, 0.345, end * 0.43]]);
     }
     b.box('metal', [0.024, 0.065, 0.18], [side * 0.32, 0.34, 0.15], [0, 0, 0], 0.005);
@@ -170,7 +170,7 @@ export function buildGroundRover(): ShipModel {
 }
 
 export function buildRoverWheels() {
-  const base = new THREE.CylinderGeometry(ROVER_RULES.wheelRadius, ROVER_RULES.wheelRadius, 0.17, 16).rotateZ(Math.PI / 2), rubber = [base.toNonIndexed()]; base.dispose();
+  const base = new THREE.CylinderGeometry(ROVER_MODEL.wheelRadius, ROVER_MODEL.wheelRadius, 0.17, 16).rotateZ(Math.PI / 2), rubber = [base.toNonIndexed()]; base.dispose();
   for (let i = 0; i < 16; i++) {
     const a = i / 16 * Math.PI * 2;
     const tread = new THREE.BoxGeometry(0.19, 0.035, 0.065).rotateX(a).translate(0, Math.cos(a) * 0.198, Math.sin(a) * 0.198); rubber.push(tread.toNonIndexed()); tread.dispose();

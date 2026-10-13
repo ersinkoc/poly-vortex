@@ -1,7 +1,8 @@
 import { clearTerrainPosition, terrainHeight, terrainImpact } from './terrain';
 import type { Entity } from './types';
 
-export const ROVER_RULES = { capacity: 12, first: 10, intervalMin: 24, intervalMax: 36, speed: 4.6, travelMin: 9, travelMax: 14, bodyRadius: 0.55, wheelRadius: 0.2, track: 0.94, wheelbase: 0.94, armingDelay: 0.6, triggerRadius: 1.6, lifetime: 12, fuse: 0.35, blastRadius: 4.2, damage: 420 } as const;
+export const ROVER_MODEL = { scale: 0.6, bodyRadius: 0.55, wheelRadius: 0.2, track: 0.94, wheelbase: 0.94 } as const;
+export const ROVER_RULES = { capacity: 12, first: 10, intervalMin: 24, intervalMax: 36, speed: 4.6, travelMin: 9, travelMax: 14, bodyRadius: ROVER_MODEL.bodyRadius * ROVER_MODEL.scale, wheelRadius: ROVER_MODEL.wheelRadius * ROVER_MODEL.scale, track: ROVER_MODEL.track * ROVER_MODEL.scale, wheelbase: ROVER_MODEL.wheelbase * ROVER_MODEL.scale, armingDelay: 0.6, triggerRadius: 1.6, lifetime: 12, fuse: 0.35, blastRadius: 4.2, damage: 420 } as const;
 export type GroundRover = { id: number; x: number; z: number; yaw: number; age: number; traveled: number; range: number; parked: number; fuse: number; state: 'rolling' | 'armed' | 'primed' | 'detonated' };
 
 export function roverWheelSite(rover: Pick<GroundRover, 'x' | 'z' | 'yaw'>, side: number, end: number) {
