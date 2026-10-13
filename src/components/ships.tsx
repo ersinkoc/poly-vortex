@@ -11,12 +11,14 @@ import GroundRovers from './ground-rovers';
 import { DRONE_HULL, DRONE_FIRE, DRONE_FORMATION, DRONE_ORBIT, droneMuzzle, dronePose } from '@/game/orbital-drones';
 import { terrainHeight } from '@/game/terrain';
 import { attachDamageMaterial, buildDamageUniforms, damageHeat, hullDamage } from '@/game/ship-damage';
+import { enemyWeapon, HOSTILE_WEAPONS, rangedPose } from '@/game/enemy-weapons';
 import { GOLIATH, goliathMuzzle, goliathPose } from '@/game/goliath-ai';
 import { DRONE_DOCK, PLAYER_SCALE, playerFlightPose } from '@/game/player-pose';
 
 type ActorAsset = { model: ShipModel; materials: ReturnType<typeof buildShipMaterials> };
 const accents = ['#ff5774', '#a685ff', '#ffae50', '#ff3a5d'];
 const matrixObject = new THREE.Object3D();
+const weaponTint = new THREE.Color();
 
 function PlayerShip({ asset, shadow }: { asset: ActorAsset & { damage: ReturnType<typeof buildDamageUniforms> }; shadow: THREE.Texture }) {
   const group = useRef<THREE.Group>(null), footprint = useRef<THREE.Mesh>(null), light = useRef<THREE.PointLight>(null);
@@ -32,7 +34,7 @@ function PlayerShip({ asset, shadow }: { asset: ActorAsset & { damage: ReturnTyp
       group.current.position.set(pose.x, menu ? 0.95 + Math.sin(clock.elapsedTime * 2.5) * 0.045 : pose.y, pose.z);
       group.current.rotation.set(menu ? -0.04 : pose.pitch, menu ? clock.elapsedTime * 0.1 + 0.7 : pose.yaw, menu ? Math.sin(clock.elapsedTime * 0.7) * 0.025 : pose.bank);
       group.current.scale.setScalar(menu ? 2.25 : PLAYER_SCALE);
-      group.current.visible = true;
+      group.current.visible = menu || p.hp > 0;
     }
     const flame = asset.materials.engine as THREE.MeshBasicMaterial;
     const flicker = state.reducedEffects ? 1 : 1 - heat * 0.22 * (0.5 + 0.5 * Math.sin(engine.time * 27));
@@ -41,8 +43,8 @@ function PlayerShip({ asset, shadow }: { asset: ActorAsset & { damage: ReturnTyp
     (asset.materials.signal as THREE.MeshStandardMaterial).emissiveIntensity = 3.1 * (1 - damage * 0.6) * flicker;
     const armor = asset.materials.armor as THREE.MeshPhysicalMaterial;
     armor.emissive.set(p.dashTime > 0 && !menu ? '#83c6e1' : '#000000'); armor.emissiveIntensity = 0.16;
-    if (footprint.current) { footprint.current.position.set(p.x, terrainHeight(p.x, p.z) + 0.035, p.z); footprint.current.rotation.set(-Math.PI / 2, 0, -(menu ? clock.elapsedTime * 0.1 + 0.7 : p.angle)); footprint.current.scale.set(menu ? 5.5 : 2.4, menu ? 7 : 3, 1); }
-    if (light.current) { light.current.position.set(p.x, 1.8, p.z); light.current.color.copy(idleFlame).lerp(failingFlame, heat); light.current.intensity = 9 + (state.reducedEffects ? 0 : p.hullHit * 10); }
+    if (footprint.current) { footprint.current.visible = menu || p.hp > 0; footprint.current.position.set(p.x, terrainHeight(p.x, p.z) + 0.035, p.z); footprint.current.rotation.set(-Math.PI / 2, 0, -(menu ? clock.elapsedTime * 0.1 + 0.7 : p.angle)); footprint.current.scale.set(menu ? 5.5 : 2.4, menu ? 7 : 3, 1); }
+    if (light.current) { light.current.position.set(p.x, 1.8, p.z); light.current.color.copy(idleFlame).lerp(failingFlame, heat); light.current.intensity = menu || p.hp > 0 ? 9 + (state.reducedEffects ? 0 : p.hullHit * 10) : 0; }
   });
   return <>
     <group ref={group} dispose={null}>{SURFACES.map(surface => <mesh key={surface} geometry={asset.model[surface]} material={asset.materials[surface]} castShadow={surface === 'hull' || surface === 'armor'} receiveShadow />)}<DroneBay /></group>
@@ -92,14 +94,17 @@ function EnemyShips({ kind, asset, shadow }: { kind: 0 | 1 | 2 | 3; asset: Actor
       if (e.kind !== kind) continue;
       const orbit = menu ? clock.elapsedTime * 0.035 : 0;
       const x = e.x * Math.cos(orbit) - e.z * Math.sin(orbit), z = e.x * Math.sin(orbit) + e.z * Math.cos(orbit);
-      const heavy = kind === 2 && !menu ? goliathPose(e, engine.player) : null;
+      const heavy = !menu ? kind === 2 ? goliathPose(e, engine.player) : kind === 1 ? rangedPose(e, engine.player) : null : null;
       const yaw = heavy?.yaw ?? (kind === 1 ? clock.elapsedTime * 0.25 + e.id : Math.atan2((menu ? 0 : engine.player.x) - x, (menu ? 0 : engine.player.z) - z));
       const scale = e.radius * (menu ? 1.45 : 1);
       matrixObject.position.set(x, e.radius * 0.75 + 0.3 + Math.sin(clock.elapsedTime * 2 + e.id) * 0.045, z);
       matrixObject.rotation.set(Math.sin(e.age + e.id) * 0.025, yaw, Math.cos(e.age * 1.5 + e.id) * (kind === 0 ? 0.09 : 0.025));
       if (heavy) { matrixObject.position.set(heavy.x, heavy.y, heavy.z); matrixObject.rotation.set(heavy.pitch, heavy.yaw, heavy.bank, 'XYZ'); }
       matrixObject.scale.setScalar(scale); matrixObject.updateMatrix();
-      for (const mesh of layers.current) mesh?.setMatrixAt(count, matrixObject.matrix);
+      for (let i = 0; i < layers.current.length; i++) {
+        const mesh = layers.current[i]; mesh?.setMatrixAt(count, matrixObject.matrix);
+        if (kind === 1 && SURFACES[i] === 'signal') mesh?.setColorAt(count, weaponTint.set(HOSTILE_WEAPONS[enemyWeapon(e)].color));
+      }
       if (footprints.current) {
         matrixObject.position.set(x, terrainHeight(x, z) + 0.025 + kind * 0.001, z); matrixObject.rotation.set(-Math.PI / 2, 0, -yaw); matrixObject.scale.set(scale * 2.5, scale * 2.9, 1); matrixObject.updateMatrix(); footprints.current.setMatrixAt(count, matrixObject.matrix);
       }
@@ -113,7 +118,7 @@ function EnemyShips({ kind, asset, shadow }: { kind: 0 | 1 | 2 | 3; asset: Actor
       }
       count++;
     }
-    for (const mesh of [...layers.current, footprints.current]) if (mesh) { mesh.count = count; mesh.instanceMatrix.needsUpdate = true; }
+    for (const mesh of [...layers.current, footprints.current]) if (mesh) { mesh.count = count; mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; }
     if (cannonLights.current) { cannonLights.current.count = lightCount; cannonLights.current.instanceMatrix.needsUpdate = true; }
   });
   return <>
@@ -178,6 +183,8 @@ export default function ShipFleet() {
     const player = { model: buildPlayerShip(), materials: buildShipMaterials('#bdff6f', true, textures), damage: buildDamageUniforms() };
     for (const surface of ['hull', 'armor', 'metal', 'glass'] as const) attachDamageMaterial(player.materials[surface], player.damage);
     const enemies = ([0, 1, 2, 3] as const).map(kind => ({ model: buildEnemyShip(kind), materials: buildShipMaterials(accents[kind], false, textures) }));
+    enemies[1].materials.signal.dispose();
+    enemies[1].materials.signal = new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffffff').multiplyScalar(3.1), toneMapped: false });
     const drone = { model: buildEscortDrone(), materials: buildShipMaterials('#6ee7ff', false, textures) };
     const rotor = buildDroneRotor();
     const charge = { model: buildGroundCharge(), materials: buildShipMaterials('#ffba6a', false, textures) };

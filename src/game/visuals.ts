@@ -1,14 +1,30 @@
 import * as THREE from 'three';
 
 export const VISUAL_LIMITS = { blasts: 24, scorches: 48, puffs: 144, debris: 192, lights: 3, rubble: 324 } as const;
-export type Blast = { id: number; x: number; z: number; size: number; age: number; color: string; energy: boolean };
+export const DESTRUCTION = { life: 6, fireLife: 2.8, smokeLife: 6, debrisCount: 8 } as const;
+export type Blast = { id: number; x: number; y?: number; z: number; size: number; age: number; color: string; energy: boolean };
 export type Scorch = { x: number; z: number; size: number; age: number };
 export const visualNoise = (a: number, b = 0) => {
   let n = Math.imul(a + 17, 374761393) ^ Math.imul(b + 73, 668265263); n = Math.imul(n ^ n >>> 13, 1274126177); return ((n ^ n >>> 16) >>> 0) / 4294967296;
 };
 
+/** Deterministic ballistic panels: settle on terrain after one damped bounce. */
+export function wreckFragment(b: Blast, index: number, ground: (x: number, z: number) => number) {
+  const seed = b.id * 17, angle = index * 2.399 + visualNoise(seed, index + 50) * 2;
+  const speed = (1.5 + visualNoise(seed, index + 60) * 3) * Math.sqrt(b.size), lift = 2 + visualNoise(seed, index + 70) * 4;
+  const startY = b.y ?? ground(b.x, b.z) + 0.7, localGround = ground(b.x, b.z) + 0.09;
+  const fallTime = (lift + Math.sqrt(lift * lift + 19.6 * Math.max(0, startY - localGround))) / 9.8;
+  const after = Math.max(0, b.age - fallTime), bounceTime = Math.min(after, 0.4), travel = Math.min(b.age, fallTime) + Math.min(after, 0.6) * 0.28;
+  const x = b.x + Math.cos(angle) * travel * speed, z = b.z + Math.sin(angle) * travel * speed;
+  const floor = ground(x, z) + 0.09;
+  const y = b.age < fallTime ? Math.max(floor, startY + lift * b.age - 4.9 * b.age * b.age) : floor + Math.max(0, bounceTime * (0.4 - bounceTime) * 5);
+  const fade = Math.min(1, Math.max(0, DESTRUCTION.life - b.age));
+  return { x, y, z, angle, spin: Math.min(b.age, fallTime + 0.4), fade, size: b.size * (0.18 + visualNoise(seed, index + 80) * 0.22) };
+}
+
 /** CPU-generated RGBA sprites: transparent borders, no images or downloads. */
 export function buildVfxTextures(size = 128) {
+  const fire = new Uint8Array(size * size * 4);
   const glow = new Uint8Array(size * size * 4), smoke = new Uint8Array(size * size * 4), scorch = new Uint8Array(size * size * 4);
   const noise = (x: number, y: number, cells: number) => {
     const gx = x / size * cells, gy = y / size * cells, ix = Math.floor(gx), iy = Math.floor(gy);
@@ -20,13 +36,14 @@ export function buildVfxTextures(size = 128) {
     const i = (y * size + x) * 4, r = Math.hypot((x + 0.5) / size * 2 - 1, (y + 0.5) / size * 2 - 1);
     const edge = Math.max(0, 1 - r), grain = noise(x, y, 6) * 0.65 + noise(x, y, 15) * 0.35;
     glow.set([255, 255, 255, Math.round(edge ** 2.3 * 255)], i);
+    fire.set([255, 255, 255, Math.round(edge ** 1.2 * (0.35 + grain * 0.65) * 255)], i);
     smoke.set([255, 255, 255, Math.round(edge ** 0.65 * (0.3 + grain * 0.7) * 210)], i);
     const char = Math.max(0, 1 - r * (0.82 + grain * 0.45));
     scorch.set([255, 255, 255, Math.round(char ** 1.5 * (0.45 + grain * 0.55) * 210)], i);
-    if (x === 0 || y === 0 || x === size - 1 || y === size - 1) { glow[i + 3] = smoke[i + 3] = scorch[i + 3] = 0; }
+    if (x === 0 || y === 0 || x === size - 1 || y === size - 1) { fire[i + 3] = glow[i + 3] = smoke[i + 3] = scorch[i + 3] = 0; }
   }
   const texture = (pixels: Uint8Array) => { const t = new THREE.DataTexture(pixels, size, size); t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter; t.generateMipmaps = true; t.needsUpdate = true; return t; };
-  return { glow: texture(glow), smoke: texture(smoke), scorch: texture(scorch) };
+  return { fire: texture(fire), glow: texture(glow), smoke: texture(smoke), scorch: texture(scorch) };
 }
 
 export function rubbleAt(cx: number, cz: number, index: number) {

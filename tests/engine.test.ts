@@ -34,9 +34,11 @@ describe('combat simulation', () => {
     game.hitEnemy(goliath, 10000); expect(game.kills).toBe(2); expect(game.gems).toHaveLength(2);
     game.hitEnemy(goliath, 10000); expect(game.kills).toBe(2);
   });
-  test('orbiters emit hostile projectile rings', () => {
-    game.spawn(1, 0, 8); game.enemies[0].timer = 0; game.tick(1 / 60);
-    expect(game.bolts.filter(b => b.enemy)).toHaveLength(8);
+  test('orbiters warn before firing an aimed three-round plasma burst', () => {
+    game.weapons.pulse = 0; game.spawn(1, 0, 8); game.enemies[0].hp = 10000; game.enemies[0].weapon = 'plasma'; game.enemies[0].timer = 0; game.tick(1 / 60);
+    expect(game.enemies[0].ranged).toBeDefined(); expect(game.bolts.filter(b => b.enemy)).toHaveLength(0);
+    for (let i = 0; i < 56; i++) game.tick(1 / 60);
+    expect(game.enemies[0].weaponShots).toBe(3);
   });
   test('every specialized loadout remains capable of firing the basic cannon', () => {
     useGame.setState({ loadout: 'cryo' }); game.reset(); expect(game.weapons.cryo).toBe(1); expect(game.weapons.pulse).toBe(1);

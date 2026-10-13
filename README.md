@@ -45,6 +45,16 @@ The custom domain is `poly-vortex.oxog.dev`, configured in `public/CNAME` and Gi
 
 Collect cyan XP prisms. A compact side reel automatically installs one randomized common, rare, or overclocked upgrade without pausing combat. Mix pulse lasers, escort drones, cryo-singularities, and Tesla arcs. At three minutes the Vortex Sentinel arrives. Classic extracts immediately on its defeat; Expedition opens a service and extraction window, then continues into another front. Standard and Overdrive difficulties are available. Every run awards core credits, saved in browser local storage, for permanent armor, damage, and speed upgrades. There are no accounts or server dependencies.
 
+## Vehicle destruction — 1.21.0
+
+Every destroyed vehicle, including ranged platforms, escorts and the player core, emits a physical blast at its hull altitude. A textured fireball gives way to smaller flickering flames for 2.8 seconds, rising dark smoke for six seconds, and distinct metal panels and chassis chunks that fall, bounce and settle on the terrain before fading. Balanced quality also retains fire, smoke and fewer fragments. EMP and energy-only discharges remain clean. Combat effects freeze on pause; after defeat or extraction only the remaining destruction animation finishes while gameplay stays frozen. Effects share fixed instance budgets; overflow retains the latest impacts without changing combat randomness.
+
+## Enemy weapon roles — 1.21.0
+
+Ranged platforms enter patrols after three seconds. Pink plasma platforms hold 7–10m and release three aimed rounds 0.18s apart after a 0.55s warning. Violet laser snipers hold 11–14m and charge for 1.1s before a fast single bolt; amber rocket platforms hold 12–16m and launch a slow unguided rocket after 0.9s. Reloads are respectively 3.5, 4.5 and 5.5 seconds after the salvo. All lock their aim at warning time, respect solid cover and cancel attacks if the core leaves their firing envelope. Gun lights, muzzle flashes, projectile shapes and steady colored aim lines distinguish them. Warnings remain available with reduced effects.
+
+Crowd separation cannot drive ranged platforms or Sentinel into a deliberate ram; only red interceptors pursue contact. Sentinel holds 12–16m while retaining its three barrage phases. Goliath cannons retain their slower cadence. Cryo gravity and flying into a hostile body still cause normal physical contact. Ranged volleys can aim at an exposed airborne escort at most once every four seconds; their shared projectile pool and physical barrel positions remain bounded. Fast hostile shots use swept three-dimensional core collision. Rockets are dodgeable ballistic projectiles, with impact bursts and direct-hit damage.
+
 ## Smaller ground rovers — 1.20.1
 
 Four-wheel vehicles now render at 60% of their previous linear size. Chassis, tires, hubs and ground shadows share the scale; wheel spacing, terrain sampling, body clearance and rolling speed use the corresponding physical dimensions. Travel, deployment cadence, sensor radius, fuse and explosion damage remain unchanged.
@@ -65,7 +75,7 @@ Tap **TACTICAL** to open a scrollable overview containing the radar, encounter, 
 
 ## Destructible escorts — 1.18
 
-Each installed escort has 40 hull, independent of core armor and shield. Hostile projectiles use swept three-dimensional collision against its flight volume: low rounds pass underneath, elevated rounds can hit it, and one round hits at most one escort. Orbiter and Sentinel volleys can replace one existing round with a straight shot aimed at a visible escort within 12m, no more than once per four seconds per hostile. These shots aim at the drone's position when fired, respect cover and can be evaded through movement. Goliath cadence is unchanged.
+Each installed escort has 40 hull, independent of core armor and shield. Hostile projectiles use swept three-dimensional collision against its flight volume: low rounds pass underneath, elevated rounds can hit it, and one round hits at most one escort. Ranged platform salvos can target a visible escort within 12m, no more than once per four seconds per hostile; Sentinel rings replace one existing round with an escort shot. These shots aim at the drone's position when fired, respect cover and can be evaded through movement. Goliath cadence is unchanged.
 
 Hits produce sparks at flight height and briefly light the damaged armor; worn hulls darken. At zero hull, the drone breaks into airborne debris, stops firing and disappears from the instanced fleet. Survivors keep their identities, gun locks and cooldowns while moving into the smaller formation with existing collision clearance. The escort weapon slot shows active/installed count and individual hull pips; red slots indicate losses. Drone destruction awards no enemy kills, XP, combo, credits or loot.
 

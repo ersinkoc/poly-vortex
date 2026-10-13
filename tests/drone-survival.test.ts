@@ -113,21 +113,23 @@ test('HUD snapshots preserve slot identities and cannot mutate live drone hull',
   useGame.getState().droneHull[1] = 1; expect(game.droneRack.units[1].hp).toBe(30);
 });
 
-test('Orbiter and Sentinel replace a ring round with a height-aware shot without extra shots or rapid anti-air spam', () => {
-  for (const kind of [1, 3] as const) {
+test('Sentinel replaces a ring round with a height-aware shot without extra shots or rapid anti-air spam', () => {
+  for (const kind of [3] as const) {
     const g = new GameEngine(14); g.reset(); g.spawn(kind, 0, 8); const e = g.enemies.at(-1)!;
     e.hp = e.maxHp = 100000; e.age = 4; e.timer = 0; g.bossPhase = kind === 3 ? 1 : 0;
     g.tick(1 / 60);
-    expect(g.bolts.filter(b => b.enemy).length).toBe(kind === 3 ? 18 : 8);
+    expect(g.bolts.filter(b => b.enemy).length).toBe(18);
     const shot = g.bolts.find(b => b.enemy && (b.vy ?? 0) > 0); expect(shot).toBeDefined(); expect(e.escortShotAt).toBeGreaterThanOrEqual(4);
     g.bolts = []; e.timer = 0; g.tick(1 / 60); expect(g.bolts.some(b => b.enemy && (b.vy ?? 0) > 0)).toBe(false);
   }
 });
 
 test('an aimed hostile anti-air round actually reaches and damages a resting escort', () => {
-  game.spawn(1, 0, 8); const e = game.enemies.at(-1)!; e.timer = 100;
+  game.spawn(1, 0, 8); const e = game.enemies.at(-1)!; e.weapon = 'plasma'; e.timer = 100;
   for (let i = 0; i < 180; i++) { game.enemies = [e]; game.tick(1 / 60); }
   e.age = 4; e.timer = 0; game.tick(1 / 60); e.timer = 100;
+  expect(game.bolts.some(b => b.enemy)).toBe(false);
+  for (let i = 0; i < 33; i++) { game.enemies = [e]; game.tick(1 / 60); }
   expect(game.bolts.some(b => b.enemy && (b.vy ?? 0) > 0)).toBe(true);
   for (let i = 0; i < 180; i++) { game.enemies = [e]; game.tick(1 / 60); }
   expect(game.droneRack.units.some(u => u.hp > 0 && u.hp < DRONE_HULL.hp)).toBe(true);

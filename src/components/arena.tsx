@@ -16,6 +16,8 @@ import MissionActors from './mission-actors';
 import { TargetMarker } from './target-lock';
 import { navigationSignals } from '@/game/navigation';
 import CinematicEffects from './cinematic-effects';
+import EnemyWeaponSignals from './enemy-weapon-signals';
+import { hostileBoltColor } from '@/game/enemy-weapons';
 import ServiceBeacon from './service-beacon';
 
 const dummy = new THREE.Object3D();
@@ -25,8 +27,8 @@ function Projectiles() {
   useFrame(({ clock }) => {
     if (bolts.current) {
       engine.bolts.forEach((b, i) => {
-        dummy.position.set(b.x, b.y ?? 0.7, b.z); dummy.rotation.set(-Math.atan2(b.vy ?? 0, Math.hypot(b.vx, b.vz)), Math.atan2(b.vx, b.vz), 0, 'YXZ'); dummy.scale.set(b.heavy !== undefined ? 0.16 : b.enemy ? 0.17 : b.drone !== undefined ? 0.055 : 0.08, b.heavy !== undefined ? 0.16 : 0.08, b.heavy !== undefined ? 0.36 : b.enemy ? 0.17 : 0.6); dummy.updateMatrix();
-        bolts.current!.setMatrixAt(i, dummy.matrix); bolts.current!.setColorAt(i, color.set(b.heavy !== undefined ? '#ffc280' : b.enemy ? '#ff4088' : b.drone !== undefined ? '#78e8ff' : '#b5ff62').multiplyScalar(3));
+        dummy.position.set(b.x, b.y ?? 0.7, b.z); dummy.rotation.set(-Math.atan2(b.vy ?? 0, Math.hypot(b.vx, b.vz)), Math.atan2(b.vx, b.vz), 0, 'YXZ'); dummy.scale.set(b.hostileWeapon === 'laser' ? 0.045 : b.hostileWeapon === 'missile' ? 0.13 : b.heavy !== undefined ? 0.16 : b.enemy ? 0.17 : b.drone !== undefined ? 0.055 : 0.08, b.hostileWeapon === 'laser' ? 0.045 : b.heavy !== undefined ? 0.16 : 0.08, b.hostileWeapon === 'laser' ? 1.1 : b.hostileWeapon === 'missile' ? 0.48 : b.heavy !== undefined ? 0.36 : b.enemy ? 0.17 : 0.6); dummy.updateMatrix();
+        bolts.current!.setMatrixAt(i, dummy.matrix); bolts.current!.setColorAt(i, color.set(b.enemy ? hostileBoltColor(b) : b.drone !== undefined ? '#78e8ff' : '#b5ff62').multiplyScalar(3));
       });
       bolts.current.count = engine.bolts.length; bolts.current.instanceMatrix.needsUpdate = true; if (bolts.current.instanceColor) bolts.current.instanceColor.needsUpdate = true;
     }
@@ -208,7 +210,7 @@ export default function Arena() {
     <fog attach="fog" args={['#080e15', 28, 72]} />
     <ShipLighting followPlayer />
     <SceneController /><Terrain /><MissionActors /><ServiceBeacon /><TargetMarker /><ProtocolRing /><ShipFleet />
-    <Projectiles /><Effects /><CombatEffects /><CinematicEffects /><Stars radius={65} depth={35} count={600} factor={1.3} saturation={0} fade speed={0.1} />
+    <Projectiles /><EnemyWeaponSignals /><Effects /><CombatEffects /><CinematicEffects /><Stars radius={65} depth={35} count={600} factor={1.3} saturation={0} fade speed={0.1} />
     <PostFX />
   </Canvas>;
 }

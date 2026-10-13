@@ -2,12 +2,12 @@ import { audio } from './audio';
 import { useGame } from './store';
 import { SECTORS, sectorAt } from './progression';
 import { MissionDirector } from './missions';
-import { clearTerrainPosition, terrainImpact } from './terrain';
+import { clearTerrainPosition, terrainHeight, terrainImpact } from './terrain';
 import { angleDifference, friendlyInLine, PULSE_RANGE, selectTarget, turnTowards } from './targeting';
 import { ROCKET_CAPACITY, SUPPLY_RULES, supplyLifetime } from './supplies';
 import { EncounterDirector } from './director';
 import { inspectLauncher, LAUNCHER_COPY, ROCKET_RULES } from './launcher';
-import { VISUAL_LIMITS, type Blast, type Scorch } from './visuals';
+import { DESTRUCTION, VISUAL_LIMITS, type Blast, type Scorch } from './visuals';
 import { RewardReel } from './reward-reel';
 import { UPGRADE_LIMITS, previewUpgrade } from './upgrade-preview';
 import { shieldContact, shieldImpact, SHIELD_IMPACT, type HitSource, type ShieldHit } from './shield-impact';
@@ -16,6 +16,7 @@ import { DRONE_FIRE, DroneFormation, DroneRack, createDroneGuns, droneClearance,
 import { droneDockPose } from './player-pose';
 import { CHARGE_RULES, chargeRemaining, type GroundCharge } from './ground-charges';
 import { RoverBay, ROVER_RULES, type GroundRover } from './ground-rovers';
+import { coreContact, enemyWeapon, hostileBand, HOSTILE_WEAPONS, rangedMuzzle } from './enemy-weapons';
 import { GOLIATH, goliathMuzzle, goliathRadial } from './goliath-ai';
 import type { Arc, Bolt, Cache, DamageText, Entity, Gem, Hazard, Input, Particle, Rocket, Shockwave, Supply, Upgrade, UpgradeId, Vortex, WeaponId } from './types';
 
@@ -142,15 +143,15 @@ export class GameEngine {
     const isElite = elite && kind !== 3;
     const scale = this.runMode === 'expedition' ? fleetScale(this.chapter, this.chapterTime).health : 1 + this.time / 240;
     const hp = [16, 35, 100, 2200][kind] * scale * (this.overdrive ? 1.3 : 1) * (isElite ? 2.8 : 1);
-    this.enemies.push({ id: ++this.uid, x: x ?? this.player.x + Math.sin(angle) * r, z: z ?? this.player.z + Math.cos(angle) * r, hp, maxHp: hp, kind, radius: [0.48, 0.62, 1.1, 2.3][kind] * (isElite ? 1.18 : 1), age: 0, timer: (kind === 2 ? GOLIATH.firstShot : 1) + this.random() * 2, elite: isElite });
+    this.enemies.push({ id: ++this.uid, x: x ?? this.player.x + Math.sin(angle) * r, z: z ?? this.player.z + Math.cos(angle) * r, hp, maxHp: hp, kind, radius: [0.48, 0.62, 1.1, 2.3][kind] * (isElite ? 1.18 : 1), age: 0, timer: (kind === 2 ? GOLIATH.firstShot : kind === 1 ? 2.5 : 1) + this.random() * 2, elite: isElite });
   }
   announce(title: string, detail: string) { this.announcement = title; this.announcementDetail = detail; this.announcementTime = 5; }
   wave(x: number, z: number, radius: number, color: string, life = 0.7) {
     if (this.shockwaves.length < LIMITS.shockwaves) this.shockwaves.push({ x, z, radius, color, life, maxLife: life });
   }
-  blast(x: number, z: number, size: number, color = '#ff9a51', energy = false) {
+  blast(x: number, z: number, size: number, color = '#ff9a51', energy = false, y = terrainHeight(x, z) + 0.7) {
     if (this.blasts.length >= VISUAL_LIMITS.blasts) this.blasts.shift();
-    this.blasts.push({ id: ++this.visualId, x, z, size, color, age: 0, energy });
+    this.blasts.push({ id: ++this.visualId, x, y, z, size, color, age: 0, energy });
     if (!energy && size >= 1.1) { if (this.scorches.length >= VISUAL_LIMITS.scorches) this.scorches.shift(); this.scorches.push({ x, z, size: size * 1.1, age: 0 }); }
   }
   activateSurge() {
@@ -256,7 +257,7 @@ export class GameEngine {
     if (enemy.elite) { this.eliteKills++; if (this.caches.length < LIMITS.caches) this.caches.push({ x: enemy.x, z: enemy.z, age: 0 }); this.wave(enemy.x, enemy.z, 5, '#ffcf6c'); }
     else if (this.kills % 45 === 0 && this.time - this.lastCombatSupply >= 25 && this.dropSupply(this.kills % 90 ? 'magnet' : 'overdrive', enemy.x, enemy.z)) this.lastCombatSupply = this.time;
     this.burst(enemy.x, enemy.z, colors[enemy.kind], enemy.kind >= 2 ? 40 : 13);
-    this.blast(enemy.x, enemy.z, [0.7, 1.05, 1.8, 3.5][enemy.kind], enemy.kind === 1 ? '#ca95ff' : '#ffab65', enemy.kind === 1);
+    this.blast(enemy.x, enemy.z, [0.7, 1.05, 1.8, 3.5][enemy.kind], '#ffab65', false, enemy.radius * 0.75 + 0.3);
     if (this.gems.length < LIMITS.gems) this.gems.push({ x: enemy.x, z: enemy.z, value: [3, 7, 18, 100][enemy.kind], age: 0 });
     this.pulse = { x: enemy.x, z: enemy.z, time: this.time };
     this.wave(enemy.x, enemy.z, enemy.kind >= 2 ? 4 : 1.8, colors[enemy.kind], enemy.kind >= 2 ? 0.8 : 0.4);
@@ -295,7 +296,7 @@ export class GameEngine {
     const point = hullLoss > 0 || !impact ? this.player : shieldContact(this.player, impact);
     this.burst(point.x, point.z, hullLoss > 0 ? '#ffb16b' : '#72dfff', 20); hullLoss > 0 ? audio.hit() : audio.shield();
     if (hullLoss > 0) this.wave(this.player.x, this.player.z, 2, '#ff7150', 0.35);
-    if (this.player.hp === 0) { this.publish(); useGame.getState().saveRun(this.score, this.kills, false, this.salvage); }
+    if (this.player.hp === 0) { this.blast(this.player.x, this.player.z, 2.2, '#ffad65', false, 0.95); audio.explosion(); this.publish(); useGame.getState().saveRun(this.score, this.kills, false, this.salvage); }
   }
   createChoices(salvage = false): Upgrade[] {
     const pool = (Object.keys(defs) as UpgradeId[]).filter(id => (!(id in this.weapons) || this.weapons[id as WeaponId] < 6) && (id !== 'critical' || this.criticalChance < 0.75) && (id !== 'pierce' || this.piercing < 6) && (id !== 'speed' || this.speed < UPGRADE_LIMITS.speed) && (id !== 'haste' || this.haste > UPGRADE_LIMITS.haste));
@@ -345,7 +346,7 @@ export class GameEngine {
       rocketNotice: this.rocketNotice, rocketNoticeKind: this.rocketNoticeKind, rocketNoticeTime: this.rocketNoticeTime,
       encounter: this.director.phase, encounterRemaining: this.director.remaining, encounterRound: this.director.round, combatPressure: this.director.stress,
       rocketAmmo: this.rocketAmmo, rocketCapacity: ROCKET_CAPACITY, rocketCooldown: this.rocketCooldown, rocketReady: lock.status === 'ready',
-      targeting: this.input.aiming ? 'aim' : 'auto', target: target ? { id: target.id, kind: target.kind, distance: distance(target, this.player), hp: target.hp, maxHp: target.maxHp } : null,
+      targeting: this.input.aiming ? 'aim' : 'auto', target: target ? { id: target.id, kind: target.kind, weapon: target.kind === 1 ? enemyWeapon(target) : undefined, distance: distance(target, this.player), hp: target.hp, maxHp: target.maxHp } : null,
       time: this.time, hp: this.player.hp, maxHp: this.player.maxHp, xp: this.xp, nextXp: this.nextXp, level: this.level, score: this.score, kills: this.kills, combo: this.combo, dash: this.player.dashCooldown, enemies: this.enemies.length, weapons: { ...this.weapons },
       shield: this.shield, maxShield: this.maxShield, surge: this.surge, sector: this.sector, bossPhase: this.bossPhase, peakCombo: this.peakCombo, elites: this.eliteKills, caches: this.caches.length, salvage: this.salvage, overdrive: this.overdriveTime, repair: this.repairTime, announcement: this.announcement, announcementDetail: this.announcementDetail, announcementTime: this.announcementTime,
       mission: this.missions.snapshot(), missionsCompleted: this.missions.completed, rescued: this.missions.rescued,
@@ -461,7 +462,7 @@ export class GameEngine {
       const pressure = this.runMode === 'expedition' ? fleetScale(this.chapter, this.chapterTime).pressure : 1 + this.time / 45;
       this.spawnTimer = Math.max(0.09, 0.75 / pressure) / (this.overdrive ? 1.4 : 1) / this.director.spawnRate;
       const doctrine = doctrineAt(this.runMode === 'expedition' ? this.chapter : 1);
-      const r = this.random(); this.spawn(this.chapterTime > 35 && r > 1 - doctrine.heavy ? 2 : this.chapterTime > 14 && r > 1 - doctrine.heavy - doctrine.orbiter ? 1 : 0, undefined, undefined, this.chapterTime > 25 && this.uid % (this.sector >= 2 ? 8 : 12) === 0);
+      const r = this.random(); this.spawn(this.chapterTime > 35 && r > 1 - doctrine.heavy ? 2 : this.chapterTime > 3 && r > 1 - doctrine.heavy - Math.max(0.32, doctrine.orbiter) ? 1 : 0, undefined, undefined, this.chapterTime > 25 && this.uid % (this.sector >= 2 ? 8 : 12) === 0);
     }
     // Spatial bins keep flocking local; avoid a quadratic whole-horde comparison.
     const bins = new Map<string, Entity[]>();
@@ -478,7 +479,11 @@ export class GameEngine {
       const speed = [2.8, 2.1, 1.4, 1.15][e.kind] * motionScale * (e.kind === 0 ? chaserScale : 1) * (this.overdrive ? 1.2 : 1) * (e.elite ? 1.14 : 1);
       let vx = dx / d * speed, vz = dz / d * speed;
       if (e.kind === 2) { const radial = e.cannon && d >= GOLIATH.holdMin ? 0 : goliathRadial(d, speed); vx = dx / d * radial; vz = dz / d * radial; }
-      if (e.kind === 1 && d < 10) { const radial = d < 7 ? -0.7 : 0; vx = dx / d * radial - dz / d * 1.4; vz = dz / d * radial + dx / d * 1.4; }
+      if (e.kind === 1 || e.kind === 3) {
+        const band = hostileBand(e), radial = d > band.max ? speed : d < band.min ? -speed * 0.85 : 0;
+        const strafe = e.kind === 1 && !e.ranged && d <= band.max ? 0.65 * (e.id % 2 ? 1 : -1) : 0;
+        vx = dx / d * radial - dz / d * strafe; vz = dz / d * radial + dx / d * strafe;
+      }
       const bx = Math.floor(e.x / 2), bz = Math.floor(e.z / 2);
       for (let ox = -1; ox <= 1; ox++) for (let oz = -1; oz <= 1; oz++) {
         const neighbors = bins.get(`${bx + ox},${bz + oz}`); if (!neighbors) continue;
@@ -487,8 +492,9 @@ export class GameEngine {
           if (nd > 0.01 && nd < safe) { const push = (safe - nd) * 2.5 / nd; vx += (e.x - other.x) * push; vz += (e.z - other.z) * push; }
         }
       }
-      if (e.kind === 2 && d <= GOLIATH.holdMax) {
-        const radial = vx * dx / d + vz * dz / d, limit = d < GOLIATH.holdMin ? -speed * GOLIATH.retreat : 0;
+      const band = e.kind === 2 ? { min: GOLIATH.holdMin, max: GOLIATH.holdMax } : hostileBand(e);
+      if (e.kind !== 0 && d <= band.max) {
+        const radial = vx * dx / d + vz * dz / d, limit = d < band.min ? -speed * (e.kind === 2 ? GOLIATH.retreat : 0.85) : 0;
         if (radial > limit) { vx -= dx / d * (radial - limit); vz -= dz / d * (radial - limit); }
       }
       for (const v of this.vortices) { const vd = distance(e, v); if (vd < v.radius && vd > 0.1) { vx += (v.x - e.x) / vd * 5; vz += (v.z - e.z) / vd * 5; this.hitEnemy(e, dt * (12 + this.weapons.cryo * 7) * this.damage); } }
@@ -496,6 +502,7 @@ export class GameEngine {
       e.x += vx * dt; e.z += vz * dt; e.vx = vx; e.vz = vz;
       clearTerrainPosition(e, e.radius);
       if (e.kind === 2) this.tickGoliath(e, dt);
+      if (e.kind === 1) this.tickRanged(e, dt);
       if (d < e.radius + 0.6) this.hurt([10, 14, 24, 35][e.kind], e);
       if (e.kind === 3) {
         const stage = e.hp / e.maxHp > 0.66 ? 1 : e.hp / e.maxHp > 0.33 ? 2 : 3;
@@ -505,9 +512,9 @@ export class GameEngine {
           if (stage > 1) this.addHazard(p.x, p.z, 4, 2);
         }
       }
-      if ((e.kind === 1 || e.kind === 3) && e.timer <= 0 && d < 26) {
-        e.timer = e.kind === 3 ? this.bossPhase === 3 ? 0.65 : this.bossPhase === 2 ? 0.5 : 1.5 : e.elite ? 2.2 : 3.5;
-        const count = e.kind === 3 ? this.bossPhase === 2 ? 7 : this.bossPhase === 3 ? 11 : 18 : 8;
+      if (e.kind === 3 && e.timer <= 0 && d < 26) {
+        e.timer = this.bossPhase === 3 ? 0.65 : this.bossPhase === 2 ? 0.5 : 1.5;
+        const count = this.bossPhase === 2 ? 7 : this.bossPhase === 3 ? 11 : 18;
         // Replace one existing ring round with a straight, height-aware escort shot.
         // No extra barrage or homing; anti-air acquisition is limited to once per 4s.
         const antiAir = e.age >= (e.escortShotAt ?? 0) + 4 ? this.droneRack.airborne
@@ -515,8 +522,8 @@ export class GameEngine {
           .filter(({ pose }) => distance(e, pose) < 12 && !terrainImpact(e, pose))
           .sort((a, b) => distance(e, a.pose) - distance(e, b.pose))[0] : undefined;
         for (let j = 0; j < count && this.bolts.length < LIMITS.bolts; j++) {
-          const a = e.kind === 3 && this.bossPhase === 3 ? Math.atan2(dx, dz) + (j - 5) * 0.105 : j / count * Math.PI * 2 + e.age * (this.bossPhase === 2 ? 1.8 : 0.4);
-          const velocity = e.kind === 3 && this.bossPhase > 1 ? 6 : 4.5;
+          const a = this.bossPhase === 3 ? Math.atan2(dx, dz) + (j - 5) * 0.105 : j / count * Math.PI * 2 + e.age * (this.bossPhase === 2 ? 1.8 : 0.4);
+          const velocity = this.bossPhase > 1 ? 6 : 4.5;
           if (j === 0 && antiAir) {
             const pose = antiAir.pose, flight = Math.max(0.1, distance(e, pose) / velocity), angle = Math.atan2(pose.x - e.x, pose.z - e.z);
             this.bolts.push({ x: e.x, y: 0.95, z: e.z, vx: Math.sin(angle) * velocity, vz: Math.cos(angle) * velocity, vy: (pose.y - 0.95) / flight, enemy: true, age: 0, target: 0, damage: e.elite ? 14 : 10 });
@@ -615,14 +622,14 @@ export class GameEngine {
       if (b.y !== undefined) b.y += (b.vy ?? 0) * dt;
       b.traveled = (b.traveled ?? 0) + Math.hypot(b.x - oldX, b.z - oldZ);
       const impact = terrainImpact({ x: oldX, z: oldZ }, b);
-      if (impact) { b.x = impact.x; b.z = impact.z; b.age = 10; this.burst(b.x, b.z, '#e0d2ad', 3); continue; }
+      if (impact) { b.x = impact.x; b.z = impact.z; b.age = 10; this.burst(b.x, b.z, '#e0d2ad', 3); if (b.hostileWeapon === 'missile') this.blast(b.x, b.z, 1.2, '#ffbc65'); continue; }
       if (!b.enemy && (friendlyInLine({ x: oldX, z: oldZ }, b, b.drone !== undefined ? droneProtectedBodies : friendlies) || b.drone !== undefined && distance(b, p) < 1.15)) { b.age = 10; this.burst(b.x, b.z, '#89eadd', 3); continue; }
       if (b.drone !== undefined && droneInLine({ x: oldX, y: oldY, z: oldZ }, { x: b.x, y: b.y ?? 0.95, z: b.z }, this.droneFormation.poses, this.droneFormation.count, b.drone, this.droneRack.airborne)) { b.age = 10; this.burst(b.x, b.z, '#89eadd', 3); continue; }
       if (b.traveled > (b.range ?? Infinity)) { b.age = 10; continue; }
       if (b.enemy) {
         const contact = droneContact({ x: oldX, y: oldY, z: oldZ }, { x: b.x, y: b.y ?? 0.7, z: b.z }, this.droneFormation.poses, this.droneRack.airborne);
         if (contact) { this.hitDrone(contact.id, b.damage); b.age = 10; }
-        else if (distance(b, p) < 0.7 && Math.abs((b.y ?? 0.95) - 0.95) < 0.75) { this.hurt(b.damage, b); b.age = 10; }
+        else if (coreContact({ x: oldX, y: oldY, z: oldZ }, { x: b.x, y: b.y ?? 0.7, z: b.z }, p)) { this.hurt(b.damage, b); b.age = 10; if (b.hostileWeapon === 'missile') { this.blast(b.x, b.z, 1.2, '#ffbc65'); this.wave(b.x, b.z, 2, '#ffbc65'); } }
       }
       else for (const e of this.enemies) if (e.hp > 0 && !b.hits?.includes(e.id) && distance(b, e) < e.radius + 0.25) {
         const critical = this.random() < this.criticalChance; this.hitEnemy(e, b.damage * (critical ? 2 : 1), critical); (b.hits ??= []).push(e.id);
@@ -667,10 +674,36 @@ export class GameEngine {
     for (const w of this.shockwaves) w.life -= dt; this.shockwaves = this.shockwaves.filter(w => w.life > 0);
     for (const d of this.damageTexts) d.life -= dt; this.damageTexts = this.damageTexts.filter(d => d.life > 0);
     for (const hit of this.shieldHits) hit.age += dt; this.shieldHits = this.shieldHits.filter(hit => hit.age < SHIELD_IMPACT.life);
-    for (const b of this.blasts) b.age += dt; this.blasts = this.blasts.filter(b => b.age < 2.4);
+    for (const b of this.blasts) b.age += dt; this.blasts = this.blasts.filter(b => b.age < (b.energy ? 2.4 : DESTRUCTION.life));
     for (const s of this.scorches) s.age += dt; this.scorches = this.scorches.filter(s => s.age < 22);
     audio.combo = this.combo;
     this.hudTimer += dt; if (this.hudTimer > 0.1) { this.hudTimer = 0; this.publish(); }
+  }
+
+  private tickRanged(e: Entity, dt: number) {
+    const weapon = enemyWeapon(e), rule = HOSTILE_WEAPONS[weapon], d = distance(e, this.player);
+    if (!e.ranged) {
+      if (e.timer > 0 || d < rule.min - 0.5 || d > rule.range || terrainImpact(e, this.player)) return;
+      const antiAir = e.age >= (e.escortShotAt ?? 0) + 4 ? this.droneRack.airborne
+        .map(id => this.droneFormation.poses[id]).filter(p => distance(e, p) < 12 && !terrainImpact(e, p))
+        .sort((a, b) => distance(e, a) - distance(e, b))[0] : undefined;
+      const aim = antiAir ?? this.player;
+      e.ranged = { remaining: rule.windup, aimX: aim.x, aimY: antiAir?.y ?? 0.95, aimZ: aim.z, rounds: rule.rounds };
+      if (antiAir) e.escortShotAt = e.age;
+      return;
+    }
+    const charge = e.ranged, side = (e.weaponShots ?? 0) % 2 === 0 ? -1 : 1;
+    const aim = { x: charge.aimX, z: charge.aimZ }, muzzle = rangedMuzzle(e, aim, side);
+    if (d < rule.min - 0.5 || d > rule.range || terrainImpact(e, muzzle) || terrainImpact(muzzle, aim)) { e.ranged = undefined; e.timer = 1.5; return; }
+    charge.remaining -= dt; if (charge.remaining > 1e-8) return;
+    if (this.bolts.length >= LIMITS.bolts) { e.ranged = undefined; e.timer = rule.reload; return; }
+    const dx = aim.x - muzzle.x, dz = aim.z - muzzle.z, flight = Math.max(0.1, Math.hypot(dx, dz) / rule.speed), angle = Math.atan2(dx, dz);
+    this.bolts.push({ x: muzzle.x, y: muzzle.y, z: muzzle.z, vx: Math.sin(angle) * rule.speed, vz: Math.cos(angle) * rule.speed, vy: (charge.aimY - muzzle.y) / flight, enemy: true, age: 0, target: 0, damage: rule.damage, range: rule.range, hostileWeapon: weapon });
+    e.weaponFlash = { at: e.age, aimX: aim.x, aimZ: aim.z, side }; e.weaponShots = (e.weaponShots ?? 0) + 1;
+    if (weapon === 'missile') audio.cannonShot(); else audio.shot();
+    charge.rounds--;
+    if (charge.rounds > 0) charge.remaining = rule.gap;
+    else { e.ranged = undefined; e.timer = rule.reload; }
   }
 
   private tickGoliath(e: Entity, dt: number) {
@@ -775,6 +808,7 @@ export class GameEngine {
     const pose = this.droneFormation.poses[id], lost = this.droneRack.units[id].hp <= 0;
     this.burst(pose.x, pose.z, lost ? '#ff9c57' : '#ffe6a1', lost ? 28 : 5, pose.y);
     if (lost) {
+      this.blast(pose.x, pose.z, 0.85, '#ffad65', false, pose.y);
       const gun = this.droneGuns[id]; gun.active = false; gun.targetId = 0; gun.flash = 0;
       this.trauma = Math.max(this.trauma, 0.18); audio.explosion();
       this.announce('ESCORT LOST', `${this.droneRack.slots.length}/${this.droneRack.capacity} operational · field service can rebuild one escort.`);

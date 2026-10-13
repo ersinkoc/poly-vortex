@@ -24,9 +24,11 @@ test('B intent plants one finite ground charge at the ship position with a full 
   expect(useGame.getState().chargeAmmo).toBe(2); expect(useGame.getState().charges).toHaveLength(1);
   game.tick(1 / 60); expect(game.charges).toHaveLength(1);
 });
-test('nearby chasers, orbiters and goliaths survive until the fuse then die once to the same blast', () => {
+test('chasers, orbiters and goliaths inside the detonation radius die once to the same blast', () => {
   game.spawn(0, 2, 0); game.spawn(1, 0, 3); game.spawn(2, -2, 0); game.placeCharge(); const charge = game.charges[0];
   advance(2.98); expect(game.kills).toBe(0); expect(charge.detonated).toBe(false); expect(game.charges).toHaveLength(1);
+  // Keep all three classes inside this damage fixture; ranged AI can otherwise escape the fuse.
+  for (const e of game.enemies) { e.x = e.kind - 1; e.z = 2; }
   game.tick(1 / 60); expect(charge.detonated).toBe(true); expect(game.charges).toHaveLength(0); expect(game.kills).toBe(3);
   expect(game.blasts.some(b => b.size === 4.5)).toBe(true); expect(game.shockwaves.some(w => w.radius === 5.5)).toBe(true); expect(game.pulse.x).toBe(0);
   const score = game.score; game.hitStop = 0; advance(2); expect(game.kills).toBe(3); expect(game.score).toBe(score);
@@ -38,7 +40,7 @@ test('a planted bomb stays behind and destroys a pursuer that enters its radius 
 });
 test('blast is strong but finite against bosses and does not touch hostiles outside its radius', () => {
   game.spawn(3, 0, 4); const boss = game.enemies[0]; const hp = boss.hp; game.damage = 2;
-  game.spawn(2, 0, 20); const distant = game.enemies[1], distantHp = distant.hp; game.placeCharge(); advance(3);
+  game.spawn(2, 0, 20); const distant = game.enemies[1], distantHp = distant.hp; game.placeCharge(); game.player.z = -12; advance(3);
   expect(boss.hp).toBeCloseTo(hp - CHARGE_RULES.damage * 2, 8); expect(boss.hp).toBeGreaterThan(0); expect(distant.hp).toBe(distantHp);
 });
 test('an intervening rock protects a nearby hostile from the ground blast', () => {
