@@ -12,6 +12,7 @@ import { DRONE_HULL, DRONE_FIRE, DRONE_FORMATION, DRONE_ORBIT, droneMuzzle, dron
 import { terrainHeight } from '@/game/terrain';
 import { attachDamageMaterial, buildDamageUniforms, damageHeat, hullDamage } from '@/game/ship-damage';
 import { enemyWeapon, HOSTILE_WEAPONS, rangedPose } from '@/game/enemy-weapons';
+import { sentinelDefense } from '@/game/sentinel';
 import { GOLIATH, goliathMuzzle, goliathPose } from '@/game/goliath-ai';
 import { DRONE_DOCK, PLAYER_SCALE, playerFlightPose } from '@/game/player-pose';
 
@@ -104,6 +105,11 @@ function EnemyShips({ kind, asset, shadow }: { kind: 0 | 1 | 2 | 3; asset: Actor
       for (let i = 0; i < layers.current.length; i++) {
         const mesh = layers.current[i]; mesh?.setMatrixAt(count, matrixObject.matrix);
         if (kind === 1 && SURFACES[i] === 'signal') mesh?.setColorAt(count, weaponTint.set(HOSTILE_WEAPONS[enemyWeapon(e)].color));
+        if (kind === 3 && SURFACES[i] === 'signal') mesh?.setColorAt(count, weaponTint.set(sentinelDefense(e.age).armored ? '#82c6ef' : '#ffbd62'));
+        if (kind === 3 && SURFACES[i] === 'armor') {
+          const boost = !state.reducedEffects && e.sentinelHit !== undefined && e.age - e.sentinelHit < 0.14 ? 1.7 : 1;
+          mesh?.setColorAt(count, weaponTint.setRGB(boost, boost, boost));
+        }
       }
       if (footprints.current) {
         matrixObject.position.set(x, terrainHeight(x, z) + 0.025 + kind * 0.001, z); matrixObject.rotation.set(-Math.PI / 2, 0, -yaw); matrixObject.scale.set(scale * 2.5, scale * 2.9, 1); matrixObject.updateMatrix(); footprints.current.setMatrixAt(count, matrixObject.matrix);
@@ -183,8 +189,10 @@ export default function ShipFleet() {
     const player = { model: buildPlayerShip(), materials: buildShipMaterials('#bdff6f', true, textures), damage: buildDamageUniforms() };
     for (const surface of ['hull', 'armor', 'metal', 'glass'] as const) attachDamageMaterial(player.materials[surface], player.damage);
     const enemies = ([0, 1, 2, 3] as const).map(kind => ({ model: buildEnemyShip(kind), materials: buildShipMaterials(accents[kind], false, textures) }));
-    enemies[1].materials.signal.dispose();
-    enemies[1].materials.signal = new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffffff').multiplyScalar(3.1), toneMapped: false });
+    for (const kind of [1, 3]) {
+      enemies[kind].materials.signal.dispose();
+      enemies[kind].materials.signal = new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffffff').multiplyScalar(3.1), toneMapped: false });
+    }
     const drone = { model: buildEscortDrone(), materials: buildShipMaterials('#6ee7ff', false, textures) };
     const rotor = buildDroneRotor();
     const charge = { model: buildGroundCharge(), materials: buildShipMaterials('#ffba6a', false, textures) };

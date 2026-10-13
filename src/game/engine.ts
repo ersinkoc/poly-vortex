@@ -18,6 +18,7 @@ import { droneDockPose } from './player-pose';
 import { CHARGE_RULES, chargeRemaining, type GroundCharge } from './ground-charges';
 import { RoverBay, ROVER_RULES, type GroundRover } from './ground-rovers';
 import { coreContact, enemyWeapon, hostileBand, HOSTILE_WEAPONS, rangedMuzzle } from './enemy-weapons';
+import { SENTINEL, sentinelDefense, sentinelHealth } from './sentinel';
 import { GOLIATH, goliathMuzzle, goliathRadial } from './goliath-ai';
 import type { Arc, Bolt, Cache, DamageText, Entity, Gem, Hazard, Input, Particle, Rocket, Shockwave, Supply, Upgrade, UpgradeId, Vortex, WeaponId } from './types';
 
@@ -145,7 +146,7 @@ export class GameEngine {
     const angle = this.random() * Math.PI * 2, r = 19 + this.random() * 6;
     const isElite = elite && kind !== 3;
     const scale = this.runMode === 'expedition' ? fleetScale(this.chapter, this.chapterTime).health : 1 + this.time / 240;
-    const hp = [16, 35, 100, 2200][kind] * scale * (this.overdrive ? 1.3 : 1) * (isElite ? 2.8 : 1);
+    const hp = kind === 3 ? sentinelHealth({ weapons: this.weapons, damage: this.damage, haste: this.haste, criticalChance: this.criticalChance, escorts: this.droneRack.slots.length, chapter: this.runMode === 'expedition' ? this.chapter : 1, overdrive: this.overdrive }) : [16, 35, 100, 2200][kind] * scale * (this.overdrive ? 1.3 : 1) * (isElite ? 2.8 : 1);
     this.enemies.push({ id: ++this.uid, x: x ?? this.player.x + Math.sin(angle) * r, z: z ?? this.player.z + Math.cos(angle) * r, hp, maxHp: hp, kind, radius: [0.48, 0.62, 1.1, 2.3][kind] * (isElite ? 1.18 : 1), age: 0, timer: (kind === 2 ? GOLIATH.firstShot : kind === 1 ? 2.5 : 1) + this.random() * 2, elite: isElite });
   }
   announce(title: string, detail: string) { this.announcement = title; this.announcementDetail = detail; this.announcementTime = 5; }
@@ -251,6 +252,7 @@ export class GameEngine {
   }
   hitEnemy(enemy: Entity, damage: number, critical = false) {
     if (enemy.hp <= 0) return;
+    if (enemy.kind === 3) { damage *= sentinelDefense(enemy.age).factor; enemy.sentinelHit = enemy.age; }
     enemy.hp -= damage; this.comboTimer = 4; this.streak++; this.combo = 1 + Math.min(9, Math.floor(this.streak / 12));
     this.peakCombo = Math.max(this.peakCombo, this.combo);
     if (damage >= 3 && this.damageTexts.length < LIMITS.damageTexts) this.damageTexts.push({ x: enemy.x, z: enemy.z, value: Math.round(damage), critical, life: 0.75 });
@@ -511,13 +513,14 @@ export class GameEngine {
       if (e.kind === 3) {
         const stage = e.hp / e.maxHp > 0.66 ? 1 : e.hp / e.maxHp > 0.33 ? 2 : 3;
         if (stage !== this.bossPhase) {
-          this.bossPhase = stage; this.announce(stage === 1 ? 'SENTINEL // PHASE I' : stage === 2 ? 'SENTINEL // PHASE II' : 'SENTINEL // ENRAGED', stage === 1 ? 'Arena cleared. Face the guardian alone.' : stage === 2 ? 'Spiral barrage. Keep circling.' : 'Targeted volleys. Save a phase shift.');
+          this.bossPhase = stage; this.announce(stage === 1 ? 'SENTINEL // PHASE I' : stage === 2 ? 'SENTINEL // PHASE II' : 'SENTINEL // ENRAGED', stage === 1 ? 'Armor cycles. Strike when the amber reactor opens.' : stage === 2 ? 'Spiral barrage and paired ground strikes. Keep circling.' : 'Targeted volleys and triple strikes. Save a phase shift.');
           e.timer = Math.min(e.timer, 0.6); this.wave(e.x, e.z, 7, '#ff5478', 1);
           if (stage > 1) this.addHazard(p.x, p.z, 4, 2);
         }
       }
+      if (e.kind === 3) this.tickSentinel(e, dt);
       if (e.kind === 3 && e.timer <= 0 && d < 26) {
-        e.timer = this.bossPhase === 3 ? 0.65 : this.bossPhase === 2 ? 0.5 : 1.5;
+        e.timer = this.bossPhase === 3 ? 0.65 : this.bossPhase === 2 ? 0.5 : 1.3;
         const count = this.bossPhase === 2 ? 7 : this.bossPhase === 3 ? 11 : 18;
         // Replace one existing ring round with a straight, height-aware escort shot.
         // No extra barrage or homing; anti-air acquisition is limited to once per 4s.
@@ -729,6 +732,16 @@ export class GameEngine {
     const muzzle = goliathMuzzle(e, this.player, -1);
     if (terrainImpact(e, muzzle) || terrainImpact(muzzle, this.player)) { e.timer = GOLIATH.retry; return; }
     e.cannon = { remaining: GOLIATH.windup, aimX: this.player.x, aimZ: this.player.z };
+  }
+
+  private tickSentinel(e: Entity, dt: number) {
+    e.sentinelStrike = (e.sentinelStrike ?? SENTINEL.firstStrike) - dt;
+    if (e.sentinelStrike > 0 || distance(e, this.player) > 26) return;
+    e.sentinelStrike = (this.bossPhase === 3 ? 4.8 : this.bossPhase === 2 ? 6 : 8) * (this.overdrive ? 0.85 : 1);
+    const p = this.player, dx = p.x - e.x, dz = p.z - e.z, d = Math.hypot(dx, dz) || 1;
+    const x = p.x + p.vx * 0.35, z = p.z + p.vz * 0.35;
+    if (this.bossPhase !== 2) this.addHazard(x, z, 2.5, SENTINEL.strikeDelay);
+    if (this.bossPhase > 1) for (const side of [-1, 1]) this.addHazard(x + dz / d * 3.4 * side, z - dx / d * 3.4 * side, 2.5, SENTINEL.strikeDelay);
   }
 
   private engageSentinel() {

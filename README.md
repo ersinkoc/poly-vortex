@@ -45,6 +45,14 @@ The custom domain is `poly-vortex.oxog.dev`, configured in `public/CNAME` and Gi
 
 Collect cyan XP prisms. A compact side reel automatically installs one randomized common, rare, or overclocked upgrade without pausing combat. Mix pulse lasers, escort drones, cryo-singularities, and Tesla arcs. At three minutes the Vortex Sentinel arrives. Classic extracts immediately on its defeat; Expedition opens a service and extraction window, then continues into another front. Standard and Overdrive difficulties are available. Every run awards core credits, saved in browser local storage, for permanent armor, damage, and speed upgrades. There are no accounts or server dependencies.
 
+## Sentinel balance — 1.24.0
+
+Sentinel health snapshots the installed arsenal, damage, critical chance, firing haste and surviving escort count at arrival, with a minimum hull and ordnance reserve. Later upgrades do not rescale an existing boss. Temporary Overdrive pickups still give a real advantage; Overdrive difficulty and later expedition fronts raise the encounter budget.
+
+A blue armored reactor reduces incoming damage by 40% for 3.2 seconds, followed by an amber 3.3-second opening that increases incoming damage by 35%. The shared desktop/mobile meter shows the state and countdown, and the rendered reactor lights follow the same simulation clock. All damage types pass through the same armor calculation; no hidden invulnerability or forced minimum fight timer is added.
+
+The duel retains ring, spiral and targeted barrages. Additional ground strikes escalate from one to two to three marked zones, with a 1.6-second warning and bounded projectile/hazard pools. Phase I ring cadence is 1.3 seconds. Pause and hit-stop freeze armor and strike timers. A deterministic, stationary, invulnerable stress fixture with all four modules at level 6, fourfold damage, maximum legal haste and critical chance required 21.97 seconds and passed through all three phases; actual run duration depends on aim, range, cover, movement and temporary boosts.
+
 ## Living battlefield — 1.23.0
 
 Small procedural desert foxes and lizard-like scavengers occasionally wander into the arena, pause, look around and flee nearby ships, hostiles and fresh physical explosions. Goliath wrecks sometimes release one or two unarmed crew: runners escape immediately, while injured survivors crawl before getting up. Their departure starts above the wreck, settles onto the actual terrain and animates independent limbs. Muted colors and a small scale keep them separate from the beacon-marked rescue pilots.

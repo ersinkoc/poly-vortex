@@ -1,3 +1,4 @@
+import { sentinelDefense } from '../src/game/sentinel';
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { RoverBay, ROVER_RULES, roverPose, roverWheelSite, type GroundRover } from '../src/game/ground-rovers';
 import { GameEngine } from '../src/game/engine';
@@ -85,7 +86,7 @@ test('rover blast clears ordinary hostiles, damages bosses finitely and protects
   g.player.invulnerable = 0; g.player.hp = 37; g.shield = 12; g.shieldDelay = 10;
   g.missions.tick(8, g.player, 0, () => 0.5); const pilot = g.missions.mission!.targets[0]; pilot.x = 3; pilot.z = 0;
   g.roverBay.units = [rover({ state: 'primed', age: 2 })]; advance(g, 0.35);
-  expect(g.kills).toBe(1); expect(boss.hp).toBeCloseTo(hp - ROVER_RULES.damage, 8); expect(boss.hp).toBeGreaterThan(0);
+  expect(g.kills).toBe(1); expect(boss.hp).toBeCloseTo(hp - ROVER_RULES.damage * sentinelDefense(boss.age).factor, 8); expect(boss.hp).toBeGreaterThan(0);
   expect(g.player.hp).toBe(37); expect(g.shield).toBe(12); expect(pilot.done).toBe(false); expect(g.roverBay.units).toHaveLength(0);
   expect(g.blasts.some(b => b.size === 2.8)).toBe(true); expect(g.shockwaves.some(w => w.radius === 4.2)).toBe(true);
 });

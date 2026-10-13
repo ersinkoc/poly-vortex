@@ -1,3 +1,4 @@
+import { sentinelDefense } from '../src/game/sentinel';
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { GameEngine } from '../src/game/engine';
 import { CHARGE_RULES, chargeRemaining } from '../src/game/ground-charges';
@@ -41,7 +42,7 @@ test('a planted bomb stays behind and destroys a pursuer that enters its radius 
 test('blast is strong but finite against bosses and does not touch hostiles outside its radius', () => {
   game.spawn(3, 0, 4); const boss = game.enemies[0]; const hp = boss.hp; game.damage = 2;
   game.spawn(2, 0, 20); const distant = game.enemies[1], distantHp = distant.hp; game.placeCharge(); game.player.z = -12; advance(3);
-  expect(boss.hp).toBeCloseTo(hp - CHARGE_RULES.damage * 2, 8); expect(boss.hp).toBeGreaterThan(0); expect(distant.hp).toBe(distantHp);
+  expect(boss.hp).toBeCloseTo(hp - CHARGE_RULES.damage * 2 * sentinelDefense(boss.age).factor, 8); expect(boss.hp).toBeGreaterThan(0); expect(distant.hp).toBe(distantHp);
 });
 test('an intervening rock protects a nearby hostile from the ground blast', () => {
   let rock = null;

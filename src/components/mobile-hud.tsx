@@ -6,6 +6,7 @@ import { engine } from '@/game/engine';
 import { useGame } from '@/game/store';
 import { WEAPONS, type WeaponId } from '@/game/types';
 import { LAUNCHER_COPY } from '@/game/launcher';
+import SentinelMeter from './sentinel-meter';
 import ChargeControl from './charge-control';
 import DroneStatus from './drone-status';
 import ExpeditionHUD from './expedition-hud';
@@ -46,7 +47,7 @@ export default function MobileHUD({ intelOpen, onIntelOpen, onIntelClose, onHelp
   const alert = s.rocketNoticeTime > 0 ? s.rocketNotice : s.chargeNoticeTime > 0 ? s.chargeNotice : s.announcementTime > 0 ? s.announcement : '';
   return <div className="hud mobile-hud">
     <header className="mobile-flight-strip"><div className={`mobile-integrity ${s.hp / s.maxHp < 0.3 ? 'critical' : ''}`}><span><Shield size={11} /> CORE <strong>{Math.ceil(s.hp)}/{s.maxHp}</strong></span><i><b style={{ width: `${s.hp / s.maxHp * 100}%` }} /></i><small>SHIELD {Math.ceil(s.shield)}/{s.maxShield}</small><i className="mobile-shield-bar"><b style={{ width: `${s.shield / s.maxShield * 100}%` }} /></i></div><div className="mobile-clock"><strong>{clock(s.time)}</strong><small>{s.service ? 'SERVICE' : boss ? 'SENTINEL' : `BOSS ${clock(s.sentinelIn)}`}</small></div><button ref={toggle} className="mobile-intel-toggle" aria-label="Open tactical overview" aria-haspopup="dialog" aria-expanded={intelOpen} aria-controls={intelOpen ? 'mobile-tactical-sheet' : undefined} onClick={onIntelOpen}><Layers3 size={19} /><span>TACTICAL</span>{s.mission?.status === 'active' && <i />}</button><button className="mobile-pause" aria-label="Pause game" onClick={() => s.setPhase('paused')}><Pause size={19} /></button></header>
-    {boss && <div className="mobile-boss-meter"><span>SENTINEL · PHASE {s.bossPhase || 1}</span><i><b style={{ width: `${boss.hp / boss.maxHp * 100}%` }} /></i></div>}
+    {boss && <SentinelMeter compact />}
     <NavigationSignals />
     {s.service && <button className="mobile-objective-chip" onClick={onIntelOpen}>SERVICE · {Math.ceil(s.service.remaining)}s · {Math.ceil(s.dockDistance)}m <span>OPEN</span></button>}
     {!s.service && s.mission?.status === 'active' && <button className="mobile-objective-chip" onClick={onIntelOpen}><Crosshair size={12} /> {s.mission.progress.toFixed(s.mission.kind === 'uplink' ? 1 : 0)}/{s.mission.goal} · {Math.ceil(s.mission.remaining)}s <span>MISSION</span></button>}

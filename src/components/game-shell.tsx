@@ -12,6 +12,7 @@ import { Component, useCallback, useEffect, useRef, useState, type ReactNode } f
 import { audio } from '@/game/audio';
 import { engine } from '@/game/engine';
 import ExpeditionHUD from './expedition-hud';
+import SentinelMeter from './sentinel-meter';
 import { useGame } from '@/game/store';
 import { ACHIEVEMENTS } from '@/game/progression';
 import RewardSlot from './reward-slot';
@@ -57,7 +58,7 @@ function Menu({ open, start }: { open: (panel: Panel) => void; start: () => void
     </header>
     <main className="menu-main">
       <div className="hero-copy">
-        <motion.div className="eyebrow" initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}><span className="tiny-cross">+</span> A GEOMETRIC ROGUELITE <span className="version">V.27</span></motion.div>
+        <motion.div className="eyebrow" initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}><span className="tiny-cross">+</span> A GEOMETRIC ROGUELITE <span className="version">V.28</span></motion.div>
         <motion.h1 initial={{ y: 18, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.18, duration: 0.6 }}>SHAPE<br />THE <span className="title-star">✳</span><br /><span>CHAOS.</span></motion.h1>
         <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.28 }}>
           <p className="hero-description">One core. Infinite chaos.<br />Outlast the swarm. Evolve your arsenal.<br /><span>Break the protocol.</span></p>
@@ -80,7 +81,7 @@ function Menu({ open, start }: { open: (panel: Panel) => void; start: () => void
       </div>
       <div className="deployment-bar"><span><CircleDot size={14} /> READY FOR DEPLOYMENT</span><button onClick={() => open('settings')}>MODE <strong>{difficulty === 'standard' ? 'STANDARD' : 'OVERDRIVE'}</strong><ChevronRight size={13} /></button><button onClick={() => open('armory')}>LOADOUT <strong>{WEAPONS[loadout].name.toUpperCase()}</strong><ChevronRight size={13} /></button><button onClick={() => open('core')}>CORE CREDITS <strong>{number(profile.credits)}</strong><ArrowUpRight size={13} /></button></div>
     </main>
-    <footer className="footer"><span>DESIGNED TO BE OUTNUMBERED.</span><span className="footer-center"><i /> ALL SYSTEMS PROCEDURAL</span><button onClick={() => open('records')}>PERSONAL BEST <strong>{number(profile.best).padStart(6, '0')}</strong><Trophy size={13} /></button><span className="build-number">BUILD 027 / 2026</span></footer>
+    <footer className="footer"><span>DESIGNED TO BE OUTNUMBERED.</span><span className="footer-center"><i /> ALL SYSTEMS PROCEDURAL</span><button onClick={() => open('records')}>PERSONAL BEST <strong>{number(profile.best).padStart(6, '0')}</strong><Trophy size={13} /></button><span className="build-number">BUILD 028 / 2026</span></footer>
   </motion.div>;
 }
 
@@ -97,6 +98,7 @@ function PanelContent({ panel }: { panel: Exclude<Panel, null> }) {
   if (panel === 'controls') return <>
     <p className="panel-intro">Weapons fire at a clear, locked hostile. Move the mouse to aim: targets outside your aiming cone are ignored. Keep moving and collect prisms.</p>
     <div className="tip"><Crosshair size={18} /><p><strong>Read the enemy weapons</strong>Red interceptors rush you. Ranged platforms keep their distance: pink guns fire three plasma rounds, violet guns charge a fast laser, amber guns launch slow unguided rockets. Their colored aim lines lock before firing: move sideways or use stone cover. Heavy tanks reload slowly; Sentinel holds distance and changes barrage patterns.</p></div>
+    <div className="tip"><Shield size={18} /><p><strong>Break the Sentinel armor cycle</strong>Blue reactor lights mean sealed armor: hits deal 40% less damage for 3.2 seconds. Amber lights mark a 3.3-second opening: hits deal 35% more damage, so save rockets for it. Its hull is calibrated to your weapons when it arrives. Later phases mark paired and triple ground strikes; leave the pink circles before their 1.6-second warning ends.</p></div>
     <div className="control-row"><span><Keyboard /> MOVEMENT</span><div className="keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><em>or arrow keys</em></div></div>
     <div className="control-row"><span><MousePointer2 /> AIM DIRECTION</span><div className="keys"><kbd>MOUSE</kbd></div></div>
     <div className="control-row"><span><Crosshair /> TARGETING MODE</span><div className="keys"><kbd>F</kbd><em>assisted / precision</em></div></div>
@@ -174,7 +176,7 @@ function HUD({ open }: { open: (panel: Panel) => void }) {
   const boss = !!bossEnemy;
   return <div className="hud">
     <div className="hud-top"><div className="hud-core"><Logo small /><div className="integrity-label"><span>CORE INTEGRITY</span><strong>{Math.ceil(s.hp)}<small> / {s.maxHp}</small></strong></div><div className={`integrity-bar ${s.hp / s.maxHp < 0.3 ? 'critical' : ''}`}><i style={{ width: `${s.hp / s.maxHp * 100}%` }} /></div></div><div className="hud-timer"><span>{s.service ? 'SERVICE WINDOW' : boss ? 'SENTINEL AWAKENED' : 'SURVIVE THE PROTOCOL'}</span><strong>{time(s.time)}</strong><small>{s.service ? `NEXT FRONT IN ${Math.ceil(s.service.remaining)}s` : boss ? 'DESTROY TO OPEN EXTRACTION' : `SENTINEL IN ${time(s.sentinelIn)}`}</small></div><div className="hud-right"><button className="icon-button" aria-label={s.sound ? 'Mute audio' : 'Enable audio'} onClick={() => useGame.setState({ sound: !s.sound })}>{s.sound ? <Volume2 size={18} /> : <VolumeX size={18} />}</button><button className="icon-button" aria-label="Pause game" onClick={() => { if (s.phase === 'playing') s.setPhase('paused'); }}><Pause size={18} /></button><div className="score"><span>SCORE</span><strong>{number(s.score).padStart(6, '0')}</strong><small>{number(s.kills)} ELIMINATED</small></div></div></div>
-    {boss && bossEnemy && <div className="boss-bar"><span>VORTEX SENTINEL // PHASE {s.bossPhase || 1}</span><div><i style={{ width: `${bossEnemy.hp / bossEnemy.maxHp * 100}%` }} /></div></div>}
+    {boss && <SentinelMeter />}
     <AnimatePresence>{notice && s.phase === 'playing' && <motion.div className="deploy-notice" initial={{ opacity: 0, y: 10, x: '-50%' }} animate={{ opacity: 1, y: 0, x: '-50%' }} exit={{ opacity: 0, x: '-50%' }}><span>PROTOCOL INITIATED</span><h2>KEEP. MOVING.</h2><p>Mouse aims. E fires rockets. B plants a timed charge. Q clears the swarm.</p></motion.div>}</AnimatePresence>
     {s.combo >= 2 && <div className="combo"><strong>×{Math.floor(s.combo)}</strong><span>CHAIN MULTIPLIER</span></div>}
     <div className="hud-bottom"><div className="weapon-slots">{(Object.keys(WEAPONS) as WeaponId[]).map(id => { const Icon = weaponIcons[id], lv = s.weapons[id]; return <div key={id} className={`weapon-slot ${lv ? 'equipped' : ''} ${id === 'glaive' && lv ? 'escort-slot' : ''}`} style={{ '--weapon-color': WEAPONS[id].color } as React.CSSProperties} title={`${WEAPONS[id].name} · ${lv ? `Level ${lv}` : 'Not equipped'}`}><Icon size={23} /><span>{lv ? `LV ${lv}` : '—'}</span>{id === 'glaive' && lv > 0 && <DroneStatus hull={s.droneHull} units={s.droneStatus} />}</div>; })}<div className={`dash-slot ${s.dash <= 0 ? 'ready' : ''}`}><Wind size={22} /><div><span>PHASE SHIFT</span><strong>{s.dash <= 0 ? 'READY' : `${s.dash.toFixed(1)}s`}</strong></div><kbd>SPACE</kbd></div><ChargeControl /></div><div className="hud-performance"><span><i /> SECTOR_{String(s.sector + 1).padStart(2, '0')}</span><small>{s.enemies} HOSTILES <span>/</span> {s.fps} FPS</small></div></div>

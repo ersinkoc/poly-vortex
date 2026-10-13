@@ -15,7 +15,7 @@ const catalog = [
   { name: 'Chaser', code: 'CX.01 / PURSUIT DRONE', role: 'FAST ATTACK', color: '#ff5774', icon: Wind, copy: 'A compact autonomous interceptor. A reinforced nose, optical tracking array, and twin engines make this hunter relentless.' },
   { name: 'Orbiter', code: 'OR.02 / RECON PLATFORM', role: 'RANGED CONTROL', color: '#a685ff', icon: Orbit, copy: 'A standoff weapons platform: pink plasma bursts, violet charged lasers, or amber unguided rockets. Its aim line warns before firing; evade sideways or use stone cover.' },
   { name: 'Goliath', code: 'GT.03 / SIEGE CARRIER', role: 'HEAVY ARMOR', color: '#ffae50', icon: Shield, copy: 'A heavy hover carrier with overlapping ceramic armor, reinforced engine nacelles, cooling grilles, and a twin-barrel siege turret.' },
-  { name: 'Vortex Sentinel', code: 'VS.00 / DREADNOUGHT', role: 'PROTOCOL GUARDIAN', color: '#ff3a5d', icon: Skull, copy: 'The final defense. Eight armored reactor arms surround a shielded core, flanked by four forward cannons and a ring of lift engines.' },
+  { name: 'Vortex Sentinel', code: 'VS.00 / DREADNOUGHT', role: 'PROTOCOL GUARDIAN', color: '#ff3a5d', icon: Skull, copy: 'A guardian calibrated to your arsenal. Blue sealed armor resists hits; the amber exposed reactor rewards timed bursts. Three barrage phases add increasingly dangerous telegraphed ground strikes.' },
 ];
 
 function DisplayShip({ selected }: { selected: number }) {

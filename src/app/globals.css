@@ -252,3 +252,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 @media(max-width:600px) { .rocket-control { right: 16px; bottom: 173px; }.rocket-control button { min-width: 150px; padding: 8px 10px; gap: 7px; }.rocket-control button>svg { width: 18px; }.rocket-control span { font-size: 5px; letter-spacing: .2px; }.rocket-control strong { font-size: 8px; }.rocket-control small { font-size: 5px; margin: 5px 0; letter-spacing: .2px; }.rocket-control b { width: 10px; }.rocket-control kbd { display: none; }.combat-buffs { bottom: 295px; }.hud:has(.mission-panel) .combo { top: 177px; right: auto; left: 16px; text-align: left; } }
 
 .escort-slot { gap: 3px; }.escort-slot svg { width: 18px; height: 18px; }.drone-status { display: flex; flex-direction: column; align-items: center; gap: 3px; }.drone-status>span { font: 6px var(--mono); letter-spacing: -.15px; }.drone-hull-pips { display: flex; gap: 1px; }.drone-hull-pips>i { position: relative; width: 4px; height: 7px; background: #47788855; overflow: hidden; }.drone-hull-pips b { position: absolute; bottom: 0; width: 100%; background: #6ee7ff; }.drone-hull-pips .damaged b { background: #ffb765; }.drone-hull-pips .lost { background: #a6404055; border-top: 1px solid #ff657c; }
+
+.boss-bar.armored span, .mobile-boss-meter.armored span { color: #8ac8ef; }
+.boss-bar.exposed span, .mobile-boss-meter.exposed span { color: #ffd48b; }
+.boss-bar.exposed > div > i, .mobile-boss-meter.exposed > i > b { background: #ffb85c; }
