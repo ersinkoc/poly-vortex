@@ -4,6 +4,7 @@ import './expedition.css';
 import './charges.css';
 import './rovers.css';
 import './mobile-hud.css';
+import './drone-battery.css';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://poly-vortex.oxog.dev'),

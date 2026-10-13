@@ -12,6 +12,7 @@ import { DRONE_HULL, DRONE_FIRE, DRONE_FORMATION, DRONE_ORBIT, droneMuzzle, dron
 import { terrainHeight } from '@/game/terrain';
 import { attachDamageMaterial, buildDamageUniforms, damageHeat, hullDamage } from '@/game/ship-damage';
 import { GOLIATH, goliathMuzzle, goliathPose } from '@/game/goliath-ai';
+import { DRONE_DOCK, PLAYER_SCALE, playerFlightPose } from '@/game/player-pose';
 
 type ActorAsset = { model: ShipModel; materials: ReturnType<typeof buildShipMaterials> };
 const accents = ['#ff5774', '#a685ff', '#ffae50', '#ff3a5d'];
@@ -27,9 +28,10 @@ function PlayerShip({ asset, shadow }: { asset: ActorAsset & { damage: ReturnTyp
     asset.damage.uHullDamage.value = damage;
     asset.damage.uHullImpact.value = menu || state.reducedEffects ? 0 : p.hullHit / 0.65;
     if (group.current) {
-      group.current.position.set(p.x, 0.95 + Math.sin(clock.elapsedTime * 2.5) * 0.045, p.z);
-      group.current.rotation.set(menu ? -0.04 : p.vz * 0.009, menu ? clock.elapsedTime * 0.1 + 0.7 : p.angle, menu ? Math.sin(clock.elapsedTime * 0.7) * 0.025 : -p.vx * 0.025);
-      group.current.scale.setScalar(menu ? 2.25 : 0.83);
+      const pose = playerFlightPose(engine.time, p);
+      group.current.position.set(pose.x, menu ? 0.95 + Math.sin(clock.elapsedTime * 2.5) * 0.045 : pose.y, pose.z);
+      group.current.rotation.set(menu ? -0.04 : pose.pitch, menu ? clock.elapsedTime * 0.1 + 0.7 : pose.yaw, menu ? Math.sin(clock.elapsedTime * 0.7) * 0.025 : pose.bank);
+      group.current.scale.setScalar(menu ? 2.25 : PLAYER_SCALE);
       group.current.visible = true;
     }
     const flame = asset.materials.engine as THREE.MeshBasicMaterial;
@@ -43,10 +45,38 @@ function PlayerShip({ asset, shadow }: { asset: ActorAsset & { damage: ReturnTyp
     if (light.current) { light.current.position.set(p.x, 1.8, p.z); light.current.color.copy(idleFlame).lerp(failingFlame, heat); light.current.intensity = 9 + (state.reducedEffects ? 0 : p.hullHit * 10); }
   });
   return <>
-    <group ref={group} dispose={null}>{SURFACES.map(surface => <mesh key={surface} geometry={asset.model[surface]} material={asset.materials[surface]} castShadow={surface === 'hull' || surface === 'armor'} receiveShadow />)}</group>
+    <group ref={group} dispose={null}>{SURFACES.map(surface => <mesh key={surface} geometry={asset.model[surface]} material={asset.materials[surface]} castShadow={surface === 'hull' || surface === 'armor'} receiveShadow />)}<DroneBay /></group>
     <mesh ref={footprint}><planeGeometry args={[1, 1]} /><meshBasicMaterial map={shadow} transparent opacity={0.4} depthWrite={false} /></mesh>
     <pointLight ref={light} color="#9cdbff" intensity={9} distance={6} decay={2} />
   </>;
+}
+
+function DroneBay() {
+  const group = useRef<THREE.Group>(null), lights = useRef<THREE.InstancedMesh>(null), hatch = useRef<THREE.Mesh>(null);
+  const resources = useMemo(() => ({ pose: new THREE.Object3D(), color: new THREE.Color(), frame: new THREE.RingGeometry(0.15, 0.2, 16), hatch: new THREE.BoxGeometry(0.27, 0.035, 0.24), lamp: new THREE.BoxGeometry(1, 1, 1), frameMaterial: new THREE.MeshStandardMaterial({ color: '#3e6268', metalness: 0.9, roughness: 0.4, emissive: '#3fbbcd', emissiveIntensity: 0.45 }), hatchMaterial: new THREE.MeshStandardMaterial({ color: '#233532', metalness: 0.9, roughness: 0.5 }), lampMaterial: new THREE.MeshBasicMaterial({ toneMapped: false }) }), []);
+  useEffect(() => {
+    const mesh = lights.current; mesh?.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    return () => { mesh?.dispose(); resources.frame.dispose(); resources.hatch.dispose(); resources.lamp.dispose(); resources.frameMaterial.dispose(); resources.hatchMaterial.dispose(); resources.lampMaterial.dispose(); };
+  }, [resources]);
+  useFrame(() => {
+    const rack = engine.droneRack, hidden = useGame.getState().phase === 'menu' || !rack.capacity;
+    if (group.current) group.current.visible = !hidden;
+    if (!lights.current) return;
+    for (let i = 0; i < rack.capacity; i++) {
+      const u = rack.units[i], { pose, color } = resources;
+      pose.position.set((i - (rack.capacity - 1) / 2) * 0.06, 0.015, 0.13); pose.scale.set(0.035, 0.018, 0.05); pose.updateMatrix(); lights.current.setMatrixAt(i, pose.matrix);
+      color.set(u.hp <= 0 ? '#6b2334' : u.state === 'charging' ? '#7dffb3' : u.state === 'returning' || u.state === 'waiting' ? '#ffb368' : '#78dcff');
+      lights.current.setColorAt(i, color.multiplyScalar(u.state === 'charging' ? 1.5 + u.battery / 100 * 2 : 0.7));
+    }
+    lights.current.count = hidden ? 0 : rack.capacity; lights.current.instanceMatrix.needsUpdate = true;
+    if (lights.current.instanceColor) lights.current.instanceColor.needsUpdate = true;
+    if (hatch.current) { const transfer = rack.units.some(u => u.hp > 0 && (u.state === 'returning' || u.state === 'launching')); hatch.current.scale.x = transfer ? 0.22 : 1; }
+  });
+  return <group ref={group} position={[DRONE_DOCK.x, DRONE_DOCK.y, DRONE_DOCK.z]}>
+    <mesh rotation={[-Math.PI / 2, 0, 0]} geometry={resources.frame} material={resources.frameMaterial} dispose={null} />
+    <mesh ref={hatch} position={[0, -0.01, 0]} geometry={resources.hatch} material={resources.hatchMaterial} dispose={null} />
+    <instancedMesh ref={lights} args={[resources.lamp, resources.lampMaterial, DRONE_ORBIT.capacity]} count={0} frustumCulled={false} dispose={null} />
+  </group>;
 }
 
 function EnemyShips({ kind, asset, shadow }: { kind: 0 | 1 | 2 | 3; asset: ActorAsset; shadow: THREE.Texture }) {
@@ -107,7 +137,8 @@ function EscortDrones({ asset, rotor, shadow }: { asset: ActorAsset; rotor: THRE
       const i = engine.droneFormation.slots[draw];
       const pose = dronePose(engine.time, i, count, engine.player, engine.droneFormation), { body, fan, fanWorld, footprint } = objects;
       const gun = engine.droneGuns[i], yaw = gun.active ? gun.yaw : pose.yaw, pitch = gun.active ? gun.pitch : pose.pitch;
-      body.position.set(pose.x, pose.y, pose.z); body.rotation.set(pitch, yaw, pose.bank, 'YXZ'); body.scale.setScalar(DRONE_ORBIT.scale); body.updateMatrix();
+      const scale = pose.scale ?? 1;
+      body.position.set(pose.x, pose.y, pose.z); body.rotation.set(pitch, yaw, pose.bank, 'YXZ'); body.scale.setScalar(DRONE_ORBIT.scale * scale); body.updateMatrix();
       const hull = engine.droneRack.units[i], integrity = hull.hp / DRONE_HULL.hp;
       objects.wear.setRGB(0.35 + integrity * 0.65, 0.19 + integrity * 0.81, 0.13 + integrity * 0.87);
       if (hull.hit > 0 && !state.reducedEffects) objects.wear.setRGB(1.8, 0.8, 0.35);
@@ -117,11 +148,11 @@ function EscortDrones({ asset, rotor, shadow }: { asset: ActorAsset; rotor: THRE
       }
       let j = 0;
       for (const side of [-1, 1]) for (const end of [-1, 1]) {
-        fan.position.set(side * 0.55, 0.065, end * 0.37); fan.rotation.set(0, engine.time * 54 * side * end + i * 0.8, 0); fan.updateMatrix();
+        fan.position.set(side * 0.55, 0.065, end * 0.37); fan.rotation.set(0, hull.rotor * side * end + i * 0.8, 0); fan.updateMatrix();
         fanWorld.multiplyMatrices(body.matrix, fan.matrix); fans.current?.setMatrixAt(draw * 4 + j++, fanWorld);
       }
       const spread = Math.max(0, pose.y - DRONE_FORMATION.altitude) * 0.2;
-      footprint.position.set(pose.x, terrainHeight(pose.x, pose.z) + 0.03, pose.z); footprint.rotation.set(-Math.PI / 2, 0, -yaw); footprint.scale.set(1.7 + spread, 1.9 + spread, 1); footprint.updateMatrix();
+      footprint.position.set(pose.x, terrainHeight(pose.x, pose.z) + 0.03, pose.z); footprint.rotation.set(-Math.PI / 2, 0, -yaw); footprint.scale.set((1.7 + spread) * scale, (1.9 + spread) * scale, 1); footprint.updateMatrix();
       footprints.current?.setMatrixAt(draw, footprint.matrix);
       if (gun.flash > 0 && !state.reducedEffects) {
         const muzzle = droneMuzzle(pose, yaw, gun.barrel, pitch), size = Math.sqrt(gun.flash / DRONE_FIRE.flashDuration);
