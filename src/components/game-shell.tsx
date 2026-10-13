@@ -2,31 +2,27 @@
 
 import dynamic from 'next/dynamic';
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
-import { ArrowDown, ArrowRight, ArrowUpRight, Bomb, Check, ChevronRight, CircleDot, Cpu, Crosshair, Disc3, Expand, Hexagon, Keyboard, Layers3, MousePointer2, Orbit, Pause, Play, Radio, Rocket, RotateCcw, Shield, SlidersHorizontal, Snowflake, Sparkles, Trophy, Volume2, VolumeX, Wind, X, Zap } from 'lucide-react';
-import ChargeControl from './charge-control';
-import RoverReadout from './rover-readout';
-import DroneStatus from './drone-status';
+import { ArrowRight, ArrowUpRight, Check, CircleDot, Cpu, Crosshair, Disc3, Hexagon, Pause, Play, Rocket, RotateCcw, Shield, SlidersHorizontal, Snowflake, Trophy, Wind, X, Zap } from 'lucide-react';
 import MobileHUD from './mobile-hud';
 import { useCompactHUD } from './use-compact-hud';
 import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { audio } from '@/game/audio';
 import { engine } from '@/game/engine';
-import ExpeditionHUD from './expedition-hud';
-import SentinelMeter from './sentinel-meter';
 import { useGame } from '@/game/store';
 import { ACHIEVEMENTS } from '@/game/progression';
-import RewardSlot from './reward-slot';
-import TacticalHUD from './tactical-hud';
 import RocketGuide from './rocket-guide';
 import ShipSelector from './ship-selector';
-import { FLIGHTFRAMES } from '@/game/flightframes';
+import LaunchMenu from './launch-menu';
+import FlightHUD from './flight-hud';
+import FlightManual from './flight-manual';
+
 import { useShipSync } from './use-ship-sync';
 import { WEAPONS, type Profile, type WeaponId } from '@/game/types';
 
 const Arena = dynamic(() => import('./arena'), { ssr: false, loading: () => <div className="arena-loading"><Hexagon size={32} /><span>INITIALIZING THE VORTEX</span><i /></div> });
 type Panel = 'protocol' | 'controls' | 'armory' | 'ships' | 'settings' | 'core' | 'records' | 'ordnance' | null;
 const weaponIcons = { pulse: Crosshair, glaive: Disc3, cryo: Snowflake, tesla: Zap };
-const panelTitles = { protocol: 'The protocol', controls: 'Know your controls', armory: 'Choose your arsenal', ships: 'Choose your warship', settings: 'System settings', core: 'Core modifications', records: 'Flight record', ordnance: 'Rocket flight manual' };
+const panelTitles = { protocol: 'The protocol', controls: 'Visual flight manual', armory: 'Choose your arsenal', ships: 'Choose your warship', settings: 'System settings', core: 'Core modifications', records: 'Flight record', ordnance: 'Rocket flight manual' };
 const number = (n: number) => Math.floor(n).toLocaleString('en-US');
 const time = (n: number) => `${Math.floor(n / 60).toString().padStart(2, '0')}:${Math.floor(n % 60).toString().padStart(2, '0')}`;
 
@@ -39,54 +35,8 @@ class ArenaBoundary extends Component<{ children: ReactNode }, { error: boolean 
   }
 }
 
-function Logo({ small = false }: { small?: boolean }) {
-  return <div className={`brand ${small ? 'brand-small' : ''}`}><span className="brand-symbol"><Hexagon size={35} strokeWidth={1.4} /><Zap size={17} strokeWidth={2.2} /></span><div>POLY<span className="brand-divider">/</span>VORTEX<small>NEON PROTOCOL</small></div></div>;
-}
-
 function Toggle({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
   return <button className={`toggle ${active ? 'active' : ''}`} role="switch" aria-checked={active} aria-label={label} onClick={onClick}><span /></button>;
-}
-
-function Menu({ open, start }: { open: (panel: Panel) => void; start: () => void }) {
-  const runMode = useGame(s => s.runMode);
-  const ship = useGame(s => s.ship), frame = FLIGHTFRAMES[ship];
-  const sound = useGame(s => s.sound), profile = useGame(s => s.profile), difficulty = useGame(s => s.difficulty), loadout = useGame(s => s.loadout);
-  const [fullscreen, setFullscreen] = useState(false);
-  useEffect(() => { const update = () => setFullscreen(!!document.fullscreenElement); document.addEventListener('fullscreenchange', update); return () => document.removeEventListener('fullscreenchange', update); }, []);
-  const expand = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); } catch { /* The game remains playable when embedding disables fullscreen. */ } };
-  return <motion.div className="menu" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-    <header className="header">
-      <Logo />
-      <nav aria-label="Main navigation"><button onClick={() => open('protocol')}>THE PROTOCOL</button><button onClick={() => open('controls')}>HOW TO PLAY</button><button onClick={() => open('armory')}>ARMORY <ArrowUpRight size={13} /></button><button onClick={() => open('records')}>FLIGHT LOG</button></nav>
-      <div className="header-actions"><span className="online-status"><i /> SYSTEM ONLINE</span><button className="icon-button" title={sound ? 'Mute audio' : 'Enable audio'} aria-label={sound ? 'Mute audio' : 'Enable audio'} onClick={() => { useGame.setState({ sound: !sound }); void audio.unlock().catch(() => undefined); }}>{sound ? <Volume2 size={18} /> : <VolumeX size={18} />}</button><button className="icon-button" aria-label="Settings" title="Settings" onClick={() => open('settings')}><SlidersHorizontal size={18} /></button></div>
-    </header>
-    <main className="menu-main">
-      <div className="hero-copy">
-        <motion.div className="eyebrow" initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}><span className="tiny-cross">+</span> A GEOMETRIC ROGUELITE <span className="version">V.30</span></motion.div>
-        <motion.h1 initial={{ y: 18, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.18, duration: 0.6 }}>SHAPE<br />THE <span className="title-star">✳</span><br /><span>CHAOS.</span></motion.h1>
-        <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.28 }}>
-          <p className="hero-description">One core. Infinite chaos.<br />Outlast the swarm. Evolve your arsenal.<br /><span>Break the protocol.</span></p>
-          <div className="run-route" aria-label="Run duration"><button aria-pressed={runMode === 'expedition'} onClick={() => useGame.setState({ runMode: 'expedition' })}>EXPEDITION <small>KEEP GOING</small></button><button aria-pressed={runMode === 'classic'} onClick={() => useGame.setState({ runMode: 'classic' })}>CLASSIC <small>ONE SENTINEL</small></button></div>
-          <button className="primary-button enter-button" onClick={start}><span><Play size={15} fill="currentColor" /> ENTER THE VORTEX</span><ArrowUpRight size={24} /></button>
-          <div className="start-meta"><button className="ship-open" aria-label="Choose warship" onClick={() => open('ships')}><Hexagon size={14} /> {frame.name.toUpperCase()} / CHANGE SHIP</button><button onClick={() => open('controls')}>CONTROLS <Keyboard size={14} /></button></div>
-        </motion.div>
-      </div>
-      <div className="preview-chrome">
-        <div className="preview-top"><span><Radio size={13} /> LIVE SIMULATION</span><span>SECTOR_07 <span className="muted">//</span> THE VORTEX</span></div>
-        <div className="preview-coordinate coord-one">X: 00.000<br />Y: 00.000<br /><span>CORE SIGNAL: STABLE</span></div>
-        <div className="core-label"><span className="label-line" /><div><span className="micro">SELECTED FLIGHTFRAME</span><strong>{frame.name.toUpperCase()}</strong><small>{frame.code} <span>·</span> PHASE-SHIFT ENABLED</small></div></div>
-        <div className="arena-spec"><div><span className="signal-bars"><i /><i /><i /><i /><i /></span> REACTOR OUTPUT <strong>98.4%</strong></div><button className="icon-button" aria-label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} onClick={expand}><Expand size={18} /></button></div>
-      </div>
-      <div className="mission-strip">
-        <div className="mission-strip-title"><span className="micro">THE LOOP</span><strong>SURVIVE. EVOLVE. REPEAT.</strong><ArrowDown size={15} /></div>
-        <div className="feature"><span className="feature-icon"><Layers3 size={22} /></span><div><h3>INFINITE PRESSURE</h3><p>Relentless swarms. No two runs alike.</p></div></div>
-        <div className="feature"><span className="feature-icon"><Zap size={22} /></span><div><h3>UNLIMITED POTENTIAL</h3><p>Four weapon systems. Your evolution.</p></div></div>
-        <div className="feature"><span className="feature-icon"><Orbit size={24} /></span><div><h3>PURE NEON ENERGY</h3><p>Procedural worlds. Unfiltered chaos.</p></div></div>
-      </div>
-      <div className="deployment-bar"><span><CircleDot size={14} /> READY FOR DEPLOYMENT</span><button onClick={() => open('settings')}>MODE <strong>{difficulty === 'standard' ? 'STANDARD' : 'OVERDRIVE'}</strong><ChevronRight size={13} /></button><button onClick={() => open('armory')}>LOADOUT <strong>{WEAPONS[loadout].name.toUpperCase()}</strong><ChevronRight size={13} /></button><button onClick={() => open('core')}>CORE CREDITS <strong>{number(profile.credits)}</strong><ArrowUpRight size={13} /></button></div>
-    </main>
-    <footer className="footer"><span>DESIGNED TO BE OUTNUMBERED.</span><span className="footer-center"><i /> ALL SYSTEMS PROCEDURAL</span><button onClick={() => open('records')}>PERSONAL BEST <strong>{number(profile.best).padStart(6, '0')}</strong><Trophy size={13} /></button><span className="build-number">BUILD 030 / 2026</span></footer>
-  </motion.div>;
 }
 
 function PanelContent({ panel }: { panel: Exclude<Panel, null> }) {
@@ -101,31 +51,8 @@ function PanelContent({ panel }: { panel: Exclude<Panel, null> }) {
     <div className="profile-stats flight-stats"><div><span>LIFETIME HOSTILES</span><strong>{number(profile.totalKills)}</strong></div><div><span>DEPLOYMENTS</span><strong>{profile.runs}</strong></div><div><span>EXTRACTIONS</span><strong>{profile.wins}</strong></div></div>
     <div className="achievement-list">{ACHIEVEMENTS.map(a => { const unlocked = profile.achievements.includes(a.id); return <div className={unlocked ? 'unlocked' : ''} key={a.id}><span>{unlocked ? <Trophy size={20} /> : <Hexagon size={20} />}</span><div><h3>{a.name}</h3><p>{a.description}</p></div>{unlocked ? <Check size={16} /> : <span className="achievement-lock">LOCKED</span>}</div>; })}</div>
   </>;
-  if (panel === 'controls') return <>
-    <p className="panel-intro">Weapons fire at a clear, locked hostile. Move the mouse to aim: targets outside your aiming cone are ignored. Keep moving and collect prisms.</p>
-    <div className="tip"><Crosshair size={18} /><p><strong>Read the enemy weapons</strong>Red interceptors rush you. Ranged platforms keep their distance: pink guns fire three plasma rounds, violet guns charge a fast laser, amber guns launch slow unguided rockets. Their colored aim lines lock before firing: move sideways or use stone cover. Heavy tanks reload slowly; Sentinel holds distance and changes barrage patterns.</p></div>
-    <div className="tip"><Shield size={18} /><p><strong>Break the Sentinel armor cycle</strong>Blue reactor lights mean sealed armor: hits deal 40% less damage for 3.2 seconds. Amber lights mark a 3.3-second opening: hits deal 35% more damage, so save rockets for it. Its hull is calibrated to your weapons when it arrives. Later phases mark paired and triple ground strikes; leave the pink circles before their 1.6-second warning ends.</p></div>
-    <div className="control-row"><span><Keyboard /> MOVEMENT</span><div className="keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><em>or arrow keys</em></div></div>
-    <div className="control-row"><span><MousePointer2 /> AIM DIRECTION</span><div className="keys"><kbd>MOUSE</kbd></div></div>
-    <div className="control-row"><span><Crosshair /> TARGETING MODE</span><div className="keys"><kbd>F</kbd><em>assisted / precision</em></div></div>
-    <div className="control-row"><span><Wind /> PHASE SHIFT</span><div className="keys"><kbd>SPACE</kbd><em>or right-click</em></div></div>
-    <div className="control-row"><span><Zap /> VORTEX SURGE</span><div className="keys"><kbd>Q</kbd><em>EMP / clear bullets</em></div></div>
-    <div className="control-row"><span><Rocket /> HELLION ROCKET</span><div className="keys"><kbd>E</kbd><em>6 rounds / ammo crates refill 3</em></div></div>
-    <div className="control-row"><span><Bomb /> GROUND CHARGE</span><div className="keys"><kbd>B</kbd><em>3 charges / 3s fuse / 5.5m blast</em></div></div>
-    <div className="control-row"><span><Pause /> PAUSE</span><div className="keys"><kbd>ESC</kbd></div></div>
-    <div className="control-row"><span><Layers3 /> MODULE REEL</span><div className="keys"><em>Automatic / keep moving</em></div></div>
-    <div className="control-row"><span><Shield /> FIELD SERVICE</span><div className="keys"><em>Green beacon / stop for 3s</em></div></div>
-    <div className="tip"><Shield size={18} /><p><strong>Heavy siege vehicles</strong>Goliaths hold at 9–12m and retreat if you close in. Amber barrels warn before a single slow shell; change direction during their one-second aim lock. They leave at least 7.5 seconds between shots, including elites. Rocks block their firing lane.</p></div>
-    <div className="tip"><Bomb size={18} /><p><strong>Leave a trap behind</strong>Press B or tap the charge icon to plant a bomb at your current position. Follow its countdown and lure pursuers into the amber circle. It explodes after three seconds. Rocks block the blast; your core and pilots are protected. Move clear before placing another. Blue crates refill one charge, up to three; there is no passive refill.</p></div>
-    <div className="tip"><Cpu size={18} /><p><strong>Radar minefield</strong>The automatic bay deploys three or six four-wheel mines after ten seconds, then every 24–36 seconds. They drive 9–14m and stop before rocks. A rotating roof radar scans a cyan holographic field: the inner 1.6m ring is the proximity trigger; the dashed outer 4.2m boundary is blast reach. Detected hostiles leave fading diamond echoes and turn the field amber. A trigger turns it red; the small center arc counts down to detonation. Idle mines expire after twelve seconds. Rocks block detection and damage; your core and pilots are protected. New launches wait during service and spend no B charges or rockets.</p></div>
-    <div className="tip"><Radio size={18} /><p><strong>Long-range expedition</strong>Each Sentinel opens a 30-second service window. Clear the beacon perimeter and stop there for three seconds without taking damage. Service restores 35% hull, shields, three rockets, one charge and 50 EMP once. Extract at the beacon to bank credits, or keep playing into the next front automatically. Escape pauses all timers.</p></div>
-    <div className="tip"><Sparkles size={18} /><p><strong>A little advice</strong>Dash through danger: phase shift makes you briefly invulnerable. Collect cyan prisms to level up. Gold elites drop rare salvage. Mouse aim focuses the pulse salvo on one hostile. Rocks stop bullets, and pilots in the firing line hold friendly fire. Q discharges your EMP, and blue shields regenerate after four seconds without a hit. Amber signals mark stranded pilots: stay in their perimeter for 1.5 seconds to extract. Follow the field-operation arrow for timed missions. E fires a limited rocket at your locked target. Blue crates refill up to three rockets and 20 EMP charge. Red first-aid cases are rare. Touch controls appear on mobile.</p></div>
-  </>;
-  if (panel === 'protocol') return <>
-    <p className="panel-intro">You are the last stable core in a collapsing geometric system. The protocol wants you erased. Rewrite it.</p>
-    {[['01', 'Survive the swarm', 'Move through an infinite arena as chasers, orbiters, and heavy goliaths close in. Your core tracks one visible hostile. Mouse aim chooses your firing lane.'], ['02', 'Evolve in real time', 'Collect XP prisms. The side reel automatically installs one randomized upgrade. Keep moving while rewards queue. Stack rare and overclocked modules into devastating builds.'], ['03', 'Bring them home', 'Rescue stranded pilots, restore communication relays, and break enemy blockades. Complete timed operations for bonus credits, repairs, and EMP charge.'], ['04', 'Break the protocol', 'Every front has a Sentinel after three minutes. Expedition keeps your build: clear the green beacon, stop there for three seconds, then extract during its 30-second window or continue automatically. Classic ends at the first Sentinel. Bank credits for permanent upgrades.']].map(([n, title, copy]) => <div className="brief-step" key={n}><span>{n}</span><div><h3>{title}</h3><p>{copy}</p></div></div>)}
-    <div className="protocol-bottom"><Hexagon size={20} /><span>ONE CORE. ONE CHANCE. <strong>MAKE IT COUNT.</strong></span></div>
-  </>;
+  if (panel === 'controls') return <FlightManual />;
+  if (panel === 'protocol') return <FlightManual />;
   if (panel === 'armory') return <>
     <p className="panel-intro">Select your starting module. The pulse cannon is always equipped. Find and evolve every system during your run.</p>
     <div className="armory-list">{(Object.keys(WEAPONS) as WeaponId[]).map(id => { const w = WEAPONS[id], Icon = weaponIcons[id]; return <button className={`weapon-option ${loadout === id ? 'selected' : ''}`} style={{ '--weapon-color': w.color } as React.CSSProperties} key={id} onClick={() => useGame.setState({ loadout: id })}><span className="weapon-option-icon"><Icon size={27} /></span><div><span className="micro">{w.code}</span><h3>{w.name}</h3><p>{w.description}</p></div><span className="select-indicator">{loadout === id && <Check size={13} />}</span></button>; })}</div>
@@ -163,7 +90,7 @@ function Modal({ panel, close }: { panel: Exclude<Panel, null>; close: () => voi
     const key = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { e.stopImmediatePropagation(); close(); }
       if (e.key === 'Tab') {
-        const buttons = ref.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], [tabindex="0"]'); if (!buttons?.length) return;
+        const buttons = ref.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], summary, [tabindex="0"]'); if (!buttons?.length) return;
         const first = buttons[0], last = buttons[buttons.length - 1];
         if (e.shiftKey && (document.activeElement === first || document.activeElement === ref.current)) { e.preventDefault(); last.focus(); }
         else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
@@ -172,23 +99,6 @@ function Modal({ panel, close }: { panel: Exclude<Panel, null>; close: () => voi
     window.addEventListener('keydown', key, true); return () => { window.removeEventListener('keydown', key, true); previous?.focus(); };
   }, [close]);
   return <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={close}><motion.div ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="panel-title" className="panel" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }} onClick={e => e.stopPropagation()}><div className="panel-header"><div><span className="micro">POLY-VORTEX / SYSTEM INTERFACE</span><h2 id="panel-title">{panelTitles[panel]}</h2></div><button className="icon-button" aria-label="Close dialog" onClick={close}><X size={20} /></button></div><PanelContent panel={panel} /></motion.div></motion.div>;
-}
-
-function HUD({ open }: { open: (panel: Panel) => void }) {
-  const s = useGame();
-  const [notice, setNotice] = useState(true);
-  useEffect(() => { setNotice(true); const t = setTimeout(() => setNotice(false), 6500); return () => clearTimeout(t); }, [s.runId]);
-  const bossEnemy = engine.enemies.find(e => e.kind === 3 && e.hp > 0);
-  const boss = !!bossEnemy;
-  return <div className="hud">
-    <div className="hud-top"><div className="hud-core"><Logo small /><div className="integrity-label"><span>CORE INTEGRITY</span><strong>{Math.ceil(s.hp)}<small> / {s.maxHp}</small></strong></div><div className={`integrity-bar ${s.hp / s.maxHp < 0.3 ? 'critical' : ''}`}><i style={{ width: `${s.hp / s.maxHp * 100}%` }} /></div></div><div className="hud-timer"><span>{s.service ? 'SERVICE WINDOW' : boss ? 'SENTINEL AWAKENED' : 'SURVIVE THE PROTOCOL'}</span><strong>{time(s.time)}</strong><small>{s.service ? `NEXT FRONT IN ${Math.ceil(s.service.remaining)}s` : boss ? 'DESTROY TO OPEN EXTRACTION' : `SENTINEL IN ${time(s.sentinelIn)}`}</small></div><div className="hud-right"><button className="icon-button" aria-label={s.sound ? 'Mute audio' : 'Enable audio'} onClick={() => useGame.setState({ sound: !s.sound })}>{s.sound ? <Volume2 size={18} /> : <VolumeX size={18} />}</button><button className="icon-button" aria-label="Pause game" onClick={() => { if (s.phase === 'playing') s.setPhase('paused'); }}><Pause size={18} /></button><div className="score"><span>SCORE</span><strong>{number(s.score).padStart(6, '0')}</strong><small>{number(s.kills)} ELIMINATED</small></div></div></div>
-    {boss && <SentinelMeter />}
-    <AnimatePresence>{notice && s.phase === 'playing' && <motion.div className="deploy-notice" initial={{ opacity: 0, y: 10, x: '-50%' }} animate={{ opacity: 1, y: 0, x: '-50%' }} exit={{ opacity: 0, x: '-50%' }}><span>PROTOCOL INITIATED</span><h2>KEEP. MOVING.</h2><p>Mouse aims. E fires rockets. B plants a timed charge. Q clears the swarm.</p></motion.div>}</AnimatePresence>
-    {s.combo >= 2 && <div className="combo"><strong>×{Math.floor(s.combo)}</strong><span>CHAIN MULTIPLIER</span></div>}
-    <div className="hud-bottom"><div className="weapon-slots">{(Object.keys(WEAPONS) as WeaponId[]).map(id => { const Icon = weaponIcons[id], lv = s.weapons[id]; return <div key={id} className={`weapon-slot ${lv ? 'equipped' : ''} ${id === 'glaive' && lv ? 'escort-slot' : ''}`} style={{ '--weapon-color': WEAPONS[id].color } as React.CSSProperties} title={`${WEAPONS[id].name} · ${lv ? `Level ${lv}` : 'Not equipped'}`}><Icon size={23} /><span>{lv ? `LV ${lv}` : '—'}</span>{id === 'glaive' && lv > 0 && <DroneStatus hull={s.droneHull} units={s.droneStatus} />}</div>; })}<div className={`dash-slot ${s.dash <= 0 ? 'ready' : ''}`}><Wind size={22} /><div><span>PHASE SHIFT</span><strong>{s.dash <= 0 ? 'READY' : `${s.dash.toFixed(1)}s`}</strong></div><kbd>SPACE</kbd></div><ChargeControl /></div><div className="hud-performance"><span><i /> SECTOR_{String(s.sector + 1).padStart(2, '0')}</span><small>{s.enemies} HOSTILES <span>/</span> {s.fps} FPS</small></div></div>
-    <div className="xp-container"><span>LV. {s.level}</span><div className="xp-bar"><i style={{ width: `${Math.min(100, s.xp / s.nextXp * 100)}%` }} /></div><small>{Math.floor(s.xp)} / {s.nextXp} XP</small></div>
-    <RewardSlot /><ExpeditionHUD /><RoverReadout /><TacticalHUD onOrdnanceHelp={() => { if (useGame.getState().phase === 'playing') useGame.getState().setPhase('paused'); open('ordnance'); }} /><TouchControls />
-  </div>;
 }
 
 function TouchControls({ showDash = true }: { showDash?: boolean }) {
@@ -206,12 +116,12 @@ function TouchControls({ showDash = true }: { showDash?: boolean }) {
 
 function PauseOverlay({ open }: { open: (p: Panel) => void }) {
   const canExtract = useGame(s => s.canExtract);
-  return <motion.div className="game-overlay pause-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><div className="pause-card"><span className="eyebrow"><Pause size={14} /> SIGNAL SUSPENDED</span><h2>TAKE A<br /><em>BREATHER.</em></h2><p>Your core is safe. The chaos can wait.</p><button className="primary-button" onClick={() => useGame.getState().setPhase('playing')}>RESUME PROTOCOL <Play size={17} fill="currentColor" /></button><button className="secondary-button" onClick={() => open('settings')}>SYSTEM SETTINGS <SlidersHorizontal size={15} /></button>{canExtract && <button className="secondary-button" onClick={() => engine.extract()}>EXTRACT & BANK CREDITS <ArrowUpRight size={14} /></button>}<button className="text-button" onClick={() => { engine.publish(); useGame.getState().saveRun(engine.score, engine.kills, false, engine.salvage); }}>END RUN <ArrowUpRight size={13} /></button><small>PRESS ESC TO RESUME</small></div></motion.div>;
+  return <motion.div className="game-overlay pause-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><div className="pause-card"><span className="eyebrow"><Pause size={14} /> SIGNAL SUSPENDED</span><h2>Paused.</h2><p>Enemies and mission timers are paused.</p><button className="primary-button" onClick={() => useGame.getState().setPhase('playing')}>RESUME PROTOCOL <Play size={17} fill="currentColor" /></button><button className="secondary-button" onClick={() => open('settings')}>SYSTEM SETTINGS <SlidersHorizontal size={15} /></button>{canExtract && <button className="secondary-button" onClick={() => engine.extract()}>EXTRACT & BANK CREDITS <ArrowUpRight size={14} /></button>}<button className="text-button" onClick={() => { engine.publish(); useGame.getState().saveRun(engine.score, engine.kills, false, engine.salvage); }}>END RUN <ArrowUpRight size={13} /></button><button className="secondary-button" onClick={() => open('controls')}>VISUAL FLIGHT MANUAL <Crosshair size={15} /></button><small>PRESS ESC TO RESUME</small></div></motion.div>;
 }
 
 function ResultOverlay({ start, open }: { start: () => void; open: (p: Panel) => void }) {
   const s = useGame(), won = s.phase === 'won';
-  return <motion.div className="game-overlay result-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><div className="result-card"><span className="result-symbol">{won ? <Trophy size={40} /> : <Hexagon size={40} />}</span><span className="eyebrow">{won ? 'EXTRACTION SUCCESSFUL' : 'CORE CONNECTION TERMINATED'}</span><h2>{won ? <>PROTOCOL<br /><em>BROKEN.</em></> : <>DEATH IS<br /><em>JUST DATA.</em></>}</h2><p>{won ? 'You rewrote the rules. The vortex remembers.' : 'Every run makes you stronger. Deploy again.'}</p><div className="result-stats"><div><span>FINAL SCORE</span><strong>{number(s.score)}</strong></div><div><span>SURVIVED</span><strong>{time(s.time)}</strong></div><div><span>ELIMINATED</span><strong>{number(s.kills)}</strong></div></div><div className="result-extra"><span>PEAK CHAIN <strong>×{Math.floor(s.peakCombo)}</strong></span><span>ELITES <strong>{s.elites}</strong></span><span>SALVAGE <strong>{s.salvage} CR</strong></span><span>RESCUED <strong>{s.rescued}</strong></span><span>MISSIONS <strong>{s.missionsCompleted}</strong></span><span>SENTINELS <strong>{s.sentinels}</strong></span><span>FRONTS <strong>{s.chapter}</strong></span></div><div className="credits-earned"><Cpu size={18} /><span>CORE CREDITS EARNED</span><strong>+{s.earned} CR</strong></div><button className="primary-button" onClick={start}>DEPLOY AGAIN <RotateCcw size={18} /></button><div className="result-actions"><button className="secondary-button" onClick={() => open('core')}>UPGRADE CORE <ArrowUpRight size={14} /></button><button className="secondary-button" onClick={() => s.setPhase('menu')}>COMMAND CENTER <ArrowRight size={14} /></button></div></div></motion.div>;
+  return <motion.div className="game-overlay result-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><div className="result-card"><span className="result-symbol">{won ? <Trophy size={40} /> : <Hexagon size={40} />}</span><span className="eyebrow">{won ? 'EXTRACTION SUCCESSFUL' : 'CORE CONNECTION TERMINATED'}</span><h2>{won ? <>Extracted.</> : <>Run ended.</>}</h2><p>{won ? 'Credits banked. Choose your next deployment.' : 'Upgrade your core or try another ship.'}</p><div className="result-stats"><div><span>FINAL SCORE</span><strong>{number(s.score)}</strong></div><div><span>SURVIVED</span><strong>{time(s.time)}</strong></div><div><span>ELIMINATED</span><strong>{number(s.kills)}</strong></div></div><details className="result-detail"><summary>RUN DETAILS</summary><div className="result-extra"><span>PEAK CHAIN <strong>×{Math.floor(s.peakCombo)}</strong></span><span>ELITES <strong>{s.elites}</strong></span><span>SALVAGE <strong>{s.salvage} CR</strong></span><span>RESCUED <strong>{s.rescued}</strong></span><span>MISSIONS <strong>{s.missionsCompleted}</strong></span><span>SENTINELS <strong>{s.sentinels}</strong></span><span>FRONTS <strong>{s.chapter}</strong></span></div></details><div className="credits-earned"><Cpu size={18} /><span>CORE CREDITS EARNED</span><strong>+{s.earned} CR</strong></div><button className="primary-button" onClick={start}>DEPLOY AGAIN <RotateCcw size={18} /></button><button className="secondary-button result-ship-button" onClick={() => open('ships')}>CHOOSE NEXT SHIP <ArrowUpRight size={14} /></button><div className="result-actions"><button className="secondary-button" onClick={() => open('core')}>UPGRADE CORE <ArrowUpRight size={14} /></button><button className="secondary-button" onClick={() => s.setPhase('menu')}>COMMAND CENTER <ArrowRight size={14} /></button></div></div></motion.div>;
 }
 
 export default function GameShell() {
@@ -232,17 +142,19 @@ export default function GameShell() {
     engine.input.keys.clear(); engine.input.moveX = 0; engine.input.moveZ = 0; engine.input.aiming = false;
     setIntelOpen(true);
   };
-  useEffect(() => { if (!compact && intelOpen) closeIntel(); }, [compact, intelOpen, closeIntel]);
+  const previousCompact = useRef(compact);
+  useEffect(() => { if (previousCompact.current !== compact && intelOpen) closeIntel(); previousCompact.current = compact; }, [compact, intelOpen, closeIntel]);
+  useEffect(() => { const key = (e: KeyboardEvent) => { if(e.code !== 'KeyT' || e.repeat || e.ctrlKey || e.altKey || e.metaKey || e.target instanceof HTMLElement && e.target.closest('input,textarea,select,dialog'))return; if(useGame.getState().phase==='playing'||useGame.getState().phase==='paused'){e.preventDefault();if(intelOpen)closeIntel();else openIntel()} }; window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key); }, [intelOpen,closeIntel]);
   useEffect(() => { if (phase !== 'paused' && intelOpen) { setIntelOpen(false); intelPaused.current = false; } }, [phase, intelOpen]);
-  const intelHelp = () => { setIntelOpen(false); intelPaused.current = false; setPanel('ordnance'); };
+  const intelHelp = () => { if (useGame.getState().phase === 'playing') useGame.getState().setPhase('paused'); setIntelOpen(false); intelPaused.current = false; setPanel('ordnance'); };
   const closePanel = useRef(() => setPanel(null));
   useEffect(() => { useGame.getState().hydrate(); return () => audio.stopMusic(); }, []);
   useEffect(() => { audio.setEnabled(sound); }, [sound]);
   useEffect(() => { if (phase === 'playing') audio.startMusic(); else audio.stopMusic(); }, [phase]);
   const start = () => { setPanel(null); void audio.unlock().catch(() => { useGame.setState({ sound: false }); }); useGame.getState().start(); };
   return <MotionConfig reducedMotion={reducedEffects ? 'always' : 'user'}><div className={`app-shell ${phase === 'menu' ? 'is-menu' : 'is-game'} ${reducedEffects ? 'reduced-effects' : ''}`}>
-    <div className="arena-canvas"><ArenaBoundary><Arena /></ArenaBoundary></div>
-    <AnimatePresence mode="wait">{phase === 'menu' ? <Menu key="menu" open={setPanel} start={start} /> : <motion.div key="game" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="game-interface">{compact ? <MobileHUD intelOpen={intelOpen} onIntelOpen={openIntel} onIntelClose={closeIntel} onHelp={intelHelp} movement={<TouchControls showDash={false} />} /> : <HUD open={setPanel} />}<AnimatePresence>{phase === 'paused' && !intelOpen && <PauseOverlay key="pause" open={setPanel} />}{(phase === 'dead' || phase === 'won') && <ResultOverlay key="result" start={start} open={setPanel} />}</AnimatePresence></motion.div>}</AnimatePresence>
+    <div className="arena-canvas"><ArenaBoundary>{(phase !== 'menu' || !compact) && <Arena />}</ArenaBoundary></div>
+    <AnimatePresence mode="wait">{phase === 'menu' ? <LaunchMenu key="menu" open={setPanel} start={start} /> : <motion.div key="game" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="game-interface">{compact ? <MobileHUD resumeOnClose={intelPaused.current} intelOpen={intelOpen} onIntelOpen={openIntel} onIntelClose={closeIntel} onHelp={intelHelp} movement={<TouchControls showDash={false} />} /> : <FlightHUD resumeOnClose={intelPaused.current} intelOpen={intelOpen} onIntelOpen={openIntel} onIntelClose={closeIntel} onHelp={intelHelp} />}<AnimatePresence>{phase === 'paused' && !intelOpen && <PauseOverlay key="pause" open={setPanel} />}{(phase === 'dead' || phase === 'won') && <ResultOverlay key="result" start={start} open={setPanel} />}</AnimatePresence></motion.div>}</AnimatePresence>
     <AnimatePresence>{panel && <Modal key={panel} panel={panel} close={closePanel.current} />}</AnimatePresence>
   </div></MotionConfig>;
 }

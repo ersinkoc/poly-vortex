@@ -6,10 +6,11 @@ import { useGame } from '@/game/store';
 import { LAUNCHER_COPY, ROCKET_RULES } from '@/game/launcher';
 
 const targets = ['CHASER', 'ORBITER', 'GOLIATH', 'SENTINEL'];
-export default function RocketControl({ onHelp }: { onHelp: () => void }) {
+export default function RocketControl({ onHelp, compact = false }: { onHelp: () => void; compact?: boolean }) {
   const s = useGame(), ready = s.rocketReady && s.phase === 'playing', pending = s.rocketPending > 0;
   const copy = LAUNCHER_COPY[s.launcherStatus];
   const progress = pending ? 1 - s.rocketPending / ROCKET_RULES.intentWindow : s.rocketCooldown > 0 ? 1 - s.rocketCooldown / ROCKET_RULES.cooldown : s.rocketLock?.alignment ?? 0;
+  if(compact)return <aside className="rocket-compact launcher-panel" onPointerLeave={() => { engine.input.aiming = false; }} aria-label="Hellion rocket launcher"><button aria-label="Launch rocket" disabled={s.phase!=='playing'} className={ready?'ready':''} title={copy.hint} onClick={()=>engine.requestRocket()}><Rocket size={22}/><span><strong>ROCKET {s.rocketAmmo}/{s.rocketCapacity}</strong><small>{pending?'ALIGNING':s.rocketCooldown>0?`${s.rocketCooldown.toFixed(1)}s`:copy.title}</small></span><kbd>E</kbd></button><button className="rocket-compact-help" aria-label="How rockets work" onClick={onHelp}><CircleHelp size={16}/></button>{s.rocketNoticeTime>0&&<div className={`flight-alert ${s.rocketNoticeKind}`} role="status" aria-live="polite">{s.rocketNotice}</div>}</aside>;
   return <aside className={`rocket-control launcher-panel ${pending ? 'queued' : ''}`} aria-label="Hellion rocket launcher" onPointerLeave={() => { engine.input.aiming = false; }}>
     <div className="launcher-help-row"><span>MANUAL ORDNANCE</span><button aria-label="How rockets work" title="Rocket controls and reload guide" onClick={onHelp}><CircleHelp size={12} /><span>HELP</span></button></div>
     <button className={`launcher-fire ${ready ? 'ready' : ''}`} disabled={s.phase !== 'playing'} aria-label="Launch rocket" aria-describedby="launcher-hint" onClick={() => engine.requestRocket()}>

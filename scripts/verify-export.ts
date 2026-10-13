@@ -3,6 +3,10 @@ import { resolve } from 'node:path';
 
 const site = resolve(import.meta.dir, '../out');
 const required = ['index.html', 'hangar/index.html', '404.html', 'CNAME', '.nojekyll'];
+for (const ship of ['vector', 'wraith', 'aegis']) {
+  const photo = new Uint8Array(await Bun.file(resolve(site, `ships/${ship}.jpg`)).arrayBuffer());
+  if(photo.length < 1000 || photo[0] !== 255 || photo[1] !== 216) throw new Error(`Missing or invalid local ${ship} portrait`);
+}
 for (const path of required) await access(resolve(site, path));
 const cname = (await Bun.file(resolve(site, 'CNAME')).text()).trim();
 if (cname !== 'poly-vortex.oxog.dev') throw new Error(`Unexpected custom domain: ${cname}`);

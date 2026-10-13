@@ -19,11 +19,11 @@ import NavigationSignals from './navigation-signals';
 
 const clock = (seconds: number) => `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${Math.floor(seconds % 60).toString().padStart(2, '0')}`;
 
-function TacticalSheet({ onClose, onHelp }: { onClose: () => void; onHelp: () => void }) {
+export function TacticalSheet({ onClose, onHelp, resumeOnClose = true }: { onClose: () => void; onHelp: () => void; resumeOnClose?: boolean }) {
   const s = useGame(), dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => { const el = dialog.current; el?.showModal(); return () => { el?.close(); }; }, []);
   return <dialog ref={dialog} className="mobile-tactical-sheet" id="mobile-tactical-sheet" aria-labelledby="mobile-tactical-title"
-    onCancel={e => { e.preventDefault(); onClose(); }} onKeyDown={e => { e.stopPropagation(); }}
+    onCancel={e => { e.preventDefault(); onClose(); }} onKeyDown={e => { e.stopPropagation(); if(e.code==='KeyT'){e.preventDefault();onClose()} }}
     onClick={e => { if (e.target === e.currentTarget) { const r = e.currentTarget.getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) onClose(); } }}>
     <header><div><span>FLIGHT PAUSED · LIVE TELEMETRY</span><h2 id="mobile-tactical-title">Tactical overview</h2></div><button onClick={onClose} aria-label="Close tactical overview"><X size={21} /></button></header>
     <div className="mobile-intel-scroll">
@@ -34,11 +34,11 @@ function TacticalSheet({ onClose, onHelp }: { onClose: () => void; onHelp: () =>
       <section className="mobile-ordnance-summary" aria-label="Rocket launcher details"><h3>HELLION ROCKETS · {s.rocketAmmo}/{s.rocketCapacity}</h3><p>Tap the rocket button to fire at a clear target within 23m. A queued shot waits for alignment. Blue crates restore up to three rounds.</p><p>{s.rocketNoticeTime > 0 ? s.rocketNotice : 'No passive ammunition refill.'}</p><button onClick={onHelp}>ROCKET FLIGHT MANUAL <Rocket size={16} /></button></section>
       <div className="mobile-intel-footnote">{s.rescued} RESCUED · {s.missionsCompleted} OPERATIONS · {s.salvage} SALVAGE<br />{s.repair > 0 ? `REPAIR ${s.repair.toFixed(1)}s · ` : ''}{s.overdrive > 0 ? `OVERDRIVE ${s.overdrive.toFixed(1)}s · ` : ''}SECTOR {s.sector + 1} · {s.fps} FPS</div>
     </div>
-    <footer><button onClick={onClose}>CLOSE & RESUME <Wind size={17} /></button></footer>
+    <footer><button onClick={onClose}>{resumeOnClose ? 'CLOSE & RESUME' : 'RETURN TO PAUSE'} <Wind size={17} /></button></footer>
   </dialog>;
 }
 
-export default function MobileHUD({ intelOpen, onIntelOpen, onIntelClose, onHelp, movement }: { intelOpen: boolean; onIntelOpen: () => void; onIntelClose: () => void; onHelp: () => void; movement: ReactNode }) {
+export default function MobileHUD({ intelOpen, onIntelOpen, onIntelClose, onHelp, movement, resumeOnClose = true }: { intelOpen: boolean; onIntelOpen: () => void; onIntelClose: () => void; onHelp: () => void; movement: ReactNode; resumeOnClose?: boolean }) {
   const s = useGame(), playable = s.phase === 'playing', boss = engine.enemies.find(e => e.kind === 3 && e.hp > 0);
   const toggle = useRef<HTMLButtonElement>(null), wasOpen = useRef(false);
   useEffect(() => { if (wasOpen.current && !intelOpen) toggle.current?.focus(); wasOpen.current = intelOpen; }, [intelOpen]);
@@ -62,6 +62,6 @@ export default function MobileHUD({ intelOpen, onIntelOpen, onIntelClose, onHelp
       <button className={`mobile-action surge ${s.surge >= 100 ? 'ready' : ''}`} aria-label="Activate Vortex Surge" disabled={!playable || s.surge < 100} onClick={() => { engine.input.surge = true; }}><Zap size={22} /><span>{s.surge >= 100 ? 'EMP' : `${Math.floor(s.surge)}%`}</span></button>
     </div>
     <div className="mobile-xp"><span>LV {s.level}</span><i><b style={{ width: `${Math.min(100, s.xp / s.nextXp * 100)}%` }} /></i></div>
-    {intelOpen && <TacticalSheet onClose={onIntelClose} onHelp={onHelp} />}
+    {intelOpen && <TacticalSheet onClose={onIntelClose} onHelp={onHelp} resumeOnClose={resumeOnClose} />}
   </div>;
 }

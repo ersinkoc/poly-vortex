@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import './command-center.css';
 import './expedition.css';
 import './charges.css';
 import './rovers.css';
