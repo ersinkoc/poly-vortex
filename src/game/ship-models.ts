@@ -151,9 +151,8 @@ export function buildGroundRover(): ShipModel {
   b.plate('armor', [[-0.3, 0.57], [-0.35, 0.35], [-0.31, -0.54], [0.31, -0.54], [0.35, 0.35], [0.3, 0.57]], 0.045, 0.29);
   b.box('metal', [0.6, 0.075, 0.1], [0, 0.15, 0.61], [0, 0, 0], 0.018);
   b.cylinder('metal', 0.065, 0.065, 0.28, [0, 0.4, -0.16], [0, 0, 0], 10);
-  b.box('hull', [0.25, 0.15, 0.3], [0, 0.55, -0.16], [0, 0, 0], 0.035);
-  b.box('glass', [0.19, 0.07, 0.022], [0, 0.565, 0.0], [0, 0, 0], 0.008);
-  b.box('signal', [0.15, 0.026, 0.025], [0, 0.565, 0.015], [0, 0, 0], 0.006);
+  b.cylinder('hull', 0.12, 0.15, 0.075, [0, 0.5, -0.16], [0, 0, 0], 12);
+  b.box('glass', [0.16, 0.055, 0.018], [0, 0.28, 0.57], [0, 0, 0], 0.005);
   b.box('engine', [0.3, 0.028, 0.24], [0, 0.332, 0.24], [0, 0, 0], 0.008);
   b.vents([0, 0.325, -0.36], 0.25, 3, 0.055);
   for (const side of [-1, 1]) {
@@ -179,6 +178,19 @@ export function buildRoverWheels() {
   if (!tire) throw new Error('Could not merge rover tire');
   const hub = new THREE.CylinderGeometry(0.12, 0.12, 0.182, 12).rotateZ(Math.PI / 2);
   tire.computeBoundingSphere(); hub.computeBoundingSphere(); return { tire, hub };
+}
+
+export function buildRoverRadar() {
+  const b = new ShipBuilder();
+  // Compact rotating phased-array head; coordinates are local to its roof bearing.
+  b.box('metal', [0.48, 0.085, 0.28], [0, 0.045, 0], [-0.32, 0, 0], 0.025);
+  for (let i = 0; i < 7; i++) b.box('metal', [0.018, 0.025, 0.25], [(i - 3) * 0.055, 0.09, 0], [-0.32, 0, 0], 0);
+  b.box('signal', [0.4, 0.015, 0.018], [0, 0.1, 0.115], [-0.32, 0, 0], 0.004);
+  b.cylinder('metal', 0.012, 0.012, 0.16, [0, 0.12, -0.08], [0, 0, 0], 6);
+  b.add('signal', new THREE.SphereGeometry(0.024, 6, 4), [0, 0.2, -0.08]);
+  const model = b.finish();
+  for (const surface of ['hull', 'armor', 'glass', 'engine'] as const) model[surface].dispose();
+  return { dish: model.metal, signal: model.signal };
 }
 
 export function buildDroneRotor(): THREE.BufferGeometry {

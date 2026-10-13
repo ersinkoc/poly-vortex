@@ -45,6 +45,14 @@ The custom domain is `poly-vortex.oxog.dev`, configured in `public/CNAME` and Gi
 
 Collect cyan XP prisms. A compact side reel automatically installs one randomized common, rare, or overclocked upgrade without pausing combat. Mix pulse lasers, escort drones, cryo-singularities, and Tesla arcs. At three minutes the Vortex Sentinel arrives. Classic extracts immediately on its defeat; Expedition opens a service and extraction window, then continues into another front. Standard and Overdrive difficulties are available. Every run awards core credits, saved in browser local storage, for permanent armor, damage, and speed upgrades. There are no accounts or server dependencies.
 
+## Rover radar minefields — 1.25.0
+
+Four-wheel rovers now carry independently rotating procedural phased-array radar heads. Once parked, each projects a terrain-conforming holographic hex field: a solid inner 1.6m sensor boundary and a faint dashed outer 4.2m blast boundary. The small center arc shows remaining parked lifetime, then the short detonation fuse. Cyan means armed, amber marks a radar contact, and red means primed.
+
+The 3.6-second radar sweep registers live hostiles within blast reach and line of sight, leaves up to four fading diamond echoes per rover, follows their positions and immediately removes dead, out-of-range or stone-occluded contacts. Swept intervals cover low frame rates. Radar reads simulation age, so pause/hit-stop freeze both heads and echoes. It is reconnaissance feedback: existing launch, trigger, explosion damage, core/pilot protection and combat RNG are preserved.
+
+The field pool has one draw call and fewer than 11,000 vertices across all twelve rover slots. Ground samples update only when parked positions change; radar heads, lamps and contact marks are instanced. Reduced-effects mode keeps the range/state/countdown information while suppressing rotating heads and ground sweeps. All geometry, shader patterns and signals are local; no extra mobile panel is added.
+
 ## Sentinel balance — 1.24.0
 
 Sentinel health snapshots the installed arsenal, damage, critical chance, firing haste and surviving escort count at arrival, with a minimum hull and ordnance reserve. Later upgrades do not rescale an existing boss. Temporary Overdrive pickups still give a real advantage; Overdrive difficulty and later expedition fronts raise the encounter budget.
