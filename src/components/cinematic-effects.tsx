@@ -8,6 +8,7 @@ import { engine, LIMITS } from '@/game/engine';
 import { useGame } from '@/game/store';
 import { terrainHeight } from '@/game/terrain';
 import { buildVfxTextures, DESTRUCTION, visualNoise, VISUAL_LIMITS, wreckFragment } from '@/game/visuals';
+import { explosionFireFragment, explosionSmokeFragment, explosionVertex } from '@/game/explosion-shaders';
 import { DAMAGE_LIMITS, DamageTrail, damageHeat, hullDamage } from '@/game/ship-damage';
 
 const pose = new THREE.Object3D(), tint = new THREE.Color();
@@ -43,75 +44,98 @@ function flush(mesh: THREE.InstancedMesh | null, count: number, pool?: ReturnTyp
   if (!mesh) return; mesh.count = count; mesh.instanceMatrix.needsUpdate = true; if (pool) pool.fx.needsUpdate = true;
 }
 
+function explosionPool(capacity: number) {
+  const pool = spritePool(capacity);
+  const evolution = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 4), 4).setUsage(THREE.DynamicDrawUsage);
+  pool.geometry.setAttribute('aEvolution', evolution); return { ...pool, evolution };
+}
+function setExplosion(mesh: THREE.InstancedMesh, pool: ReturnType<typeof explosionPool>, index: number, alpha: number, age: number, seed: number, mode: number) {
+  pool.evolution.setXYZW(index, age, seed, mode, 0); setSprite(mesh, pool, index, tint, alpha);
+}
+
 function Explosions({ maps }: { maps: ReturnType<typeof buildVfxTextures> }) {
   const quality = useGame(s => s.quality);
   const fire = useRef<THREE.InstancedMesh>(null), smoke = useRef<THREE.InstancedMesh>(null), debris = useRef<THREE.InstancedMesh>(null), scars = useRef<THREE.InstancedMesh>(null);
   const lights = useRef<(THREE.PointLight | null)[]>([]);
   const aftermath = useRef({ phase: useGame.getState().phase, time: 0 });
-  const assets = useMemo(() => ({ fire: spritePool(VISUAL_LIMITS.puffs), smoke: spritePool(VISUAL_LIMITS.puffs), scars: spritePool(VISUAL_LIMITS.scorches), fireUniforms: { uMap: { value: maps.fire } }, smokeUniforms: { uMap: { value: maps.smoke } }, scarUniforms: { uMap: { value: maps.scorch } } }), [maps]);
+  const assets = useMemo(() => ({ fire: explosionPool(VISUAL_LIMITS.puffs), smoke: explosionPool(VISUAL_LIMITS.puffs), scars: spritePool(VISUAL_LIMITS.scorches), fireUniforms: { uMap: { value: maps.glow }, uNoise: { value: maps.volume }, uSamples: { value: 8 } }, smokeUniforms: { uNoise: { value: maps.volume } }, scarUniforms: { uMap: { value: maps.scorch } } }), [maps]);
   useEffect(() => () => { assets.fire.geometry.dispose(); assets.smoke.geometry.dispose(); assets.scars.geometry.dispose(); }, [assets]);
   useFrame(({ camera }, delta) => {
     const s = useGame.getState(), active = s.phase !== 'menu', high = s.quality === 'high', calm = s.reducedEffects;
     if (aftermath.current.phase !== s.phase) { aftermath.current.phase = s.phase; aftermath.current.time = 0; }
-    // Finish destruction after a run ends without advancing enemies or gameplay timers.
     if (s.phase === 'dead' || s.phase === 'won') aftermath.current.time += Math.min(delta, 0.1);
-    const endTime = aftermath.current.time;
+    const endTime = aftermath.current.time; assets.fireUniforms.uSamples.value = high ? 8 : 6;
     let f = 0, m = 0, d = 0, c = 0, lightCount = 0;
-    if (active && fire.current && smoke.current && debris.current) for (const b of engine.blasts) {
-      if (Math.hypot(b.x - engine.player.x, b.z - engine.player.z) > 28) continue;
+    // New impacts receive available slots before lingering smoke and embers.
+    if (active && fire.current && smoke.current && debris.current) for (let i = engine.blasts.length - 1; i >= 0; i--) {
+      const b = engine.blasts[i]; if (Math.hypot(b.x - engine.player.x, b.z - engine.player.z) > 28) continue;
       const age = b.age + endTime, seed = b.id * 17, floor = terrainHeight(b.x, b.z), height = b.y ?? floor + 0.7;
       if (age >= (b.energy ? 2.4 : DESTRUCTION.life)) continue;
-      if (age < 0.7) for (let j = 0; j < (high ? 4 : 2) && f < VISUAL_LIMITS.puffs; j++) {
-        const a = j * 2.399 + visualNoise(seed, j) * 2, r = age * b.size * (0.3 + j * 0.12);
-        pose.position.set(b.x + Math.cos(a) * r, height + age * b.size * (0.9 + j * 0.15), b.z + Math.sin(a) * r);
-        pose.quaternion.copy(camera.quaternion); pose.scale.setScalar(b.size * (0.5 + age * 1.9) * (j ? 0.8 : 1.2));
-        tint.set(j === 0 ? b.energy ? '#d5f5ff' : '#fff1be' : b.color).multiplyScalar(calm ? 0.8 : j === 0 ? 4 : 2.1);
-        const alpha = Math.min(1, age * 30 + 0.15) * Math.max(0, 1 - age / 0.7) ** 1.6 * (calm ? 0.45 : 0.8);
-        setSprite(fire.current, assets.fire, f++, tint, alpha);
+      if (age < (b.energy ? 0.7 : 0.12) && f < VISUAL_LIMITS.puffs) {
+        pose.position.set(b.x, height, b.z); pose.quaternion.copy(camera.quaternion); pose.scale.setScalar(b.size * (0.55 + age * 3));
+        tint.set(b.energy ? b.color : '#fff4cd').multiplyScalar(calm ? 1 : 3.2);
+        setExplosion(fire.current, assets.fire, f++, Math.max(0, 1 - age / (b.energy ? 0.7 : 0.12)) * (calm ? 0.4 : 0.9), age, seed, 2);
       }
-      if (!b.energy && age < DESTRUCTION.fireLife) for (let j = 0; j < (high ? 3 : 1) && f < VISUAL_LIMITS.puffs; j++) {
-        const a = j * 2.399 + visualNoise(seed, j + 90) * 2, spread = b.size * 0.35;
-        const flicker = calm ? 1 : 0.8 + 0.2 * Math.sin(age * 23 + seed + j * 4);
-        const settling = Math.max(floor + 0.12, height - age * age * 2), decay = Math.max(0, 1 - age / DESTRUCTION.fireLife);
-        pose.position.set(b.x + Math.cos(a) * spread, settling + b.size * 0.3 * decay, b.z + Math.sin(a) * spread);
-        pose.quaternion.copy(camera.quaternion); pose.rotateZ(Math.sin(age * 5 + j) * 0.1);
-        pose.scale.set(b.size * 0.55 * flicker * decay, b.size * (0.8 + flicker * 0.35) * decay, 1);
-        tint.set(j === 0 ? '#ffbd55' : '#ff5b1c').multiplyScalar(calm ? 1.2 : 3);
-        setSprite(fire.current, assets.fire, f++, tint, Math.min(1, age * 8) * decay * (calm ? 0.35 : 0.65));
+      if (!b.energy && age < 0.95) for (let j = 0; j < (high ? 3 : 2) && f < VISUAL_LIMITS.puffs; j++) {
+        const a = j * 2.399 + visualNoise(seed, j) * 2, spread = Math.sqrt(Math.max(0, age)) * b.size * (0.16 + j * 0.08);
+        pose.position.set(b.x + Math.cos(a) * spread, height + age * b.size * (0.55 + j * 0.1), b.z + Math.sin(a) * spread);
+        pose.quaternion.copy(camera.quaternion); pose.rotateZ(a * 0.3);
+        pose.scale.setScalar(b.size * (0.55 + Math.sqrt(age) * 0.85) * (j ? 0.75 : 1));
+        tint.set('#ffffff');
+        setExplosion(fire.current, assets.fire, f++, Math.min(1, age * 25 + 0.2) * Math.max(0, 1 - age / 0.95) * (calm ? 0.45 : 0.85), age, seed + j * 3.1, 0);
       }
-      if (!b.energy) for (let j = 0; j < (high ? 6 : 2) && m < VISUAL_LIMITS.puffs; j++) {
-        const delay = j * 0.1, t = Math.max(0, age - delay);
-        const a = j * 2.399 + visualNoise(seed, j + 10), drift = t * b.size * (0.12 + visualNoise(seed, j + 20) * 0.2);
-        pose.position.set(b.x + Math.cos(a) * drift + t * 0.12, height + t * b.size * (0.4 + j * 0.055), b.z + Math.sin(a) * drift);
-        pose.quaternion.copy(camera.quaternion); pose.rotateZ(visualNoise(seed, j + 30) * 6 + t * 0.15);
-        pose.scale.setScalar(b.size * (0.5 + t * 0.65) * (0.75 + visualNoise(seed, j + 40) * 0.5));
-        tint.set(t < 0.5 ? '#302b28' : '#43494d').multiplyScalar(0.65 + j * 0.04);
-        setSprite(smoke.current, assets.smoke, m++, tint, Math.min(0.4, t * 2) * Math.max(0, 1 - age / DESTRUCTION.smokeLife) * (calm ? 0.45 : 1));
+      if (!b.energy && age < DESTRUCTION.fireLife) for (let j = 0; j < (high ? 2 : 1) && f < VISUAL_LIMITS.puffs; j++) {
+        const a = j * 2.399 + visualNoise(seed, j + 90) * 2, spread = b.size * 0.3;
+        const decay = Math.max(0, 1 - age / DESTRUCTION.fireLife), settling = Math.max(floor + 0.12, height - age * age * 2);
+        pose.position.set(b.x + Math.cos(a) * spread, settling + b.size * 0.22 * decay, b.z + Math.sin(a) * spread);
+        pose.quaternion.copy(camera.quaternion); pose.rotateZ(calm ? 0 : Math.sin(age * 4 + j) * 0.12);
+        pose.scale.set(b.size * 0.5 * decay, b.size * 0.9 * decay, 1); tint.set('#ffffff');
+        setExplosion(fire.current, assets.fire, f++, Math.min(1, age * 6) * decay * (calm ? 0.3 : 0.75), age, seed + j * 5, 1);
+      }
+      if (!b.energy) for (let j = 0; j < (high ? 4 : 2) && m < VISUAL_LIMITS.puffs; j++) {
+        const t = Math.max(0, age - j * 0.09), a = j * 2.399 + visualNoise(seed, j + 10);
+        const drift = t * b.size * (0.08 + visualNoise(seed, j + 20) * 0.13);
+        pose.position.set(b.x + Math.cos(a) * drift + t * 0.17, height + t * b.size * (0.32 + j * 0.045), b.z + Math.sin(a) * drift);
+        pose.quaternion.copy(camera.quaternion); pose.rotateZ(visualNoise(seed, j + 30) * 6 + t * 0.1);
+        pose.scale.setScalar(Math.min(6.5, b.size * (0.65 + t * 0.7) * (0.8 + visualNoise(seed, j + 40) * 0.4))); tint.set('#ffffff');
+        setExplosion(smoke.current, assets.smoke, m++, Math.min(0.65, t * 2) * Math.max(0, 1 - age / DESTRUCTION.smokeLife) * (calm ? 0.5 : 1), t, seed + j * 4, 0);
+      }
+      // A short, low pressure front throws soil outwards rather than a neon ring.
+      if (!b.energy && age < 1.2) for (let j = 0; j < (high ? 2 : 1) && m < VISUAL_LIMITS.puffs; j++) {
+        const a = j * Math.PI + seed, spread = b.size * (0.3 + age * 1.9);
+        pose.position.set(b.x + Math.cos(a) * spread, floor + 0.15 + age * 0.2, b.z + Math.sin(a) * spread);
+        pose.quaternion.copy(camera.quaternion); pose.scale.set(b.size * (0.4 + age * 1.3), b.size * (0.14 + age * 0.28), 1); tint.set('#ffffff');
+        setExplosion(smoke.current, assets.smoke, m++, Math.sin(Math.min(1, age / 1.2) * Math.PI) * (calm ? 0.18 : 0.45), age, seed + j * 7, 1);
       }
       if (!b.energy) for (let j = 0; j < (high ? DESTRUCTION.debrisCount : 4) && d < VISUAL_LIMITS.debris; j++) {
         const part = wreckFragment(endTime ? { ...b, age } : b, j, terrainHeight), panel = j % 3 !== 0;
         pose.position.set(part.x, part.y, part.z);
-        pose.rotation.set(part.spin * (3 + j), part.angle + part.spin * 4, part.spin * (j - 3));
-        pose.scale.set(part.size * (panel ? 1.8 : 0.9) * part.fade, part.size * (panel ? 0.12 : 0.7) * part.fade, part.size * part.fade);
-        pose.updateMatrix(); debris.current.setMatrixAt(d, pose.matrix);
-        tint.set(age < 0.6 ? '#ffb578' : j % 3 === 0 ? '#24282c' : '#7d8589'); debris.current.setColorAt(d++, tint);
+        pose.rotation.set(part.spin * (3 + j) * (1 - part.settle), part.angle + part.spin * 4, part.spin * (j - 3) * (1 - part.settle));
+        pose.scale.set(part.size * (panel ? 1.8 : 0.9) * part.fade, part.size * (panel ? 0.12 : 0.7) * part.fade, part.size * part.fade); pose.updateMatrix();
+        debris.current.setMatrixAt(d, pose.matrix); tint.set(j % 3 === 0 ? '#30363a' : '#939c9f'); debris.current.setColorAt(d++, tint);
+        if (high && !calm && j < 3 && age < 1.3 && f < VISUAL_LIMITS.puffs) {
+          pose.quaternion.copy(camera.quaternion); pose.scale.setScalar(part.size * (1 - age / 1.3) * 1.2); tint.set('#ff9e35').multiplyScalar(2.2);
+          setExplosion(fire.current, assets.fire, f++, Math.max(0, 1 - age / 1.3) * 0.8, age, seed, 2);
+        }
       }
-      if (high && !calm && age < 0.45 && lightCount < VISUAL_LIMITS.lights && Math.hypot(b.x - engine.player.x, b.z - engine.player.z) < 18) {
-        const light = lights.current[lightCount++]; if (light) { light.position.set(b.x, height + 0.5, b.z); light.color.set(b.color); light.intensity = (b.energy ? 12 : 32) * b.size * (1 - age / 0.45) ** 2; }
+      if (high && !calm && age < 0.35 && lightCount < VISUAL_LIMITS.lights && Math.hypot(b.x - engine.player.x, b.z - engine.player.z) < 18) {
+        const light = lights.current[lightCount++]; if (light) { light.position.set(b.x, height + 0.5, b.z); light.color.set(b.energy ? b.color : '#ffae5a'); light.intensity = (b.energy ? 12 : 24) * b.size * Math.exp(-age * 12); }
       }
     }
     if (scars.current && active && high) for (const scar of engine.scorches) {
       pose.position.set(scar.x, terrainHeight(scar.x, scar.z) + 0.035, scar.z); pose.rotation.set(-Math.PI / 2, 0, visualNoise(Math.floor(scar.x * 23), Math.floor(scar.z * 17)) * 6); pose.scale.setScalar(scar.size * 2.2);
       tint.set('#101516'); setSprite(scars.current, assets.scars, c++, tint, Math.min(0.8, Math.max(0, (22 - scar.age - endTime) / 6)));
     }
-    flush(fire.current, f, assets.fire); flush(smoke.current, m, assets.smoke); flush(debris.current, d); if (debris.current?.instanceColor) debris.current.instanceColor.needsUpdate = true; flush(scars.current, c, assets.scars);
+    flush(fire.current, f, assets.fire); flush(smoke.current, m, assets.smoke); flush(debris.current, d); flush(scars.current, c, assets.scars);
+    assets.fire.evolution.needsUpdate = true; assets.smoke.evolution.needsUpdate = true;
+    if (debris.current?.instanceColor) debris.current.instanceColor.needsUpdate = true;
     lights.current.forEach((light, i) => { if (light && i >= lightCount) light.intensity = 0; });
   });
   return <>
     <instancedMesh ref={scars} args={[assets.scars.geometry, undefined, VISUAL_LIMITS.scorches]} count={0} frustumCulled={false}><shaderMaterial vertexShader={spriteVertex} fragmentShader={spriteFragment} uniforms={assets.scarUniforms} transparent depthWrite={false} polygonOffset polygonOffsetFactor={-1} toneMapped={false} /></instancedMesh>
-    <instancedMesh ref={fire} args={[assets.fire.geometry, undefined, VISUAL_LIMITS.puffs]} count={0} frustumCulled={false}><shaderMaterial vertexShader={spriteVertex} fragmentShader={spriteFragment} uniforms={assets.fireUniforms} blending={THREE.AdditiveBlending} transparent depthWrite={false} toneMapped={false} /></instancedMesh>
-    <instancedMesh ref={smoke} args={[assets.smoke.geometry, undefined, VISUAL_LIMITS.puffs]} count={0} frustumCulled={false}><shaderMaterial vertexShader={spriteVertex} fragmentShader={spriteFragment} uniforms={assets.smokeUniforms} transparent depthWrite={false} toneMapped={false} /></instancedMesh>
-    <instancedMesh ref={debris} args={[undefined, undefined, VISUAL_LIMITS.debris]} count={0} frustumCulled={false}><boxGeometry args={[1, 1, 1]} /><meshStandardMaterial color="#ffffff" metalness={0.85} roughness={0.38} /></instancedMesh>
+    <instancedMesh ref={fire} args={[assets.fire.geometry, undefined, VISUAL_LIMITS.puffs]} count={0} frustumCulled={false}><shaderMaterial vertexShader={explosionVertex} fragmentShader={explosionFireFragment} uniforms={assets.fireUniforms} transparent depthWrite={false} toneMapped={false} /></instancedMesh>
+    <instancedMesh ref={smoke} args={[assets.smoke.geometry, undefined, VISUAL_LIMITS.puffs]} count={0} frustumCulled={false}><shaderMaterial vertexShader={explosionVertex} fragmentShader={explosionSmokeFragment} uniforms={assets.smokeUniforms} transparent depthWrite={false} toneMapped={false} /></instancedMesh>
+    <instancedMesh ref={debris} args={[undefined, undefined, VISUAL_LIMITS.debris]} count={0} frustumCulled={false}><boxGeometry args={[1, 1, 1]} /><meshStandardMaterial color="#ffffff" metalness={0.78} roughness={0.55} /></instancedMesh>
     {quality === 'high' && Array.from({ length: VISUAL_LIMITS.lights }, (_, i) => <pointLight key={i} ref={node => { lights.current[i] = node; }} intensity={0} distance={10} decay={2} />)}
   </>;
 }

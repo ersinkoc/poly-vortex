@@ -1,5 +1,5 @@
 import { beforeEach, expect, test } from 'bun:test';
-import { buildVfxTextures, DESTRUCTION, rubbleAt, VISUAL_LIMITS, wreckFragment } from '../src/game/visuals';
+import { buildVfxTextures, buildVolumeNoise, DESTRUCTION, rubbleAt, VISUAL_LIMITS, wreckFragment } from '../src/game/visuals';
 import { GameEngine } from '../src/game/engine';
 import { useGame } from '../src/game/store';
 import { audio } from '../src/game/audio';
@@ -62,7 +62,7 @@ test('wreckage fragments fall from their actual altitude, bounce and settle with
     for (let i = 0; i <= 60; i++) {
       const p = wreckFragment({ ...b, age: i / 10 }, j, ground); expect(Object.values(p).every(Number.isFinite)).toBe(true); expect(p.y).toBeGreaterThanOrEqual(0.29 - 1e-8);
     }
-    const rest = wreckFragment({ ...b, age: 5 }, j, ground); expect(rest.y).toBeCloseTo(0.29, 8); expect(rest.spin).toBeLessThan(5);
+    const rest = wreckFragment({ ...b, age: 5 }, j, ground); expect(rest.y).toBeCloseTo(0.2 + Math.max(0.09, rest.size * (j % 3 ? 0.12 : 0.7) / 2), 8); expect(rest.spin).toBeLessThan(5);
     expect(wreckFragment({ ...b, age: 6 }, j, ground).fade).toBe(0);
   }
 });
@@ -71,4 +71,23 @@ test('a lethal core hit emits exactly one physical wreck without duplicate run r
   game.player.invulnerable = 0; game.shield = 0; game.hurt(10000);
   expect(useGame.getState().phase).toBe('dead'); expect(game.blasts).toHaveLength(1); expect(game.blasts[0].energy).toBe(false);
   const runs = useGame.getState().profile.runs; game.hurt(10000); expect(game.blasts).toHaveLength(1); expect(useGame.getState().profile.runs).toBe(runs);
+});
+
+test('large blast radii cannot create oversized chassis cubes and settled panels lie flat', () => {
+  const b = { id: 8, x: 0, y: 1, z: 0, age: 5, size: 4.5, color: '#ffab65', energy: false };
+  for (let j = 0; j < DESTRUCTION.debrisCount; j++) {
+    const p = wreckFragment(b, j, () => 0);
+    expect(p.size).toBeLessThanOrEqual(0.5); expect(p.settle).toBe(1);
+    expect(p.y).toBeGreaterThanOrEqual(p.size * (j % 3 ? 0.12 : 0.7) / 2);
+  }
+});
+
+test('shared volume density is reproducible, varies across channels and wraps without a hard seam', () => {
+  const a = buildVolumeNoise(64), b = buildVolumeNoise(64);
+  try {
+    const p = a.image.data!; expect(p).toEqual(b.image.data!); expect(a.wrapS).toBe(a.wrapT);
+    expect(new Set(p.filter((_, i) => i % 4 === 0)).size).toBeGreaterThan(80);
+    expect(p.some((v, i) => i % 4 === 0 && v !== p[i + 1])).toBe(true);
+    for (let y = 0; y < 64; y++) for (let c = 0; c < 3; c++) expect(Math.abs(p[(y * 64) * 4 + c] - p[(y * 64 + 63) * 4 + c])).toBeLessThan(40);
+  } finally { a.dispose(); b.dispose(); }
 });
