@@ -12,8 +12,12 @@ import type { DockStatus, RunMode, ServiceDock } from './expedition';
 import { CHARGE_RULES, type GroundCharge } from './ground-charges';
 import { ROVER_RULES } from './ground-rovers';
 import type { DroneTelemetry } from './orbital-drones';
+import { FLIGHTFRAMES, shipId, type ShipId } from './flightframes';
+import type { BudgetLevel } from './render-budget';
 
 type GameStore = {
+  ship: ShipId; activeShip: ShipId; selectShip: (ship: ShipId) => void;
+  adaptiveQuality: boolean; renderBudget: BudgetLevel;
   droneHull: number[];
   droneStatus: DroneTelemetry[];
   roverMoving: number; roverArmed: number; roverNextWave: number; roverWaves: number;
@@ -39,6 +43,8 @@ type GameStore = {
 };
 const save = (profile: Profile) => { try { localStorage.setItem('poly-vortex-profile-v1', JSON.stringify(profile)); } catch { /* Storage can be unavailable in private browsing. */ } };
 export const useGame = create<GameStore>((set, get) => ({
+  ship: 'vector', activeShip: 'vector', adaptiveQuality: true, renderBudget: 0,
+  selectShip: ship => { if (get().phase === 'menu' || get().phase === 'dead' || get().phase === 'won') set({ ship: shipId(ship) }); },
   droneHull: [],
   droneStatus: [],
   roverMoving: 0, roverArmed: 0, roverNextWave: ROVER_RULES.first, roverWaves: 0,
@@ -61,12 +67,14 @@ export const useGame = create<GameStore>((set, get) => ({
     if (phase === 'paused' && current !== 'playing' || phase === 'playing' && current !== 'paused') return;
     set({ phase });
   },
-  start: () => set(s => ({ phase: 'playing', runId: s.runId + 1, time: 0, earned: 0, reward: null, rewardQueued: 0, hp: 100 + s.profile.upgrades.armor * 15, maxHp: 100 + s.profile.upgrades.armor * 15 })),
+  start: () => set(s => ({ phase: 'playing', activeShip: s.ship, runId: s.runId + 1, time: 0, earned: 0, reward: null, rewardQueued: 0, hp: FLIGHTFRAMES[s.ship].hull + s.profile.upgrades.armor * 15, maxHp: FLIGHTFRAMES[s.ship].hull + s.profile.upgrades.armor * 15 })),
   hydrate: () => {
     const prefersCalm = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
     try {
       const settings = JSON.parse(localStorage.getItem('poly-vortex-settings-v1') || 'null');
       if (settings && typeof settings === 'object') set({
+        ship: shipId(settings.ship),
+        adaptiveQuality: typeof settings.adaptiveQuality === 'boolean' ? settings.adaptiveQuality : true,
         runMode: settings.runMode === 'classic' ? 'classic' : 'expedition',
         sound: typeof settings.sound === 'boolean' ? settings.sound : true,
         quality: settings.quality === 'performance' ? 'performance' : 'high',
@@ -103,6 +111,12 @@ export const useGame = create<GameStore>((set, get) => ({
 }));
 
 useGame.subscribe((s, previous) => {
-  if (s.runMode === previous.runMode && s.sound === previous.sound && s.quality === previous.quality && s.difficulty === previous.difficulty && s.loadout === previous.loadout && s.aimMode === previous.aimMode && s.reducedEffects === previous.reducedEffects) return;
-  try { localStorage.setItem('poly-vortex-settings-v1', JSON.stringify({ runMode: s.runMode, sound: s.sound, quality: s.quality, difficulty: s.difficulty, loadout: s.loadout, aimMode: s.aimMode, reducedEffects: s.reducedEffects })); } catch { /* Preferences are optional when storage is unavailable. */ }
+  if (s.ship === previous.ship && s.adaptiveQuality === previous.adaptiveQuality && s.runMode === previous.runMode && s.sound === previous.sound && s.quality === previous.quality && s.difficulty === previous.difficulty && s.loadout === previous.loadout && s.aimMode === previous.aimMode && s.reducedEffects === previous.reducedEffects) return;
+  const keys = ['ship', 'adaptiveQuality', 'runMode', 'sound', 'quality', 'difficulty', 'loadout', 'aimMode', 'reducedEffects'] as const;
+  const changed = Object.fromEntries(keys.filter(key => s[key] !== previous[key]).map(key => [key, s[key]]));
+  try {
+    let saved: Record<string, unknown> = {};
+    try { const raw = JSON.parse(localStorage.getItem('poly-vortex-settings-v1') || 'null'); if (raw && typeof raw === 'object') saved = raw; } catch { /* Replace corrupt preferences with a valid snapshot. */ }
+    localStorage.setItem('poly-vortex-settings-v1', JSON.stringify({ ship: s.ship, adaptiveQuality: s.adaptiveQuality, runMode: s.runMode, sound: s.sound, quality: s.quality, difficulty: s.difficulty, loadout: s.loadout, aimMode: s.aimMode, reducedEffects: s.reducedEffects, ...saved, ...changed }));
+  } catch { /* Preferences are optional when storage is unavailable. */ }
 });

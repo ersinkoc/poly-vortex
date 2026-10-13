@@ -19,6 +19,7 @@ import { CHARGE_RULES, chargeRemaining, type GroundCharge } from './ground-charg
 import { RoverBay, ROVER_RULES, type GroundRover } from './ground-rovers';
 import { coreContact, enemyWeapon, hostileBand, HOSTILE_WEAPONS, rangedMuzzle } from './enemy-weapons';
 import { SENTINEL, sentinelDefense, sentinelHealth } from './sentinel';
+import { FLIGHTFRAMES, type ShipId } from './flightframes';
 import { GOLIATH, goliathMuzzle, goliathRadial } from './goliath-ai';
 import type { Arc, Bolt, Cache, DamageText, Entity, Gem, Hazard, Input, Particle, Rocket, Shockwave, Supply, Upgrade, UpgradeId, Vortex, WeaponId } from './types';
 
@@ -42,6 +43,7 @@ const defs: Record<UpgradeId, [string, string]> = {
 };
 
 export class GameEngine {
+  ship: ShipId = 'vector';
   readonly roverBay: RoverBay;
   charges: GroundCharge[] = []; chargeAmmo: number = CHARGE_RULES.capacity; chargeCooldown = 0; chargeNotice = ''; chargeNoticeTime = 0; private chargeUid = 0;
   droneGuns = createDroneGuns();
@@ -104,11 +106,13 @@ export class GameEngine {
     this.rocketPending = 0; this.pendingRocketTarget = 0; this.rocketNotice = ''; this.rocketNoticeTime = 0; this.rocketNoticeKind = 'success';
     this.lastCombatSupply = -25;
     const s = useGame.getState();
+    this.ship = s.activeShip;
+    const frame = FLIGHTFRAMES[this.ship];
     this.runMode = s.runMode; this.chapter = 1; this.sentinels = 0; this.chapterStarted = 0; this.service = null;
     this.player = { x: 0, z: 0, vx: 0, vz: 0, angle: 0, hp: s.maxHp, maxHp: s.maxHp, hullHit: 0, invulnerable: 1.5, dashTime: 0, dashCooldown: 0 };
     this.enemies = []; this.bolts = []; this.particles = []; this.gems = []; this.arcs = []; this.vortices = [];
     this.shockwaves = []; this.damageTexts = []; this.hazards = []; this.supplies = []; this.caches = [];
-    this.shield = 40; this.maxShield = 40; this.surge = 100; this.sector = 0; this.bossPhase = 0; this.peakCombo = 1; this.eliteKills = 0; this.salvage = 0;
+    this.shield = frame.shield; this.maxShield = frame.shield; this.surge = 100; this.sector = 0; this.bossPhase = 0; this.peakCombo = 1; this.eliteKills = 0; this.salvage = 0;
     this.criticalChance = 0.05; this.piercing = 0; this.overdriveTime = 0; this.repairTime = 0; this.shieldDelay = 0; this.hazardTimer = 37; this.supplyTimer = 24; this.repairTimer = SUPPLY_RULES.repair.first;
     this.announcement = ''; this.announcementDetail = ''; this.announcementTime = 0;
     this.weapons = { pulse: 0, glaive: 0, cryo: 0, tesla: 0 }; this.weapons[s.loadout] = 1;
@@ -117,7 +121,7 @@ export class GameEngine {
     this.time = 0; this.xp = 0; this.nextXp = 12; this.level = 1; this.score = 0; this.kills = 0; this.streak = 0; this.combo = 1;
     this.trauma = 0; this.hitFlash = 0; this.hitStop = 0; this.bossSpawned = false;
     this.pulse = { x: 0, z: 0, time: -10 };
-    this.damage = 1 + s.profile.upgrades.reactor * 0.08; this.speed = 1 + s.profile.upgrades.thrusters * 0.06;
+    this.damage = frame.damage * (1 + s.profile.upgrades.reactor * 0.08); this.speed = frame.speed * (1 + s.profile.upgrades.thrusters * 0.06);
     this.magnet = 1; this.haste = 1; this.overdrive = s.difficulty === 'overdrive';
     this.uid = 0; this.spawnTimer = 0; this.shotTimer = 0; this.cryoTimer = 2; this.teslaTimer = 1; this.hudTimer = 0; this.comboTimer = 0;
     this.droneRack.reset(this.weapons.glaive);

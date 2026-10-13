@@ -18,12 +18,15 @@ import { ACHIEVEMENTS } from '@/game/progression';
 import RewardSlot from './reward-slot';
 import TacticalHUD from './tactical-hud';
 import RocketGuide from './rocket-guide';
+import ShipSelector from './ship-selector';
+import { FLIGHTFRAMES } from '@/game/flightframes';
+import { useShipSync } from './use-ship-sync';
 import { WEAPONS, type Profile, type WeaponId } from '@/game/types';
 
 const Arena = dynamic(() => import('./arena'), { ssr: false, loading: () => <div className="arena-loading"><Hexagon size={32} /><span>INITIALIZING THE VORTEX</span><i /></div> });
-type Panel = 'protocol' | 'controls' | 'armory' | 'settings' | 'core' | 'records' | 'ordnance' | null;
+type Panel = 'protocol' | 'controls' | 'armory' | 'ships' | 'settings' | 'core' | 'records' | 'ordnance' | null;
 const weaponIcons = { pulse: Crosshair, glaive: Disc3, cryo: Snowflake, tesla: Zap };
-const panelTitles = { protocol: 'The protocol', controls: 'Know your controls', armory: 'Choose your arsenal', settings: 'System settings', core: 'Core modifications', records: 'Flight record', ordnance: 'Rocket flight manual' };
+const panelTitles = { protocol: 'The protocol', controls: 'Know your controls', armory: 'Choose your arsenal', ships: 'Choose your warship', settings: 'System settings', core: 'Core modifications', records: 'Flight record', ordnance: 'Rocket flight manual' };
 const number = (n: number) => Math.floor(n).toLocaleString('en-US');
 const time = (n: number) => `${Math.floor(n / 60).toString().padStart(2, '0')}:${Math.floor(n % 60).toString().padStart(2, '0')}`;
 
@@ -46,6 +49,7 @@ function Toggle({ active, onClick, label }: { active: boolean; onClick: () => vo
 
 function Menu({ open, start }: { open: (panel: Panel) => void; start: () => void }) {
   const runMode = useGame(s => s.runMode);
+  const ship = useGame(s => s.ship), frame = FLIGHTFRAMES[ship];
   const sound = useGame(s => s.sound), profile = useGame(s => s.profile), difficulty = useGame(s => s.difficulty), loadout = useGame(s => s.loadout);
   const [fullscreen, setFullscreen] = useState(false);
   useEffect(() => { const update = () => setFullscreen(!!document.fullscreenElement); document.addEventListener('fullscreenchange', update); return () => document.removeEventListener('fullscreenchange', update); }, []);
@@ -58,19 +62,19 @@ function Menu({ open, start }: { open: (panel: Panel) => void; start: () => void
     </header>
     <main className="menu-main">
       <div className="hero-copy">
-        <motion.div className="eyebrow" initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}><span className="tiny-cross">+</span> A GEOMETRIC ROGUELITE <span className="version">V.29</span></motion.div>
+        <motion.div className="eyebrow" initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}><span className="tiny-cross">+</span> A GEOMETRIC ROGUELITE <span className="version">V.30</span></motion.div>
         <motion.h1 initial={{ y: 18, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.18, duration: 0.6 }}>SHAPE<br />THE <span className="title-star">✳</span><br /><span>CHAOS.</span></motion.h1>
         <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.28 }}>
           <p className="hero-description">One core. Infinite chaos.<br />Outlast the swarm. Evolve your arsenal.<br /><span>Break the protocol.</span></p>
           <div className="run-route" aria-label="Run duration"><button aria-pressed={runMode === 'expedition'} onClick={() => useGame.setState({ runMode: 'expedition' })}>EXPEDITION <small>KEEP GOING</small></button><button aria-pressed={runMode === 'classic'} onClick={() => useGame.setState({ runMode: 'classic' })}>CLASSIC <small>ONE SENTINEL</small></button></div>
           <button className="primary-button enter-button" onClick={start}><span><Play size={15} fill="currentColor" /> ENTER THE VORTEX</span><ArrowUpRight size={24} /></button>
-          <div className="start-meta"><span><i /> NO DOWNLOAD. JUST SURVIVE.</span><button onClick={() => open('controls')}>CONTROLS <Keyboard size={14} /></button></div>
+          <div className="start-meta"><button className="ship-open" aria-label="Choose warship" onClick={() => open('ships')}><Hexagon size={14} /> {frame.name.toUpperCase()} / CHANGE SHIP</button><button onClick={() => open('controls')}>CONTROLS <Keyboard size={14} /></button></div>
         </motion.div>
       </div>
       <div className="preview-chrome">
         <div className="preview-top"><span><Radio size={13} /> LIVE SIMULATION</span><span>SECTOR_07 <span className="muted">//</span> THE VORTEX</span></div>
         <div className="preview-coordinate coord-one">X: 00.000<br />Y: 00.000<br /><span>CORE SIGNAL: STABLE</span></div>
-        <div className="core-label"><span className="label-line" /><div><span className="micro">YOUR ONLY CONSTANT</span><strong>THE POLY-CORE</strong><small>MK.01 <span>·</span> PHASE-SHIFT ENABLED</small></div></div>
+        <div className="core-label"><span className="label-line" /><div><span className="micro">SELECTED FLIGHTFRAME</span><strong>{frame.name.toUpperCase()}</strong><small>{frame.code} <span>·</span> PHASE-SHIFT ENABLED</small></div></div>
         <div className="arena-spec"><div><span className="signal-bars"><i /><i /><i /><i /><i /></span> REACTOR OUTPUT <strong>98.4%</strong></div><button className="icon-button" aria-label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} onClick={expand}><Expand size={18} /></button></div>
       </div>
       <div className="mission-strip">
@@ -81,7 +85,7 @@ function Menu({ open, start }: { open: (panel: Panel) => void; start: () => void
       </div>
       <div className="deployment-bar"><span><CircleDot size={14} /> READY FOR DEPLOYMENT</span><button onClick={() => open('settings')}>MODE <strong>{difficulty === 'standard' ? 'STANDARD' : 'OVERDRIVE'}</strong><ChevronRight size={13} /></button><button onClick={() => open('armory')}>LOADOUT <strong>{WEAPONS[loadout].name.toUpperCase()}</strong><ChevronRight size={13} /></button><button onClick={() => open('core')}>CORE CREDITS <strong>{number(profile.credits)}</strong><ArrowUpRight size={13} /></button></div>
     </main>
-    <footer className="footer"><span>DESIGNED TO BE OUTNUMBERED.</span><span className="footer-center"><i /> ALL SYSTEMS PROCEDURAL</span><button onClick={() => open('records')}>PERSONAL BEST <strong>{number(profile.best).padStart(6, '0')}</strong><Trophy size={13} /></button><span className="build-number">BUILD 029 / 2026</span></footer>
+    <footer className="footer"><span>DESIGNED TO BE OUTNUMBERED.</span><span className="footer-center"><i /> ALL SYSTEMS PROCEDURAL</span><button onClick={() => open('records')}>PERSONAL BEST <strong>{number(profile.best).padStart(6, '0')}</strong><Trophy size={13} /></button><span className="build-number">BUILD 030 / 2026</span></footer>
   </motion.div>;
 }
 
@@ -89,6 +93,8 @@ function PanelContent({ panel }: { panel: Exclude<Panel, null> }) {
   const runMode = useGame(s => s.runMode);
   const aimMode = useGame(s => s.aimMode), reducedEffects = useGame(s => s.reducedEffects);
   const profile = useGame(s => s.profile), sound = useGame(s => s.sound), quality = useGame(s => s.quality), difficulty = useGame(s => s.difficulty), loadout = useGame(s => s.loadout);
+  const adaptive = useGame(s => s.adaptiveQuality), budget = useGame(s => s.renderBudget);
+  if (panel === 'ships') return <ShipSelector />;
   if (panel === 'ordnance') return <RocketGuide />;
   if (panel === 'records') return <>
     <p className="panel-intro">Every deployment leaves a signal. Your flight record is saved with your core.</p>
@@ -132,7 +138,7 @@ function PanelContent({ panel }: { panel: Exclude<Panel, null> }) {
     <div className="setting-row"><div><h3>Targeting control</h3><p>{aimMode === 'precision' ? 'Only fire in your mouse aim cone. No automatic fallback.' : 'Mouse aim takes priority. Track automatically when the cursor leaves.'} Press F during flight.</p></div><div className="segmented"><button className={aimMode === 'assisted' ? 'active' : ''} onClick={() => useGame.setState({ aimMode: 'assisted' })}>ASSISTED</button><button className={aimMode === 'precision' ? 'active' : ''} onClick={() => useGame.setState({ aimMode: 'precision' })}>PRECISION</button></div></div>
     <div className="setting-row"><div><h3>Reduced effects</h3><p>Disable camera shake, hit distortion and interface motion. Combat warnings remain visible.</p></div><Toggle label="Reduced effects" active={reducedEffects} onClick={() => useGame.setState({ reducedEffects: !reducedEffects })} /></div>
     <div className="setting-row"><div><h3>Procedural audio</h3><p>Synth bassline, laser pulses, and reactive effects.</p></div><Toggle label="Procedural audio" active={sound} onClick={() => { useGame.setState({ sound: !sound }); void audio.unlock().catch(() => undefined); }} /></div>
-    <div className="setting-row"><div><h3>Render quality</h3><p>{quality === 'high' ? 'Soft shadows, layered smoke, metal debris and enhanced resolution.' : 'Reduced resolution. Shadows, dense smoke and debris disabled.'}</p></div><div className="segmented"><button className={quality === 'high' ? 'active' : ''} onClick={() => useGame.setState({ quality: 'high' })}>HIGH</button><button className={quality === 'performance' ? 'active' : ''} onClick={() => useGame.setState({ quality: 'performance' })}>PERFORMANCE</button></div></div>
+    <div className="setting-row"><div><h3>Render quality</h3><p>{adaptive ? `AUTO · ${['HIGH', 'BALANCED', 'LIGHT'][budget]} · Adapts resolution and detail for smooth combat.` : quality === 'high' ? 'Full shadows, layered smoke, debris and enhanced resolution.' : 'Light rendering with core lighting, bloom and combat signals retained.'}</p></div><div className="segmented"><button className={adaptive ? 'active' : ''} onClick={() => useGame.setState({ adaptiveQuality: true, quality: 'high', renderBudget: 0 })}>AUTO</button><button className={!adaptive && quality === 'high' ? 'active' : ''} onClick={() => useGame.setState({ adaptiveQuality: false, quality: 'high' })}>HIGH</button><button className={!adaptive && quality === 'performance' ? 'active' : ''} onClick={() => useGame.setState({ adaptiveQuality: false, quality: 'performance' })}>PERFORMANCE</button></div></div>
     <div className="setting-label">DEPLOYMENT DIFFICULTY</div>
     <div className="difficulty-options"><button className={difficulty === 'standard' ? 'selected' : ''} onClick={() => useGame.setState({ difficulty: 'standard' })}><Shield size={23} /><strong>STANDARD</strong><p>The original protocol.<br />A fair fight against impossible odds.</p>{difficulty === 'standard' && <Check size={16} />}</button><button className={difficulty === 'overdrive' ? 'selected' : ''} onClick={() => useGame.setState({ difficulty: 'overdrive' })}><Zap size={23} /><strong>OVERDRIVE</strong><p>Faster swarms. Stronger enemies.<br />For cores that crave chaos.</p>{difficulty === 'overdrive' && <Check size={16} />}</button></div>
     <div className="panel-footnote"><CircleDot size={13} /> DIFFICULTY APPLIES TO YOUR NEXT RUN</div>
@@ -209,6 +215,7 @@ function ResultOverlay({ start, open }: { start: () => void; open: (p: Panel) =>
 }
 
 export default function GameShell() {
+  useShipSync();
   const phase = useGame(s => s.phase), sound = useGame(s => s.sound);
   const reducedEffects = useGame(s => s.reducedEffects);
   const [panel, setPanel] = useState<Panel>(null);

@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { DRONE_GUN } from './orbital-drones';
 import { ROVER_MODEL } from './ground-rovers';
+import type { ShipId } from './flightframes';
 
 export const SURFACES = ['hull', 'armor', 'metal', 'glass', 'signal', 'engine'] as const;
 type Surface = typeof SURFACES[number];
@@ -73,7 +74,8 @@ class ShipBuilder {
   }
 }
 
-export function buildPlayerShip(): ShipModel {
+export function buildPlayerShip(id: ShipId = 'vector'): ShipModel {
+  if (id !== 'vector') return buildFlightframe(id);
   const b = new ShipBuilder();
   b.plate('hull', [[0, 1.7], [-0.29, 0.9], [-0.43, -0.8], [-0.24, -1.25], [0.24, -1.25], [0.43, -0.8], [0.29, 0.9]], 0.28);
   b.plate('armor', [[0, 1.55], [-0.18, 0.82], [-0.24, -0.62], [0, -0.95], [0.24, -0.62], [0.18, 0.82]], 0.09, 0.21);
@@ -95,6 +97,29 @@ export function buildPlayerShip(): ShipModel {
   b.box('metal', [0.12, 0.11, 0.38], [0, -0.09, 1.35], [0.07, 0, 0]);
   b.box('signal', [0.045, 0.035, 0.38], [0, 0.29, 1.08], [0, 0, 0], 0.006);
   b.box('signal', [0.11, 0.025, 0.045], [0, 0.325, -0.71], [0, 0, 0], 0.005);
+  return b.finish();
+}
+
+function buildFlightframe(id: 'wraith' | 'aegis'): ShipModel {
+  const b = new ShipBuilder(), heavy = id === 'aegis';
+  b.plate('hull', heavy ? [[0,1.5],[-.5,.8],[-.65,-.8],[-.4,-1.22],[.4,-1.22],[.65,-.8],[.5,.8]] : [[0,1.7],[-.18,.8],[-.28,-.75],[-.2,-1.24],[.2,-1.24],[.28,-.75],[.18,.8]], heavy ? .34 : .2);
+  b.plate('armor', [[0,1.3],[-.2,.5],[-.25,-.73],[.25,-.73],[.2,.5]], .075, heavy ? .25 : .16);
+  b.add('glass', new THREE.SphereGeometry(1,16,8,0,Math.PI*2,0,Math.PI/2), [0,heavy?.34:.23,.45], [0,0,0], [heavy?.32:.19,heavy?.23:.19,heavy?.43:.63]);
+  b.pipe('metal', [[0,.31,.98],[0,.49,.65],[0,.51,.3],[0,.32,-.12]], .013);
+  for (const side of [-1,1]) {
+    const wing: [number,number][] = heavy ? [[side*.32,.76],[side*1.49,-.36],[side*1.42,-1.05],[side*.36,-.95]] : [[side*.2,.27],[side*1.35,-.8],[side*1.15,-1.2],[side*.28,-.82]];
+    b.plate('hull',wing,heavy?.18:.08, -.02);
+    b.plate('armor', heavy ? [[side*.55,.23],[side*1.32,-.42],[side*1.18,-.86],[side*.54,-.8]] : [[side*.38,-.09],[side*1.2,-.8],[side*1.03,-.96],[side*.38,-.65]],.04,.1);
+    b.box('signal',[.025,.02,heavy?.61:.47],[side*(heavy?1.37:1.14),.12,-.69],[0,side*.2,0],.004);
+    b.thruster(side*(heavy?.82:.43),-.05,-.94,heavy?.2:.17);
+    b.gun(side*(heavy?.98:.68),.02,heavy?.05:-.3,heavy?.95:.7);
+    b.vents([side*(heavy?.55:.33),heavy?.29:.2,-.55],heavy?.25:.15,4,.055);
+    b.bolts([[side*.34,.27,.72],[side*(heavy?1.04:.72),.16,-.7]]);
+    if(heavy){b.box('armor',[.23,.29,.85],[side*.83,.13,-.72],[0,0,side*-.09],.03);b.thruster(side*.36,-.04,-1.05,.12);}
+    else b.box('metal',[.04,.22,.5],[side*.46,.18,-1.03],[.12,0,side*-.24],.008);
+  }
+  b.box('signal',[.1,.02,.035],[0,heavy?.31:.22,1.07],[0,0,0],.004);
+  b.box('engine',[.15,.025,.1],[0,.23,-.44],[0,0,0],.005);
   return b.finish();
 }
 

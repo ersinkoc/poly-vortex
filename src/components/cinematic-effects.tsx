@@ -6,6 +6,8 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { engine, LIMITS } from '@/game/engine';
 import { useGame } from '@/game/store';
+import { renderQuality } from '@/game/render-budget';
+import { FRAME_ENGINES } from '@/game/flightframes';
 import { terrainHeight } from '@/game/terrain';
 import { buildVfxTextures, DESTRUCTION, visualNoise, VISUAL_LIMITS, wreckFragment } from '@/game/visuals';
 import { explosionFireFragment, explosionSmokeFragment, explosionVertex } from '@/game/explosion-shaders';
@@ -13,7 +15,7 @@ import { DAMAGE_LIMITS, DamageTrail, damageHeat, hullDamage } from '@/game/ship-
 
 const pose = new THREE.Object3D(), tint = new THREE.Color();
 const nozzle = new THREE.Vector3(), actorRotation = new THREE.Euler();
-const exhaustCapacity = (LIMITS.enemies * 4 + 3) * 2;
+const exhaustCapacity = (LIMITS.enemies * 4 + 4) * 2;
 const spriteVertex = `attribute vec4 aFx; varying vec2 vUv; varying vec4 vFx;
 void main(){vUv=uv;vFx=aFx;gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.);}`;
 const spriteFragment = `uniform sampler2D uMap; varying vec2 vUv; varying vec4 vFx;
@@ -54,14 +56,14 @@ function setExplosion(mesh: THREE.InstancedMesh, pool: ReturnType<typeof explosi
 }
 
 function Explosions({ maps }: { maps: ReturnType<typeof buildVfxTextures> }) {
-  const quality = useGame(s => s.quality);
+  const quality = useGame(renderQuality);
   const fire = useRef<THREE.InstancedMesh>(null), smoke = useRef<THREE.InstancedMesh>(null), debris = useRef<THREE.InstancedMesh>(null), scars = useRef<THREE.InstancedMesh>(null);
   const lights = useRef<(THREE.PointLight | null)[]>([]);
   const aftermath = useRef({ phase: useGame.getState().phase, time: 0 });
   const assets = useMemo(() => ({ fire: explosionPool(VISUAL_LIMITS.puffs), smoke: explosionPool(VISUAL_LIMITS.puffs), scars: spritePool(VISUAL_LIMITS.scorches), fireUniforms: { uMap: { value: maps.glow }, uNoise: { value: maps.volume }, uSamples: { value: 8 } }, smokeUniforms: { uNoise: { value: maps.volume } }, scarUniforms: { uMap: { value: maps.scorch } } }), [maps]);
   useEffect(() => () => { assets.fire.geometry.dispose(); assets.smoke.geometry.dispose(); assets.scars.geometry.dispose(); }, [assets]);
   useFrame(({ camera }, delta) => {
-    const s = useGame.getState(), active = s.phase !== 'menu', high = s.quality === 'high', calm = s.reducedEffects;
+    const s = useGame.getState(), active = s.phase !== 'menu', high = renderQuality(s) === 'high', calm = s.reducedEffects;
     if (aftermath.current.phase !== s.phase) { aftermath.current.phase = s.phase; aftermath.current.time = 0; }
     if (s.phase === 'dead' || s.phase === 'won') aftermath.current.time += Math.min(delta, 0.1);
     const endTime = aftermath.current.time; assets.fireUniforms.uSamples.value = high ? 8 : 6;
@@ -163,8 +165,9 @@ function Exhaust() {
     const power = menu ? 0.85 : p.dashTime > 0 ? 3.2 : 0.7 + Math.min(1, Math.hypot(p.vx, p.vz) / 8) * 0.8;
     const heat = menu ? 0 : damageHeat(hullDamage(p.hp, p.maxHp));
     const flicker = s.reducedEffects ? 1 : 1 - heat * 0.22 * (0.5 + 0.5 * Math.sin(engine.time * 27));
-    if (menu || p.hp > 0) for (const offset of [-0.61, 0, 0.61]) add(p.x, p.z, 0.95 + Math.sin(clock.elapsedTime * 2.5) * 0.045, angle, scale, offset, -0.09, 1.3, power * flicker, menu ? -0.04 : p.vz * 0.009, menu ? Math.sin(clock.elapsedTime * 0.7) * 0.025 : -p.vx * 0.025, heat);
-    if (s.quality === 'high') for (const e of engine.enemies) {
+    const frame = menu ? s.ship : s.activeShip;
+    if (menu || p.hp > 0) for (const [x,y,z] of FRAME_ENGINES[frame]) add(p.x, p.z, 0.95 + Math.sin(clock.elapsedTime * 2.5) * 0.045, angle, scale, x, y, -z, power * flicker, menu ? -0.04 : p.vz * 0.009, menu ? Math.sin(clock.elapsedTime * 0.7) * 0.025 : -p.vx * 0.025, heat);
+    if (renderQuality(s) === 'high') for (const e of engine.enemies) {
       if (e.kind !== 0 && e.kind !== 2) continue;
       const orbit = menu ? clock.elapsedTime * 0.035 : 0, x = e.x * Math.cos(orbit) - e.z * Math.sin(orbit), z = e.x * Math.sin(orbit) + e.z * Math.cos(orbit);
       const yaw = Math.atan2((menu ? 0 : p.x) - x, (menu ? 0 : p.z) - z), size = e.radius * (menu ? 1.45 : 1);
@@ -205,11 +208,11 @@ function HullDamageFX({ maps }: { maps: ReturnType<typeof buildVfxTextures> }) {
     last.run = s.runId; last.time = engine.time; last.phase = s.phase;
     const damage = menu ? 0 : hullDamage(p.hp, p.maxHp);
     for (let i = 0; i < 2; i++) assets.origins[i].set(i ? -0.6 : 0.75, 0.2, i ? -0.3 : -0.45).applyEuler(actorRotation.set(p.vz * 0.009, p.angle, -p.vx * 0.025)).multiplyScalar(0.83).add(nozzle.set(p.x, 0.95 + Math.sin(clock.elapsedTime * 2.5) * 0.045, p.z));
-    assets.trail.advance(dt, damage, assets.origins, s.quality === 'high', s.reducedEffects);
+    assets.trail.advance(dt, damage, assets.origins, renderQuality(s) === 'high', s.reducedEffects);
     let m = 0, f = 0;
     if (!menu && p.hp > 0 && smoke.current && sparks.current) {
       for (const particle of assets.trail.smoke) {
-        if (particle.age >= particle.life || m >= (s.quality === 'high' ? DAMAGE_LIMITS.smoke : 8)) continue;
+        if (particle.age >= particle.life || m >= (renderQuality(s) === 'high' ? DAMAGE_LIMITS.smoke : 8)) continue;
         pose.position.set(particle.x, particle.y, particle.z); pose.quaternion.copy(camera.quaternion); pose.rotateZ(particle.spin + particle.age * 0.1); pose.scale.setScalar(particle.size + particle.age * 0.75);
         tint.set('#59616a'); setSprite(smoke.current, assets.smoke, m++, tint, Math.min(0.55, particle.age * 3) * Math.max(0, 1 - particle.age / particle.life));
       }

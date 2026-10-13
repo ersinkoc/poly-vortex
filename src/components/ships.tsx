@@ -15,6 +15,7 @@ import { enemyWeapon, HOSTILE_WEAPONS, rangedPose } from '@/game/enemy-weapons';
 import { sentinelDefense } from '@/game/sentinel';
 import { GOLIATH, goliathMuzzle, goliathPose } from '@/game/goliath-ai';
 import { DRONE_DOCK, PLAYER_SCALE, playerFlightPose } from '@/game/player-pose';
+import { FLIGHTFRAMES } from '@/game/flightframes';
 
 type ActorAsset = { model: ShipModel; materials: ReturnType<typeof buildShipMaterials> };
 const accents = ['#ff5774', '#a685ff', '#ffae50', '#ff3a5d'];
@@ -184,10 +185,9 @@ function EscortDrones({ asset, rotor, shadow }: { asset: ActorAsset; rotor: THRE
 }
 
 export default function ShipFleet() {
+  const selected = useGame(s => s.phase === 'menu' ? s.ship : s.activeShip);
   const assets = useMemo(() => {
     const textures = buildSurfaceTextures(), shadow = buildShadowTexture();
-    const player = { model: buildPlayerShip(), materials: buildShipMaterials('#bdff6f', true, textures), damage: buildDamageUniforms() };
-    for (const surface of ['hull', 'armor', 'metal', 'glass'] as const) attachDamageMaterial(player.materials[surface], player.damage);
     const enemies = ([0, 1, 2, 3] as const).map(kind => ({ model: buildEnemyShip(kind), materials: buildShipMaterials(accents[kind], false, textures) }));
     for (const kind of [1, 3]) {
       enemies[kind].materials.signal.dispose();
@@ -197,15 +197,21 @@ export default function ShipFleet() {
     const rotor = buildDroneRotor();
     const charge = { model: buildGroundCharge(), materials: buildShipMaterials('#ffba6a', false, textures) };
     const rover = { model: buildGroundRover(), materials: buildShipMaterials('#9ef1dc', false, textures) }, wheels = buildRoverWheels(), radar = buildRoverRadar();
-    return { textures, shadow, player, enemies, drone, rotor, charge, rover, wheels, radar };
+    return { textures, shadow, enemies, drone, rotor, charge, rover, wheels, radar };
   }, []);
+  const player = useMemo(() => {
+    const actor = { model: buildPlayerShip(selected), materials: buildShipMaterials(FLIGHTFRAMES[selected].color, true, assets.textures), damage: buildDamageUniforms() };
+    for (const surface of ['hull', 'armor', 'metal', 'glass'] as const) attachDamageMaterial(actor.materials[surface], actor.damage);
+    return actor;
+  }, [selected, assets.textures]);
+  useEffect(() => () => { Object.values(player.model).forEach(g => g.dispose()); Object.values(player.materials).forEach(m => m.dispose()); }, [player]);
   useEffect(() => () => {
-    for (const actor of [assets.player, ...assets.enemies, assets.drone, assets.charge, assets.rover]) {
+    for (const actor of [...assets.enemies, assets.drone, assets.charge, assets.rover]) {
       Object.values(actor.model).forEach(geometry => geometry.dispose()); Object.values(actor.materials).forEach(material => material.dispose());
     }
     Object.values(assets.textures).forEach(texture => texture.dispose()); assets.shadow.dispose(); assets.rotor.dispose();
     Object.values(assets.wheels).forEach(geometry => geometry.dispose());
     Object.values(assets.radar).forEach(geometry => geometry.dispose());
   }, [assets]);
-  return <><PlayerShip asset={assets.player} shadow={assets.shadow} /><EscortDrones asset={assets.drone} rotor={assets.rotor} shadow={assets.shadow} /><GroundCharges asset={assets.charge} /><GroundRovers asset={assets.rover} wheels={assets.wheels} radar={assets.radar} shadow={assets.shadow} />{([0, 1, 2, 3] as const).map(kind => <EnemyShips key={kind} kind={kind} asset={assets.enemies[kind]} shadow={assets.shadow} />)}</>;
+  return <><PlayerShip asset={player} shadow={assets.shadow} /><EscortDrones asset={assets.drone} rotor={assets.rotor} shadow={assets.shadow} /><GroundCharges asset={assets.charge} /><GroundRovers asset={assets.rover} wheels={assets.wheels} radar={assets.radar} shadow={assets.shadow} />{([0, 1, 2, 3] as const).map(kind => <EnemyShips key={kind} kind={kind} asset={assets.enemies[kind]} shadow={assets.shadow} />)}</>;
 }

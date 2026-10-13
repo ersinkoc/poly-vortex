@@ -8,6 +8,8 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { engine, LIMITS } from '@/game/engine';
 import { useGame } from '@/game/store';
+import { renderQuality, renderDpr } from '@/game/render-budget';
+import PerformanceGovernor from './performance-governor';
 import ShipFleet from './ships';
 import ShipLighting from './ship-lighting';
 import CombatEffects from './combat-effects';
@@ -193,10 +195,11 @@ function SceneController() {
 }
 
 function PostFX() {
-  const quality = useGame(s => s.quality);
+  const quality = useGame(renderQuality);
+  const adaptive = useGame(s => s.adaptiveQuality);
   const offset = useMemo(() => new THREE.Vector2(0.0003, 0.0003), []);
   useFrame(() => { const v = useGame.getState().reducedEffects ? 0 : 0.0003 + engine.hitFlash * 0.009; offset.set(v, v); });
-  return <EffectComposer multisampling={quality === 'high' ? 4 : 0}>
+  return <EffectComposer multisampling={!adaptive && quality === 'high' ? 4 : 0}>
     <Bloom intensity={0.82} luminanceThreshold={1} luminanceSmoothing={0.65} mipmapBlur />
     <ChromaticAberration offset={offset} radialModulation modulationOffset={0.2} />
     <Vignette offset={0.15} darkness={0.72} eskil={false} />
@@ -205,8 +208,11 @@ function PostFX() {
 }
 
 export default function Arena() {
-  const quality = useGame(s => s.quality);
-  return <Canvas shadows={quality === 'high' ? 'percentage' : false} camera={{ position: [16, 23, 20], fov: 46, near: 0.1, far: 160 }} dpr={quality === 'high' ? [1, 1.5] : 1} gl={{ antialias: false, powerPreference: 'high-performance', alpha: false }}>
+  const quality = useGame(renderQuality);
+  const phase = useGame(s => s.phase);
+  const preference = useGame(s => s.quality), adaptiveQuality = useGame(s => s.adaptiveQuality), renderBudget = useGame(s => s.renderBudget);
+  return <Canvas frameloop={phase === 'paused' ? 'demand' : 'always'} shadows={quality === 'high' ? 'percentage' : false} camera={{ position: [16, 23, 20], fov: 46, near: 0.1, far: 160 }} dpr={renderDpr({quality: preference, adaptiveQuality, renderBudget})} gl={{ antialias: false, powerPreference: 'high-performance', alpha: false }}>
+    <PerformanceGovernor />
     <color attach="background" args={['#080e15']} />
     <fog attach="fog" args={['#080e15', 28, 72]} />
     <ShipLighting followPlayer />

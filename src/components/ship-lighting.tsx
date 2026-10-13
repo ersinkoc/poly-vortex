@@ -6,11 +6,12 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { engine } from '@/game/engine';
 import { useGame } from '@/game/store';
+import { renderQuality } from '@/game/render-budget';
 
 // A local studio reflection rig; no HDR image or network request is needed.
 export default function ShipLighting({ followPlayer = false }: { followPlayer?: boolean }) {
   const key = useRef<THREE.DirectionalLight>(null), target = useMemo(() => new THREE.Object3D(), []);
-  const quality = useGame(s => s.quality);
+  const quality = useGame(renderQuality);
   useEffect(() => { const light = key.current; return () => light?.shadow.dispose(); }, []);
   useFrame(() => {
     if (!key.current || !followPlayer) return;

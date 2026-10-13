@@ -7,6 +7,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { buildTerrainTextures, TERRAIN_CELL, terrainHeight, terrainProp } from '@/game/terrain';
 import { engine } from '@/game/engine';
 import { useGame } from '@/game/store';
+import { renderQuality } from '@/game/render-budget';
 import { SECTORS } from '@/game/progression';
 import { rubbleAt, VISUAL_LIMITS } from '@/game/visuals';
 
@@ -14,7 +15,7 @@ const pose = new THREE.Object3D();
 export default function Terrain() {
   const floor = useRef<THREE.Mesh>(null), rocks = useRef<THREE.InstancedMesh>(null), ruins = useRef<THREE.InstancedMesh>(null), seams = useRef<THREE.InstancedMesh>(null);
   const rubble = useRef<THREE.InstancedMesh>(null);
-  const quality = useGame(s => s.quality);
+  const quality = useGame(renderQuality);
   useEffect(() => { cell.current = ''; }, [quality]);
   const cell = useRef('');
   const assets = useMemo(() => {
