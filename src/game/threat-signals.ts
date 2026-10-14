@@ -36,16 +36,33 @@ export function readWeaponThreat(e: Entity, player: { x: number; z: number }, ou
 /** Reused, bounded render slots prioritize shots that can still hit the core. */
 export class ThreatSignals {
   readonly slots = Array.from({ length: THREAT_SIGNALS.capacity }, emptyThreat);
+  private readonly bearings = Array.from({ length: THREAT_SIGNALS.directions }, emptyThreat);
   private readonly scratch = emptyThreat();
   readonly directions: WeaponThreat[] = [];
   readonly targets: WeaponThreat[] = [];
   count = 0; locks = 0; soonest = Infinity;
   tick(enemies: readonly Entity[], player: { x: number; z: number }) {
     this.count = 0; this.locks = 0; this.soonest = Infinity;
+    let bearingCount = 0;
     for (const e of enemies) {
       if (!readWeaponThreat(e, player, this.scratch)) continue;
       const next = this.scratch;
-      if (next.dangerous) { this.locks++; this.soonest = Math.min(this.soonest, next.remaining); }
+      if (next.dangerous) {
+        this.locks++; this.soonest = Math.min(this.soonest, next.remaining);
+        let same = -1;
+        for (let i = 0; i < bearingCount; i++) {
+          const shown = this.bearings[i];
+          const angle = next.bearing - shown.bearing;
+          if (Math.abs(Math.atan2(Math.sin(angle), Math.cos(angle))) < THREAT_SIGNALS.directionGap) { same = i; break; }
+        }
+        if (same >= 0) { if (next.remaining < this.bearings[same].remaining) Object.assign(this.bearings[same], next); }
+        else if (bearingCount < this.bearings.length) Object.assign(this.bearings[bearingCount++], next);
+        else {
+          let worst = 0;
+          for (let i = 1; i < bearingCount; i++) if (this.bearings[i].remaining > this.bearings[worst].remaining) worst = i;
+          if (next.remaining < this.bearings[worst].remaining) Object.assign(this.bearings[worst], next);
+        }
+      }
       let at = 0;
       while (at < this.count && (Number(this.slots[at].dangerous) > Number(next.dangerous) || this.slots[at].dangerous === next.dangerous && this.slots[at].remaining <= next.remaining)) at++;
       if (at >= this.slots.length) continue;
@@ -54,14 +71,11 @@ export class ThreatSignals {
       Object.assign(this.slots[at], next);
     }
     // Render a few urgent bearings, rather than stacking every lock on the hull.
-    // These reuse sorted slots; all locks still contribute to the alarm/countdown.
+    // Keep distinct directions even when the generic threat slots fill with one bearing.
     this.directions.length = 0; this.targets.length = 0;
+    this.directions.push(...this.bearings.slice(0, bearingCount).sort((a, b) => a.remaining - b.remaining));
     for (let i = 0; i < this.count; i++) {
       const threat = this.slots[i];
-      if (threat.dangerous && this.directions.length < THREAT_SIGNALS.directions && !this.directions.some(shown => {
-        const angle = threat.bearing - shown.bearing;
-        return Math.abs(Math.atan2(Math.sin(angle), Math.cos(angle))) < THREAT_SIGNALS.directionGap;
-      })) this.directions.push(threat);
       if (this.targets.length < THREAT_SIGNALS.targets && Math.hypot(threat.x - player.x, threat.z - player.z) >= THREAT_SIGNALS.coreClearance
         && !this.targets.some(shown => Math.hypot(threat.x - shown.x, threat.z - shown.z) < THREAT_SIGNALS.targetGap)) this.targets.push(threat);
     }

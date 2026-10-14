@@ -7,3 +7,10 @@ out/
 !.env.example
 .reports/
 next-env.d.ts
+
+.temp_files/
+
+.wrongstack/
+!/.wrongstack/
+/.wrongstack/*
+!/.wrongstack/project.json

@@ -8,7 +8,7 @@ export const angleDifference = (a: number, b: number) => Math.atan2(Math.sin(a -
 export const turnTowards = (angle: number, target: number, maxStep: number) => angle + Math.max(-maxStep, Math.min(maxStep, angleDifference(target, angle)));
 export function friendlyInLine(a: Position, b: Position, friendlies: readonly (Position & { radius?: number })[]) {
   const dx = b.x - a.x, dz = b.z - a.z, length2 = dx * dx + dz * dz; if (length2 < 1e-8) return false;
-  return friendlies.some(f => { const t = ((f.x - a.x) * dx + (f.z - a.z) * dz) / length2; return t > 0 && t < 1 && Math.hypot(a.x + t * dx - f.x, a.z + t * dz - f.z) < (f.radius ?? 0.75); });
+  return friendlies.some(f => { const t = ((f.x - a.x) * dx + (f.z - a.z) * dz) / length2; return t > 0 && t <= 1 && Math.hypot(a.x + t * dx - f.x, a.z + t * dz - f.z) < (f.radius ?? 0.75); });
 }
 export function selectTarget(enemies: readonly Entity[], player: Position, input: Input, lockedId: number, friendlies: readonly Position[] = [], range = PULSE_RANGE, mode: 'assisted' | 'precision' = 'assisted') {
   if (mode === 'precision' && !input.aiming) return undefined;

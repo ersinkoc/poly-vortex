@@ -97,18 +97,19 @@ export const useGame = create<GameStore>((set, get) => ({
   },
   saveRun: (score, kills, won, bonus = 0) => {
     const s = get(); if (s.phase === 'dead' || s.phase === 'won') return;
+    const currentProfile = loadSave()?.profile ?? s.profile;
     const earned = Math.floor(kills / 3) + (won ? 100 : 10) + Math.max(0, Math.floor(bonus));
-    const totalKills = s.profile.totalKills + kills, runs = s.profile.runs + 1, wins = s.profile.wins + Number(won);
+    const totalKills = currentProfile.totalKills + kills, runs = currentProfile.runs + 1, wins = currentProfile.wins + Number(won);
     const unlocked = ['first-run', ...(totalKills >= 250 ? ['hunter'] : []), ...(won ? ['breaker'] : []), ...(s.peakCombo >= 5 ? ['chain'] : []), ...(s.level >= 10 ? ['evolution'] : []), ...(runs >= 10 ? ['veteran'] : []), ...(wins >= 3 ? ['ace'] : []), ...(s.sentinels >= 3 ? ['deep-run'] : []), ...(s.time >= 600 ? ['endurance'] : [])];
-    const profile = { ...s.profile, credits: s.profile.credits + earned, best: Math.max(s.profile.best, score), runs, wins, totalKills, achievements: [...new Set([...s.profile.achievements, ...unlocked])] };
-    const result: FlightResult = { runKey: s.runKey, endedAt: Date.now(), won, score, kills, time: s.time, ship: s.activeShip, level: s.level, chapter: s.chapter, sentinels: s.sentinels, rescued: s.rescued, achievements: unlocked.filter(id => !s.profile.achievements.includes(id)) };
+    const profile = { ...currentProfile, credits: currentProfile.credits + earned, best: Math.max(currentProfile.best, score), runs, wins, totalKills, achievements: [...new Set([...currentProfile.achievements, ...unlocked])] };
+    const result: FlightResult = { runKey: s.runKey, endedAt: Date.now(), won, score, kills, time: s.time, ship: s.activeShip, level: s.level, chapter: s.chapter, sentinels: s.sentinels, rescued: s.rescued, achievements: unlocked.filter(id => !currentProfile.achievements.includes(id)) };
     const saveStatus = saveProfile(profile, result);
     if (saveStatus === 'conflict') { set({ profile: readProfile(), earned: 0, phase: won ? 'won' : 'dead', saveStatus, savedFlight: savedFlightSummary() }); return; }
     const achievement = result.achievements.at(-1);
     set({ profile, earned, phase: won ? 'won' : 'dead', saveStatus, lastFlight: result, savedFlight: null, ...(won ? { lastVictory: result } : {}), ...(achievement ? { lastAchievement: { id: achievement, unlockedAt: result.endedAt, runKey: result.runKey } } : {}) });
   },
   purchase: id => {
-    const p = get().profile; const level = p.upgrades[id]; const cost = 50 + level * 50;
+    const p = loadSave()?.profile ?? get().profile; const level = p.upgrades[id]; const cost = 50 + level * 50;
     if (level >= 5 || p.credits < cost) return;
     const profile = { ...p, credits: p.credits - cost, upgrades: { ...p.upgrades, [id]: level + 1 } };
     const saveStatus = saveProfile(profile); set({ profile, saveStatus });
@@ -122,7 +123,7 @@ useGame.subscribe((s, previous) => {
   try {
     let saved: Record<string, unknown> = {};
     try { const raw = JSON.parse(localStorage.getItem('poly-vortex-settings-v1') || 'null'); if (raw && typeof raw === 'object') saved = raw; } catch { /* Replace corrupt preferences with a valid snapshot. */ }
-    const settings = { ship: s.ship, adaptiveQuality: s.adaptiveQuality, runMode: s.runMode, sound: s.sound, quality: s.quality, difficulty: s.difficulty, loadout: s.loadout, aimMode: s.aimMode, reducedEffects: s.reducedEffects, ...saved, ...changed };
+    const settings = { ship: s.ship, adaptiveQuality: s.adaptiveQuality, runMode: s.runMode, sound: s.sound, quality: s.quality, difficulty: s.difficulty, loadout: s.loadout, aimMode: s.aimMode, reducedEffects: s.reducedEffects, ...saved, ...(loadSave()?.settings ?? {}), ...changed };
     localStorage.setItem('poly-vortex-settings-v1', JSON.stringify(settings)); saveSettings(settings);
   } catch { /* Preferences are optional when storage is unavailable. */ }
 });

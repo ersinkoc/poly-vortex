@@ -32,7 +32,7 @@ export function decodeSave(text: string | null): SaveDocument | null {
     const envelope: unknown = JSON.parse(text);
     if (!plain(envelope) || typeof envelope.data !== 'string' || envelope.data.length > SAVE_LIMIT || checksum(envelope.data) !== envelope.checksum) return null;
     const doc: unknown = JSON.parse(envelope.data);
-    if (!plain(doc) || doc.schema !== 2 || typeof doc.deviceId !== 'string' || !Number.isSafeInteger(doc.revision) || !Number.isFinite(doc.updatedAt) || !plain(doc.profile) || !plain(doc.settings) || doc.currentRun !== null && typeof doc.currentRun !== 'string' || doc.ownerId !== null && typeof doc.ownerId !== 'string') return null;
+    if (!plain(doc) || doc.schema !== 2 || typeof doc.deviceId !== 'string' || typeof doc.revision !== 'number' || !Number.isSafeInteger(doc.revision) || doc.revision < 0 || doc.revision >= Number.MAX_SAFE_INTEGER || !Number.isFinite(doc.updatedAt) || !plain(doc.profile) || !plain(doc.settings) || doc.currentRun !== null && typeof doc.currentRun !== 'string' || doc.ownerId !== null && typeof doc.ownerId !== 'string') return null;
     if (doc.checkpoint !== null && (!plain(doc.checkpoint) || typeof doc.checkpoint.runKey !== 'string' || doc.checkpoint.runKey !== doc.currentRun || !plain(doc.checkpoint.payload) || doc.checkpoint.payload.schema !== 1 || !plain(doc.checkpoint.payload.state) || !plain(doc.checkpoint.payload.systems) || !['vector', 'wraith', 'aegis'].includes(String(doc.checkpoint.ship)) || !['time', 'level', 'chapter', 'savedAt'].every(k => typeof (doc.checkpoint as Record<string, unknown>)[k] === 'number' && Number.isFinite((doc.checkpoint as Record<string, unknown>)[k])))) return null;
     if (doc.lastFlight !== null && !validResult(doc.lastFlight)) return null;
     if (doc.lastVictory !== null && (!validResult(doc.lastVictory) || (doc.lastVictory as Record<string, unknown>).won !== true)) return null;
@@ -45,7 +45,7 @@ export function loadSave(): SaveDocument | null {
   try { return decodeSave(localStorage.getItem(SAVE_KEY)) ?? decodeSave(localStorage.getItem(SAVE_BACKUP_KEY)); } catch { return null; }
 }
 export function readProfile() { return loadSave()?.profile ?? normalizeProfile(legacy('poly-vortex-profile-v1')); }
-export function readSettings() { const old = legacy('poly-vortex-settings-v1'); return { ...(loadSave()?.settings ?? {}), ...(plain(old) ? old : {}) }; }
+export function readSettings() { const old = legacy('poly-vortex-settings-v1'); return { ...(plain(old) ? old : {}), ...(loadSave()?.settings ?? {}) }; }
 function baseSave(): SaveDocument {
   return loadSave() ?? { schema: 2, deviceId: newRunKey(), revision: 0, updatedAt: Date.now(), currentRun: null, ownerId: null, profile: normalizeProfile(legacy('poly-vortex-profile-v1') ?? EMPTY_PROFILE), settings: readSettings(), lastFlight: null, lastVictory: null, lastAchievement: null, checkpoint: null };
 }

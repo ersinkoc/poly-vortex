@@ -664,7 +664,8 @@ export class GameEngine {
       }
       const wallT = wall ? Math.hypot(wall.x - previous.x, wall.z - previous.z) / (Math.sqrt(segmentLength2) || 1) : Infinity;
       if (wall && wallT <= contact) { rocket.x = wall.x; rocket.z = wall.z; this.explodeRocket(rocket); continue; }
-      if (friendlyInLine(previous, rocket, friendlies)) { rocket.age = 10; this.burst(rocket.x, rocket.z, '#8cdfff', 6); continue; }
+      const impactPoint = directHit || airburst ? { x: previous.x + dx * contact, z: previous.z + dz * contact } : rocket;
+      if (friendlyInLine(previous, impactPoint, friendlies)) { rocket.age = 10; this.burst(rocket.x, rocket.z, '#8cdfff', 6); continue; }
       if (directHit || airburst) { rocket.x = previous.x + dx * contact; rocket.z = previous.z + dz * contact; this.explodeRocket(rocket, directHit); continue; }
       if (rocket.age >= 4 || rocket.traveled >= 32) { this.explodeRocket(rocket); continue; }
       rocket.trail += dt; if (rocket.trail > 0.04) { rocket.trail = 0; this.burst(rocket.x, rocket.z, '#8e9492', 1); }

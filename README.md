@@ -2,11 +2,19 @@
 
 [Play the game](https://poly-vortex.oxog.dev) · [Inspect the fleet](https://poly-vortex.oxog.dev/hangar/) · [GitHub](https://github.com/ersinkoc/poly-vortex)
 
+**Source version:** `1.33.1` (prepared patch, not tagged or released). See [CHANGELOG.md](CHANGELOG.md) for changes since `1.33.0`.
+
 A procedural 3D roguelite bullet heaven, built with Next.js 16, React 19, TypeScript 7, React Three Fiber, Drei, Three.js, Zustand, Framer Motion, and Tailwind CSS. All models, effects, terrain, and audio are generated locally. No external fonts, models, textures, or audio files are fetched.
 
 Direct dependencies are pinned to the npm registry's stable `latest` releases verified on October 12, 2026: Next.js 16.4.0, React 19.3.0, Three.js 0.186.1, Framer Motion 14.1.0, Lucide React 1.55.0, TypeScript 7.0.2, and Tailwind CSS 4.3.3. `bun.lock` pins the complete dependency graph. Next.js 16 uses Turbopack and the project-local TypeScript CLI by default. Explicit ambient types in `tsconfig.json` include the Bun test runner for TypeScript 7.
 
 Use Node.js 20.9 or newer and Bun 1.4.3 or newer. Development output is kept in `.next-dev`, separate from production output in `.next`.
+
+## Versions and changelog
+
+Starting with `1.33.1`, use `MAJOR.MINOR.PATCH` consistently. Bug fixes, balance adjustments, and documentation changes advance `PATCH` (`1.33.0` → `1.33.1` → `1.33.2`); compatible new gameplay features advance `MINOR` (`1.33.2` → `1.34.0`); incompatible save formats or other breaking changes advance `MAJOR`. A feature no longer needs its own minor version, so fixes and smaller updates can have intermediate releases.
+
+Record notable changes under **Unreleased** in [CHANGELOG.md](CHANGELOG.md) as they land. The version in `package.json` is the next intended release; it does not mean that version has been published. To finalize a release, pass `bun run typecheck`, `bun run test`, `bun run build`, and `bun run verify:export`, then move the Unreleased notes into a dated version entry and create the matching `vX.Y.Z` Git tag. The current `1.33.1` source is still unreleased because production build/export validation has not completed. GitHub Pages deploys successful pushes to `main` independently of version tags.
 
 ## Run
 
