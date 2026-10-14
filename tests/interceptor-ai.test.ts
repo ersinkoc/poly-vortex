@@ -11,7 +11,7 @@ const previous = useGame.getState(), sound = audio.enabled;
 let game: GameEngine;
 beforeEach(() => {
   audio.enabled = false;
-  useGame.setState({ phase: 'playing', loadout: 'pulse', runMode: 'expedition', difficulty: 'standard', aimMode: 'precision', ship: 'vector', profile: structuredClone(EMPTY_PROFILE) });
+  useGame.setState({ phase: 'playing', loadout: 'pulse', runMode: 'expedition', difficulty: 'standard', aimMode: 'precision', ship: 'vector', activeShip: 'vector', maxHp: 100, profile: structuredClone(EMPTY_PROFILE) });
   game = new GameEngine(91); game.reset(); game.weapons.pulse = 0; game.player.invulnerable = 1000;
   game.roverBay.nextWave = 1000;
   game.service = { x: 1000, z: 1000, progress: 0, remaining: 1000, serviced: true };
