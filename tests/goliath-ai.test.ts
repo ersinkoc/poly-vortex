@@ -11,7 +11,7 @@ const previous = useGame.getState(), previousAudio = audio.enabled;
 let game: GameEngine;
 beforeEach(() => {
   audio.enabled = false; useGame.setState({ phase: 'playing', maxHp: 100, loadout: 'pulse', difficulty: 'standard', runMode: 'expedition', aimMode: 'precision', profile: structuredClone(EMPTY_PROFILE) });
-  game = new GameEngine(53); game.reset(); game.weapons.pulse = 0; game.player.invulnerable = 1000; game.roverBay.nextWave = 1000;
+  game = new GameEngine(53); game.reset(); game.structures = []; game.weapons.pulse = 0; game.player.invulnerable = 1000; game.roverBay.nextWave = 1000;
   // A service hold isolates the existing hostile from reinforcements and strikes.
   game.service = { x: 1000, z: 1000, progress: 0, remaining: 1000, serviced: true };
 });

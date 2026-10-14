@@ -44,7 +44,7 @@ test('all module growth transitions maintain full-body separation while new dron
 });
 
 test('nearby rocks compress the formation and drone volumes stay above their surface', () => {
-  const rock = terrainProp(1, 1)!, p = player(), f = new DroneFormation(); p.x = rock.x - rock.radius - 2; p.z = rock.z; f.reset(p, 7);
+  const rock = [terrainProp(1, 1), terrainProp(2, 1), terrainProp(3, 3)].find(p => p !== null)!, p = player(), f = new DroneFormation(); p.x = rock.x - rock.radius - 2; p.z = rock.z; f.reset(p, 7);
   for (let i = 0; i < 120; i++) { f.tick(1 / 60, i / 60, p, 7, []); safety(f, p); }
   expect(f.mode).toBe('compact'); expect(f.radius).toBeLessThan(2.61);
   const nearest = f.poses[0]; expect(nearest.y - DRONE_FORMATION.bodyRadius).toBeGreaterThan(terrainHeight(rock.x, rock.z) + rock.height);

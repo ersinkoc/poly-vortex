@@ -1,4 +1,5 @@
 import type { EnemyWeapon } from './enemy-weapons';
+import type { EnemyRole } from './battlefield';
 import { create } from 'zustand';
 import { EMPTY_PROFILE, WEAPONS, type Difficulty, type Phase, type Profile, type WeaponId } from './types';
 import type { RewardRoll } from './reward-reel';
@@ -32,7 +33,7 @@ type GameStore = {
   encounter: EncounterPhase; encounterRemaining: number; encounterRound: number; combatPressure: number;
   aimMode: 'assisted' | 'precision'; reducedEffects: boolean;
   rocketAmmo: number; rocketCapacity: number; rocketCooldown: number; rocketReady: boolean;
-  targeting: 'aim' | 'auto'; target: { id: number; kind: 0 | 1 | 2 | 3; weapon?: EnemyWeapon; distance: number; hp: number; maxHp: number } | null;
+  targeting: 'aim' | 'auto'; target: { id: number; kind: 0 | 1 | 2 | 3; weapon?: EnemyWeapon; role?: EnemyRole; distance: number; hp: number; maxHp: number } | null;
   mission: Mission | null; missionsCompleted: number; rescued: number;
   phase: Phase; difficulty: Difficulty; loadout: WeaponId; sound: boolean; quality: 'high' | 'performance';
   time: number; hp: number; maxHp: number; xp: number; nextXp: number; level: number;

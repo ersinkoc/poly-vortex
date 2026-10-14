@@ -10,6 +10,7 @@ import { useGame } from '@/game/store';
 import { renderQuality } from '@/game/render-budget';
 import { SECTORS } from '@/game/progression';
 import { rubbleAt, VISUAL_LIMITS } from '@/game/visuals';
+import { DISTRICTS, districtAt } from '@/game/battlefield';
 
 const pose = new THREE.Object3D();
 export default function Terrain() {
@@ -56,6 +57,7 @@ export default function Terrain() {
     const cx = Math.floor(px / TERRAIN_CELL), cz = Math.floor(pz / TERRAIN_CELL), key = `${cx},${cz}`;
     assets.uniforms.uTerrainTime.value = active ? engine.time : clock.elapsedTime; assets.uniforms.uTerrainCenter.value.set(px, pz); assets.uniforms.uTerrainTint.value.set(SECTORS[active ? engine.sector : 0].color);
     assets.uniforms.uTerrainPulse.value.set(active ? engine.pulse.x : 0, active ? engine.pulse.z : 0, active ? engine.pulse.time : Math.floor(clock.elapsedTime / 5) * 5);
+    assets.material.color.set(DISTRICTS[districtAt(px,pz)].color);
     if (cell.current === key || !floor.current || !rocks.current || !ruins.current || !seams.current) return;
     cell.current = key; const ox = cx * TERRAIN_CELL, oz = cz * TERRAIN_CELL;
     floor.current.position.set(ox, 0, oz); const vertices = assets.geometry.attributes.position;

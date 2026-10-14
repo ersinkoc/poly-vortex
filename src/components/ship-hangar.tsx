@@ -9,14 +9,15 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { buildEnemyShip, buildPlayerShip, buildShadowTexture, buildShipMaterials, buildSurfaceTextures, SURFACES } from '@/game/ship-models';
 import ShipLighting from './ship-lighting';
-import { FLIGHTFRAMES, SHIP_IDS } from '@/game/flightframes';
+import { FLIGHTFRAMES, SHIP_IDS, SHIP_TRAITS } from '@/game/flightframes';
 import { useGame } from '@/game/store';
 import { renderDpr } from '@/game/render-budget';
 import PerformanceGovernor from './performance-governor';
 import { useShipSync } from './use-ship-sync';
+import { ENEMY_ROLES } from '@/game/battlefield';
 
 const catalog = [
-  ...SHIP_IDS.map((id, i) => ({ name: FLIGHTFRAMES[id].name, code: FLIGHTFRAMES[id].code + ' / FLIGHTFRAME', role: FLIGHTFRAMES[id].role, color: FLIGHTFRAMES[id].color, icon: [Crosshair, Wind, Shield, Orbit, Hexagon][i], copy: FLIGHTFRAMES[id].description })),
+  ...SHIP_IDS.map((id, i) => ({ name: FLIGHTFRAMES[id].name, code: FLIGHTFRAMES[id].code + ' / FLIGHTFRAME', role: FLIGHTFRAMES[id].role, color: FLIGHTFRAMES[id].color, icon: [Crosshair, Wind, Shield, Orbit, Hexagon][i], copy: FLIGHTFRAMES[id].description+' '+SHIP_TRAITS[id].name+': '+SHIP_TRAITS[id].detail })),
   { name: 'Interceptor', code: 'CX.01 / STRIKE GUNSHIP', role: 'FLANKING ATTACK', color: '#ff5774', icon: Wind, copy: 'A fast twin-gun skirmisher. It flanks at 5.5–8m and retreats when you close in. Thin outer chevrons and a compact countdown warn before a two-round salvo. Dodge sideways; amber brackets mark the old aim point.' },
   { name: 'Orbiter', code: 'OR.02 / RECON PLATFORM', role: 'RANGED CONTROL', color: '#a685ff', icon: Orbit, copy: 'A standoff weapons platform: pink plasma bursts, violet charged lasers, or amber unguided rockets. Target brackets and directional warning chevrons signal a prepared shot. Evade sideways or use stone cover to clear the red lock.' },
   { name: 'Goliath', code: 'GT.03 / SIEGE CARRIER', role: 'HEAVY ARMOR', color: '#ffae50', icon: Shield, copy: 'A heavy hover carrier with overlapping ceramic armor, reinforced engine nacelles, cooling grilles, and a twin-barrel siege turret.' },
@@ -24,7 +25,8 @@ const catalog = [
   { name: 'Flak Raider', code: 'FR.04 / ASSAULT PLATFORM', role: 'CLOSE BURST', color: '#ff8d64', icon: Crosshair, copy: 'A close-range platform firing five staggered fragments across a spreading cone. Break the lock or clear the burst lane.' },
   { name: 'Ion Disruptor', code: 'ID.05 / CONTROL PLATFORM', role: 'ENERGY DENIAL', color: '#69e5ff', icon: Orbit, copy: 'A cyan disruption round that drains EMP charge and delays shield recharge when it reaches the core.' },
 ];
-const enemyKinds = [0, 1, 2, 3, 1, 1] as const;
+catalog.push(...Object.values(ENEMY_ROLES).map((r,i)=>({name:r.name,code:`SP.${i+1} / SPECIALIST`,role:'TACTICAL SUPPORT',color:r.color,icon:Orbit,copy:r.detail})));
+const enemyKinds = [0, 1, 2, 3, 1, 1, 1, 1, 1, 2, 0] as const;
 
 function DisplayShip({ selected }: { selected: number }) {
   const group = useRef<THREE.Group>(null);

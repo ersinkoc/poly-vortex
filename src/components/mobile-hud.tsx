@@ -17,6 +17,8 @@ import TargetReadout from './target-lock';
 import RoverReadout from './rover-readout';
 import { RadarPanel } from './tactical-hud';
 import NavigationSignals from './navigation-signals';
+import { SHIP_TRAITS } from '@/game/flightframes';
+import { DISTRICTS, EVOLUTIONS, evolved } from '@/game/battlefield';
 
 const clock = (seconds: number) => `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${Math.floor(seconds % 60).toString().padStart(2, '0')}`;
 
@@ -30,7 +32,8 @@ export function TacticalSheet({ onClose, onHelp, resumeOnClose = true }: { onClo
     <div className="mobile-intel-scroll">
       <div className="mobile-run-stats"><div><span>SCORE</span><strong>{Math.floor(s.score).toLocaleString('en-US')}</strong></div><div><span>ELIMINATED</span><strong>{s.kills}</strong></div><div><span>CHAIN</span><strong>×{s.combo}</strong></div><div><span>HOSTILES</span><strong>{s.enemies}</strong></div></div>
       <ExpeditionHUD allowPaused /><MissionHUD /><EncounterHUD /><TargetReadout /><RadarPanel />
-      <section className="mobile-build-summary" aria-label="Installed weapon modules"><h3>ARSENAL</h3>{(Object.keys(WEAPONS) as WeaponId[]).map(id => <div key={id}><span>{WEAPONS[id].name}</span><strong>{s.weapons[id] ? `LV ${s.weapons[id]}` : 'OFFLINE'}</strong></div>)}{s.weapons.glaive > 0 && <DroneStatus hull={s.droneHull} units={s.droneStatus} detailed />}</section>
+      <section className="mobile-build-summary"><h3>{DISTRICTS[engine.district].name}</h3><p>{DISTRICTS[engine.district].detail}</p><h3>{SHIP_TRAITS[s.activeShip].name}</h3><p>{SHIP_TRAITS[s.activeShip].detail}{s.activeShip==='nova'&&` · REACTOR ${Math.floor(engine.frameCharge/3*100)}%`}</p></section>
+      <section className="mobile-build-summary" aria-label="Installed weapon modules"><h3>ARSENAL · EVOLVES AT LEVEL 6</h3>{(Object.keys(WEAPONS) as WeaponId[]).map(id => <div key={id}><span>{evolved(s.weapons[id])?EVOLUTIONS[id].name:WEAPONS[id].name}<small className="evolution-copy">{EVOLUTIONS[id].detail}</small></span><strong>{s.weapons[id] ? evolved(s.weapons[id])?'EVOLVED':`LV ${s.weapons[id]}` : 'OFFLINE'}</strong></div>)}{s.weapons.glaive > 0 && <DroneStatus hull={s.droneHull} units={s.droneStatus} detailed />}</section>
       <RoverReadout />
       <section className="mobile-ordnance-summary" aria-label="Rocket launcher details"><h3>HELLION ROCKETS · {s.rocketAmmo}/{s.rocketCapacity}</h3><p>Tap the rocket button to fire at a clear target within 23m. A queued shot waits for alignment. Blue crates restore up to three rounds.</p><p>{s.rocketNoticeTime > 0 ? s.rocketNotice : 'No passive ammunition refill.'}</p><button onClick={onHelp}>ROCKET FLIGHT MANUAL <Rocket size={16} /></button></section>
       <div className="mobile-intel-footnote">{s.rescued} RESCUED · {s.missionsCompleted} OPERATIONS · {s.salvage} SALVAGE<br />{s.repair > 0 ? `REPAIR ${s.repair.toFixed(1)}s · ` : ''}{s.overdrive > 0 ? `OVERDRIVE ${s.overdrive.toFixed(1)}s · ` : ''}SECTOR {s.sector + 1} · {s.fps} FPS</div>

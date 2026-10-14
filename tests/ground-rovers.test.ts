@@ -40,7 +40,7 @@ test('rovers actually drive, stay at their own destination, and rotate wheels by
 });
 
 test('a rock stops a rover on the approach side without letting it clip or tunnel through', () => {
-  const rock = terrainProp(1, 1)!; expect(rock).not.toBeNull(); const bay = new RoverBay(2);
+  const rock = [terrainProp(1, 1), terrainProp(2, 1), terrainProp(3, 3)].find(p => p !== null)!; expect(rock).not.toBeNull(); const bay = new RoverBay(2);
   bay.units = [rover({ x: rock.x - rock.radius - ROVER_RULES.bodyRadius - 0.1, z: rock.z, yaw: Math.PI / 2 })];
   bayAdvance(bay, 1); const r = bay.units[0]; expect(r.state).toBe('armed'); expect(r.x).toBeLessThan(rock.x - rock.radius - ROVER_RULES.bodyRadius + 1e-6);
   expect(r.traveled).toBeLessThan(0.11);

@@ -16,6 +16,7 @@ import { sentinelDefense } from '@/game/sentinel';
 import { GOLIATH, goliathMuzzle, goliathPose } from '@/game/goliath-ai';
 import { DRONE_DOCK, PLAYER_SCALE, playerFlightPose } from '@/game/player-pose';
 import { FLIGHTFRAMES } from '@/game/flightframes';
+import { ENEMY_ROLES, livePart } from '@/game/battlefield';
 
 type ActorAsset = { model: ShipModel; materials: ReturnType<typeof buildShipMaterials> };
 const accents = ['#ff5774', '#a685ff', '#ffae50', '#ff3a5d'];
@@ -104,7 +105,11 @@ function EnemyShips({ kind, asset, shadow }: { kind: 0 | 1 | 2 | 3; asset: Actor
       if (heavy) { matrixObject.position.set(heavy.x, heavy.y, heavy.z); matrixObject.rotation.set(heavy.pitch, heavy.yaw, heavy.bank, 'XYZ'); }
       matrixObject.scale.setScalar(scale); matrixObject.updateMatrix();
       for (let i = 0; i < layers.current.length; i++) {
-        const mesh = layers.current[i]; mesh?.setMatrixAt(count, matrixObject.matrix);
+        const mesh = layers.current[i];
+        if (SURFACES[i] === 'engine' && !livePart(e,'engine') || SURFACES[i] === 'signal' && !livePart(e,'generator')) { matrixObject.scale.setScalar(0); matrixObject.updateMatrix(); }
+        else { matrixObject.scale.setScalar(scale); matrixObject.updateMatrix(); }
+        mesh?.setMatrixAt(count, matrixObject.matrix);
+        if (e.role && SURFACES[i] === 'armor') mesh?.setColorAt(count,weaponTint.set(ENEMY_ROLES[e.role].color));
         if (kind === 1 && (SURFACES[i] === 'signal' || SURFACES[i] === 'armor')) mesh?.setColorAt(count, weaponTint.set(HOSTILE_WEAPONS[enemyWeapon(e)].color));
         if (kind === 3 && SURFACES[i] === 'signal') mesh?.setColorAt(count, weaponTint.set(sentinelDefense(e.age).armored ? '#82c6ef' : '#ffbd62'));
         if (kind === 3 && SURFACES[i] === 'armor') {
@@ -118,6 +123,7 @@ function EnemyShips({ kind, asset, shadow }: { kind: 0 | 1 | 2 | 3; asset: Actor
       if (kind === 2 && !menu && e.hp > 0 && cannonLights.current) {
         const flash = e.cannonFlash && e.age - e.cannonFlash.at < GOLIATH.flash ? e.cannonFlash : null;
         for (const side of [-1, 1] as const) {
+          if(!livePart(e,side===-1?'leftGun':'rightGun'))continue;
           if (!e.cannon && (!flash || flash.side !== side || state.reducedEffects)) continue;
           const muzzle = goliathMuzzle(e, engine.player, side), size = e.cannon ? 0.035 + 0.075 * Math.max(0, 1 - e.cannon.remaining / GOLIATH.windup) : 0.2 * (1 - (e.age - flash!.at) / GOLIATH.flash);
           matrixObject.position.set(muzzle.x, muzzle.y, muzzle.z); matrixObject.rotation.set(0, 0, 0); matrixObject.scale.setScalar(size); matrixObject.updateMatrix(); cannonLights.current.setMatrixAt(lightCount++, matrixObject.matrix);

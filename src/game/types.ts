@@ -1,12 +1,14 @@
 import type { EnemyWeapon } from './enemy-weapons';
+import type { EnemyPart, EnemyRole } from './battlefield';
 
 export type WeaponId = 'pulse' | 'glaive' | 'cryo' | 'tesla' | 'rail' | 'scatter';
 export type Phase = 'menu' | 'playing' | 'paused' | 'dead' | 'won';
 export type Difficulty = 'standard' | 'overdrive';
 export type UpgradeId = WeaponId | 'damage' | 'speed' | 'magnet' | 'repair' | 'haste' | 'shield' | 'critical' | 'pierce';
 export type Upgrade = { id: UpgradeId; title: string; description: string; rarity: 'COMMON' | 'RARE' | 'OVERCLOCKED'; power: number };
-export type Entity = { id: number; x: number; z: number; hp: number; maxHp: number; kind: 0 | 1 | 2 | 3; radius: number; age: number; timer: number; elite: boolean; vx?: number; vz?: number; escortShotAt?: number; weapon?: EnemyWeapon; ranged?: { remaining: number; aimX: number; aimY: number; aimZ: number; rounds: number }; weaponShots?: number; weaponFlash?: { at: number; aimX: number; aimZ: number; side: -1 | 1 }; cannon?: { remaining: number; aimX: number; aimZ: number }; cannonFlash?: { at: number; aimX: number; aimZ: number; side: -1 | 1 }; cannonShots?: number; sentinelStrike?: number; sentinelHit?: number };
-export type Bolt = { x: number; z: number; vx: number; vz: number; age: number; enemy: boolean; target: number; damage: number; pierce?: number; hits?: number[]; traveled?: number; range?: number; drone?: number; heavy?: number; hostileWeapon?: EnemyWeapon; playerWeapon?: 'rail' | 'scatter'; y?: number; vy?: number };
+type EntityBase = { id: number; x: number; z: number; hp: number; maxHp: number; kind: 0 | 1 | 2 | 3; radius: number; age: number; timer: number; elite: boolean; vx?: number; vz?: number; escortShotAt?: number; weapon?: EnemyWeapon; ranged?: { remaining: number; aimX: number; aimY: number; aimZ: number; rounds: number }; weaponShots?: number; weaponFlash?: { at: number; aimX: number; aimZ: number; side: -1 | 1 }; cannon?: { remaining: number; aimX: number; aimZ: number }; cannonFlash?: { at: number; aimX: number; aimZ: number; side: -1 | 1 }; cannonShots?: number; sentinelStrike?: number; sentinelHit?: number };
+export type Entity = EntityBase & { role?: EnemyRole; parts?: EnemyPart[]; specialTimer?: number; children?: number; parent?: number; jammed?: number };
+export type Bolt = { x: number; z: number; vx: number; vz: number; age: number; enemy: boolean; target: number; damage: number; pierce?: number; hits?: number[]; traveled?: number; range?: number; drone?: number; heavy?: number; hostileWeapon?: EnemyWeapon; playerWeapon?: 'rail' | 'scatter'; y?: number; vy?: number; split?: boolean; bounce?: number; part?: EnemyPart['kind'] };
 export type Rocket = { x: number; z: number; vx: number; vz: number; age: number; target: number; traveled: number; trail: number; aimX?: number; aimZ?: number };
 export type Particle = { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; maxLife: number; color: string; size: number };
 export type Gem = { x: number; z: number; value: number; age: number };
@@ -14,7 +16,7 @@ export type Arc = { points: [number, number][]; life: number };
 export type Vortex = { x: number; z: number; life: number; radius: number };
 export type Shockwave = { x: number; z: number; radius: number; life: number; maxLife: number; color: string };
 export type DamageText = { x: number; z: number; value: number; critical: boolean; life: number };
-export type Hazard = { x: number; z: number; radius: number; age: number; delay: number; duration: number; detonated: boolean };
+export type Hazard = { x: number; z: number; radius: number; age: number; delay: number; duration: number; detonated: boolean; mine?: boolean };
 export type Supply = { x: number; z: number; type: 'repair' | 'magnet' | 'overdrive' | 'ammo'; age: number };
 export type Cache = { x: number; z: number; age: number };
 export type Profile = { credits: number; best: number; runs: number; wins: number; totalKills: number; achievements: string[]; upgrades: { armor: number; reactor: number; thrusters: number } };

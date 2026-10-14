@@ -2,7 +2,25 @@
 
 Notable changes are recorded here from the `1.34.0` development cycle onward. Versions follow `MAJOR.MINOR.PATCH`: patch for fixes and small compatible changes, minor for compatible features, and major for breaking changes. A version becomes a release only after its validation passes and its `vX.Y.Z` tag is created.
 
-## Unreleased — target `1.34.0`
+## Unreleased — target `1.35.0`
+
+### Added
+
+- Add destructible heavy-ship gun mounts, engines and generators with visible modules and functional attack/defense changes.
+- Add Mine weaver, Aegis tender, Line bomber, Hive carrier and Escort hunter roles with bounded special attacks and Drydock identification.
+- Evolve all six weapons at level 6, including Rail fragments, Scatter ricochets, Cryo projectile stasis and Tesla/escort battery synergy.
+- Give all five flightframes a unique gameplay trait and explain it in deployment, ship selection and Tactical overview.
+- Add four procedural terrain districts, destructible barricades and chain-exploding fuel depots.
+- Replace proximity-only rescues with stabilization, vulnerable following crew and safe-zone evacuation; show crew health and blockers.
+- Add convoy protection, moving salvage interception and transmitter sabotage field operations.
+- Persist new tactical states and accept older checkpoints with missing transient fields.
+
+### Fixed
+
+- Remove the Sentinel death hit pause and bound its costly volume effect while preserving particles and shockwave.
+- Hold field-operation clocks during Sentinel duels and post-boss service.
+
+## `1.34.0` — development milestone (not tagged)
 
 The prepared `1.33.1` patch was never tagged. Its fixes remain in this pending minor release.
 

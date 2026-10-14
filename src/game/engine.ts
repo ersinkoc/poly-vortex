@@ -21,6 +21,7 @@ import { coreContact, enemyWeapon, hostileBand, HOSTILE_WEAPONS, INTERCEPTOR, ra
 import { SENTINEL, sentinelDefense, sentinelHealth } from './sentinel';
 import { FLIGHTFRAMES, type ShipId } from './flightframes';
 import { GOLIATH, goliathMuzzle, goliathRadial } from './goliath-ai';
+import { aimedPart, clearStructurePosition, createParts, districtAt, districtStructures, DISTRICTS, ENEMY_ROLES, evolved, hitPart, livePart, partPosition, structureContact, type EnemyRole, type Structure } from './battlefield';
 import { BARRIER } from './barrier';
 import { captureCheckpoint, restoreCheckpoint, validateCheckpoint, type EngineCheckpoint } from './checkpoint';
 import type { SavedFlight } from './local-save';
@@ -95,6 +96,9 @@ export class GameEngine {
   private hazardTimer = 37; private supplyTimer = 24; private repairTimer = SUPPLY_RULES.repair.first as number; private ammoTimer = SUPPLY_RULES.ammo.first as number;
   private lastCombatSupply = -25;
   private nextInterceptorSalvo = 0;
+  structures: Structure[] = [];
+  frameCharge = 0;
+  district = 0;
   constructor(seed = Date.now()) {
     this.seed = seed >>> 0;
     this.roverBay = new RoverBay(this.seed);
@@ -150,6 +154,8 @@ export class GameEngine {
     this.magnet = 1; this.haste = 1; this.overdrive = s.difficulty === 'overdrive';
     this.uid = 0; this.spawnTimer = 0; this.shotTimer = 0; this.cryoTimer = 2; this.teslaTimer = 1; this.hudTimer = 0; this.comboTimer = 0;
     this.nextInterceptorSalvo = 0;
+    this.structures = districtStructures(0, 0, 1); this.frameCharge = 0; this.district = 0;
+    if (this.ship === 'bastion') this.weapons.glaive = Math.max(1, this.weapons.glaive);
     this.droneRack.reset(this.weapons.glaive);
     this.droneFormation.reset(this.player, this.droneRack.slots.length);
     this.input.keys.clear(); this.input.dash = false; this.input.moveX = 0; this.input.moveZ = 0; this.input.aiming = false;
@@ -165,7 +171,7 @@ export class GameEngine {
     }
     this.player.invulnerable = 0;
   }
-  spawn(kind: Entity['kind'], x?: number, z?: number, elite = false) {
+  spawn(kind: Entity['kind'], x?: number, z?: number, elite = false, role?: EnemyRole) {
     if (this.enemies.length >= LIMITS.enemies) {
       if (kind !== 3) return;
       // Reserve a slot for the extraction objective even at maximum horde density.
@@ -178,6 +184,9 @@ export class GameEngine {
     const scale = this.runMode === 'expedition' ? fleetScale(this.chapter, this.chapterTime).health : 1 + this.time / 240;
     const hp = kind === 3 ? sentinelHealth({ weapons: this.weapons, damage: this.damage, haste: this.haste, criticalChance: this.criticalChance, escorts: this.droneRack.slots.length, chapter: this.runMode === 'expedition' ? this.chapter : 1, overdrive: this.overdrive }) : [16, 35, 100, 2200][kind] * scale * (this.overdrive ? 1.3 : 1) * (isElite ? 2.8 : 1);
     this.enemies.push({ id: ++this.uid, x: x ?? this.player.x + Math.sin(angle) * r, z: z ?? this.player.z + Math.cos(angle) * r, hp, maxHp: hp, kind, radius: [0.48, 0.62, 1.1, 2.3][kind] * (isElite ? 1.18 : 1), age: 0, timer: (kind === 2 ? GOLIATH.firstShot : kind === 1 ? 2.5 : 1) + this.random() * 2, elite: isElite });
+    const e = this.enemies.at(-1)!;
+    if (kind >= 2 || role === 'shield' || role === 'carrier') e.parts = createParts(hp);
+    if (role) { e.role = role; e.specialTimer = 4; }
   }
   announce(title: string, detail: string) { this.announcement = title; this.announcementDetail = detail; this.announcementTime = 5; }
   wave(x: number, z: number, radius: number, color: string, life = 0.7) {
@@ -240,6 +249,7 @@ export class GameEngine {
     this.blast(rocket.x, rocket.z, 2.1);
     this.wave(rocket.x, rocket.z, ROCKET_RULES.blastRadius, '#ffb876', 0.85); this.wave(rocket.x, rocket.z, 1.7, '#fff1c4', 0.4); this.burst(rocket.x, rocket.z, '#ff9b57', 48);
     this.trauma = Math.min(1, this.trauma + 0.55); this.hitStop = 0.05; audio.explosion();
+    this.damageObjectives(rocket.x, rocket.z, ROCKET_RULES.blastRadius, ROCKET_RULES.damage * this.damage);
     for (const enemy of [...this.enemies]) {
       const d = distance(enemy, rocket);
       if (enemy.hp > 0 && d < ROCKET_RULES.blastRadius && (enemy.id === directHit || !terrainImpact(rocket, enemy, -0.15))) this.hitEnemy(enemy, ROCKET_RULES.damage * this.damage * (enemy.id === directHit ? 1 : 1 - d / ROCKET_RULES.blastRadius * 0.7));
@@ -280,9 +290,15 @@ export class GameEngine {
       this.particles.push({ x, z, y, vx: Math.cos(a) * v, vz: Math.sin(a) * v, vy: 2 + this.random() * 4, life, maxLife: life, color, size: 0.06 + this.random() * 0.13 });
     }
   }
-  hitEnemy(enemy: Entity, damage: number, critical = false) {
+  hitEnemy(enemy: Entity, damage: number, critical = false, impact?: { x: number; z: number }) {
     if (enemy.hp <= 0) return;
-    if (enemy.kind === 3) { damage *= sentinelDefense(enemy.age).factor; enemy.sentinelHit = enemy.age; }
+    if (this.ship === 'nova' && this.frameCharge >= 1.5) damage *= 1.3;
+    if (this.enemies.some(e => e !== enemy && e.hp > 0 && e.role === 'shield' && livePart(e, 'generator') && distance(e, enemy) < 5)) damage *= .55;
+    if (enemy.kind === 3) { damage *= livePart(enemy, 'generator') ? sentinelDefense(enemy.age).factor : 1; enemy.sentinelHit = enemy.age; }
+    if (impact) {
+      const broken = hitPart(enemy, damage, impact, this.player);
+      if (broken) { const pos = partPosition(enemy, broken.kind, this.player); this.blast(pos.x, pos.z, .7, '#ffb968', false, pos.y); this.burst(pos.x, pos.z, '#ffcc85', 8, pos.y); this.announce('HOSTILE MODULE DESTROYED', `${broken.kind === 'engine' ? 'Engine crippled: movement reduced.' : broken.kind === 'generator' ? 'Generator offline: defenses disabled.' : 'Weapon mount disabled: barrage reduced.'}`); }
+    }
     enemy.hp -= damage; this.comboTimer = 4; this.streak++; this.combo = 1 + Math.min(9, Math.floor(this.streak / 12));
     this.peakCombo = Math.max(this.peakCombo, this.combo);
     if (damage >= 3 && this.damageTexts.length < LIMITS.damageTexts) this.damageTexts.push({ x: enemy.x, z: enemy.z, value: Math.round(damage), critical, life: 0.75 });
@@ -293,7 +309,9 @@ export class GameEngine {
     if (enemy.elite) { this.eliteKills++; if (this.caches.length < LIMITS.caches) this.caches.push({ x: enemy.x, z: enemy.z, age: 0 }); this.wave(enemy.x, enemy.z, 5, '#ffcf6c'); }
     else if (this.kills % 45 === 0 && this.time - this.lastCombatSupply >= 25 && this.dropSupply(this.kills % 90 ? 'magnet' : 'overdrive', enemy.x, enemy.z)) this.lastCombatSupply = this.time;
     this.burst(enemy.x, enemy.z, colors[enemy.kind], enemy.kind >= 2 ? 40 : 13);
-    this.blast(enemy.x, enemy.z, [0.7, 1.05, 1.8, 3.5][enemy.kind], '#ffab65', false, enemy.radius * 0.75 + 0.3);
+    // The Sentinel's large volume fills far more screen pixels than other blasts.
+    // Keep the wide shockwave and particles, but bound the costly volume itself.
+    this.blast(enemy.x, enemy.z, [0.7, 1.05, 1.8, 2.4][enemy.kind], '#ffab65', false, enemy.radius * 0.75 + 0.3);
     if (this.gems.length < LIMITS.gems) this.gems.push({ x: enemy.x, z: enemy.z, value: [3, 7, 18, 100][enemy.kind], age: 0 });
     this.pulse = { x: enemy.x, z: enemy.z, time: this.time };
     this.wave(enemy.x, enemy.z, enemy.kind >= 2 ? 4 : 1.8, colors[enemy.kind], enemy.kind >= 2 ? 0.8 : 0.4);
@@ -304,6 +322,9 @@ export class GameEngine {
       for (const other of [...this.enemies]) if (other.id !== enemy.id && other.hp > 0 && distance(other, enemy) < 4) this.hitEnemy(other, 35 * this.damage);
     }
     if (enemy.kind === 3) {
+      // The result/service transition already marks the impact; a hit pause here
+      // freezes the final moment, including kills caused by a rocket or chain.
+      this.hitStop = 0;
       this.sentinels++;
       if (this.runMode === 'classic') { this.publish(); useGame.getState().saveRun(this.score, this.kills, true, this.salvage); }
       else {
@@ -321,7 +342,7 @@ export class GameEngine {
   }
   activateBarrier() {
     if (useGame.getState().phase !== 'playing' || this.player.hp <= 0 || this.barrierCooldown > 0) return false;
-    this.barrier = BARRIER.duration; this.barrierCooldown = BARRIER.cooldown;
+    this.barrier = BARRIER.duration + (this.ship === 'aegis' ? 1 : 0); this.barrierCooldown = BARRIER.cooldown;
     this.wave(this.player.x, this.player.z, 3.3, '#a6dfff', 0.5); audio.shield();
     this.publish(); return true;
   }
@@ -398,7 +419,7 @@ export class GameEngine {
       rocketNotice: this.rocketNotice, rocketNoticeKind: this.rocketNoticeKind, rocketNoticeTime: this.rocketNoticeTime,
       encounter: this.director.phase, encounterRemaining: this.director.remaining, encounterRound: this.director.round, combatPressure: this.director.stress,
       rocketAmmo: this.rocketAmmo, rocketCapacity: ROCKET_CAPACITY, rocketCooldown: this.rocketCooldown, rocketReady: lock.status === 'ready',
-      targeting: this.input.aiming ? 'aim' : 'auto', target: target ? { id: target.id, kind: target.kind, weapon: target.kind === 0 || target.kind === 1 ? enemyWeapon(target) : undefined, distance: distance(target, this.player), hp: target.hp, maxHp: target.maxHp } : null,
+      targeting: this.input.aiming ? 'aim' : 'auto', target: target ? { id: target.id, kind: target.kind, role: target.role, weapon: target.kind === 0 || target.kind === 1 ? enemyWeapon(target) : undefined, distance: distance(target, this.player), hp: target.hp, maxHp: target.maxHp } : null,
       time: this.time, hp: this.player.hp, maxHp: this.player.maxHp, xp: this.xp, nextXp: this.nextXp, level: this.level, score: this.score, kills: this.kills, combo: this.combo, dash: this.player.dashCooldown, enemies: this.enemies.length, weapons: { ...this.weapons },
       shield: this.shield, maxShield: this.maxShield, surge: this.surge, sector: this.sector, bossPhase: this.bossPhase, peakCombo: this.peakCombo, elites: this.eliteKills, caches: this.caches.length, salvage: this.salvage, overdrive: this.overdriveTime, repair: this.repairTime, announcement: this.announcement, announcementDetail: this.announcementDetail, announcementTime: this.announcementTime,
       mission: this.missions.snapshot(), missionsCompleted: this.missions.completed, rescued: this.missions.rescued,
@@ -457,12 +478,19 @@ export class GameEngine {
       const d = Math.hypot(dx, dz) || 1; p.vx = dx / d * 32; p.vz = dz / d * 32;
       this.burst(p.x, p.z, '#baff58', 24); this.trauma = 0.2; audio.dash();
       this.wave(p.x, p.z, 2.7, '#bdff76', 0.4);
+      if (this.ship === 'wraith') for (const e of this.enemies) { e.ranged = undefined; e.cannon = undefined; e.jammed = e.age + 2.5; }
     }
     this.input.dash = false;
-    if (p.dashTime <= 0) { const lerp = 1 - Math.exp(-11 * dt); p.vx += (mx * 7.5 * this.speed - p.vx) * lerp; p.vz += (mz * 7.5 * this.speed - p.vz) * lerp; }
+    if (p.dashTime <= 0) { const lerp = 1 - Math.exp(-11 * dt), cruise = k.has('ShiftLeft') || k.has('ShiftRight') ? 2.6 : 7.5 * this.speed; p.vx += (mx * cruise - p.vx) * lerp; p.vz += (mz * cruise - p.vz) * lerp; }
     else this.burst(p.x, p.z, '#9effcf', 2);
     p.x += p.vx * dt; p.z += p.vz * dt;
     clearTerrainPosition(p, 0.7);
+    clearStructurePosition(p,.7,this.structures);
+    const region = districtAt(p.x, p.z);
+    if (region !== this.district) { this.district = region; this.announce(DISTRICTS[region].name, DISTRICTS[region].detail); }
+    if(this.structures.length&&this.structures.every(s=>distance(s,p)>35))this.structures=districtStructures(p.x,p.z,this.chapter);
+    const closePass = Math.hypot(p.vx, p.vz) > 4 && (this.enemies.some(e => e.hp > 0 && distance(e, p) < e.radius + 3) || this.bolts.some(b => b.enemy && distance(b, p) < 1.8));
+    this.frameCharge = this.ship === 'nova' ? Math.max(0, Math.min(3, this.frameCharge + dt * (closePass ? 2 : -.5))) : 0;
     const dock = droneDockPose(this.time, p), hatchClear = droneClearance(dock.x, dock.z, this.enemies, 0, 0) <= dock.y + 0.02;
     this.droneRack.install(this.weapons.glaive); this.droneRack.tick(dt, hatchClear);
     this.droneFormation.tick(dt, this.time, p, this.droneRack.airborne.length, this.enemies, this.droneRack.airborne, this.droneRack.units);
@@ -508,6 +536,7 @@ export class GameEngine {
       if (dock.remaining <= 0) {
         this.service = null; this.chapter++; this.chapterStarted = this.time; this.bossSpawned = false; this.sector = 0;
         this.director.reset(); this.hazardTimer = 37; this.spawnTimer = 1;
+        this.structures = districtStructures(p.x, p.z, this.chapter);
         const doctrine = doctrineAt(this.chapter); this.announce(`EXPEDITION ${String(this.chapter).padStart(2, '0')} // ${doctrine.name}`, doctrine.detail);
       }
     }
@@ -516,7 +545,10 @@ export class GameEngine {
       const pressure = this.runMode === 'expedition' ? fleetScale(this.chapter, this.chapterTime).pressure : 1 + this.time / 45;
       this.spawnTimer = Math.max(0.09, 0.75 / pressure) / (this.overdrive ? 1.4 : 1) / this.director.spawnRate;
       const doctrine = doctrineAt(this.runMode === 'expedition' ? this.chapter : 1);
-      const r = this.random(); this.spawn(this.chapterTime > 35 && r > 1 - doctrine.heavy ? 2 : this.chapterTime > 3 && r > 1 - doctrine.heavy - Math.max(0.32, doctrine.orbiter) ? 1 : 0, undefined, undefined, this.chapterTime > 25 && this.uid % (this.sector >= 2 ? 8 : 12) === 0);
+      const r = this.random(), roles = Object.keys(ENEMY_ROLES) as EnemyRole[];
+      const role = this.chapterTime > 20 && (this.uid+1) % 9 === 0 && this.enemies.filter(e => e.role && e.hp > 0).length < 6 ? roles[Math.floor((this.uid+1)/9)%roles.length] : undefined;
+      const kind = role ? role==='carrier'?2:role==='hunter'?0:1 : this.chapterTime > 35 && r > 1 - doctrine.heavy ? 2 : this.chapterTime > 3 && r > 1 - doctrine.heavy - Math.max(0.32, doctrine.orbiter) ? 1 : 0;
+      this.spawn(kind, undefined, undefined, this.chapterTime > 25 && this.uid % (this.sector >= 2 ? 8 : 12) === 0, role);
     }
     // Spatial bins keep flocking local; avoid a quadratic whole-horde comparison.
     const bins = new Map<string, Entity[]>();
@@ -533,7 +565,7 @@ export class GameEngine {
       const d = Math.hypot(dx, dz) || 0.01;
       // A coincident spawn or gravity pull still has a deterministic escape heading.
       if (e.kind === 0 && Math.hypot(dx, dz) < 1e-6) { dx = Math.sin(e.id * 2.39996) * d; dz = Math.cos(e.id * 2.39996) * d; }
-      const speed = [2.8, 2.1, 1.4, 1.15][e.kind] * motionScale * (e.kind === 0 ? chaserScale : 1) * (this.overdrive ? 1.2 : 1) * (e.elite ? 1.14 : 1);
+      const speed = [2.8, 2.1, 1.4, 1.15][e.kind] * motionScale * (e.kind === 0 ? chaserScale : 1) * (this.overdrive ? 1.2 : 1) * (e.elite ? 1.14 : 1) * (livePart(e, 'engine') ? 1 : .45);
       let vx = dx / d * speed, vz = dz / d * speed;
       if (e.kind === 0) {
         const band = hostileBand(e), radial = d > band.max ? speed : d < band.min ? -speed * INTERCEPTOR.retreat : 0;
@@ -568,8 +600,25 @@ export class GameEngine {
       if (e.hp <= 0) continue;
       e.x += vx * dt; e.z += vz * dt; e.vx = vx; e.vz = vz;
       clearTerrainPosition(e, e.radius);
-      if (e.kind === 2) this.tickGoliath(e, dt);
-      if (e.kind === 0 || e.kind === 1) this.tickRanged(e, dt);
+      clearStructurePosition(e,e.radius,this.structures);
+      // Cover projection must not pin a strafing ship just inside its hold band.
+      // Slide along the same firing circle to the nearest free point instead.
+      const heldDistance=distance(e,p);
+      if(this.structures.length&&heldDistance<band.min&&heldDistance>band.min-.05){
+        const heading=Math.atan2(e.x-p.x,e.z-p.z),hold=band.min+1e-6;
+        let clear=false;
+        for(let step=1;step<=8&&!clear;step++)for(const side of [-1,1]){
+          const a=heading+step*.025*side,candidate={x:p.x+Math.sin(a)*hold,z:p.z+Math.cos(a)*hold};
+          if(this.structures.some(s=>s.hp>0&&distance(s,candidate)<s.radius+e.radius))continue;
+          if(terrainImpact(candidate,candidate,e.radius))continue;
+          e.x=candidate.x;e.z=candidate.z;clear=true;break;
+        }
+      }
+      this.tickRole(e, dt);
+      if (!e.role || e.role === 'hunter') {
+        if (e.kind === 2) this.tickGoliath(e, dt);
+        if (e.kind === 0 || e.kind === 1) this.tickRanged(e, dt);
+      }
       if (distance(e, p) < e.radius + 0.6) this.hurt([10, 14, 24, 35][e.kind], { x: e.x, z: e.z });
       if (e.kind === 3) {
         const stage = e.hp / e.maxHp > 0.66 ? 1 : e.hp / e.maxHp > 0.33 ? 2 : 3;
@@ -582,7 +631,8 @@ export class GameEngine {
       if (e.kind === 3) this.tickSentinel(e, dt);
       if (e.kind === 3 && e.timer <= 0 && d < 26) {
         e.timer = this.bossPhase === 3 ? 0.65 : this.bossPhase === 2 ? 0.5 : 1.3;
-        const count = this.bossPhase === 2 ? 7 : this.bossPhase === 3 ? 11 : 18;
+        const mounts = Number(livePart(e, 'leftGun')) + Number(livePart(e, 'rightGun'));
+        const count = Math.ceil((this.bossPhase === 2 ? 7 : this.bossPhase === 3 ? 11 : 18) * (mounts === 2 ? 1 : mounts === 1 ? .65 : .3));
         // Replace one existing ring round with a straight, height-aware escort shot.
         // No extra barrage or homing; anti-air acquisition is limited to once per 4s.
         const antiAir = e.age >= (e.escortShotAt ?? 0) + 4 ? this.droneRack.airborne
@@ -605,9 +655,16 @@ export class GameEngine {
     // Recheck clearance after hostile motion, before rendering and firing use it.
     this.droneFormation.tick(0, this.time, p, this.droneRack.airborne.length, this.enemies, this.droneRack.airborne, this.droneRack.units);
     const friendlies = this.missions.mission?.kind === 'rescue' && this.missions.mission.status === 'active' ? this.missions.mission.targets.filter(t => !t.done) : [];
-    const primary = selectTarget(this.enemies, p, this.input, this.targetId, friendlies, PULSE_RANGE, useGame.getState().aimMode); this.targetId = primary?.id ?? 0;
+    const sabotage = this.missions.mission;
+    const transmitter = sabotage?.kind === 'sabotage' && sabotage.status === 'active' ? sabotage.targets[0] : undefined;
+    const hostile = selectTarget(this.enemies, p, this.input, this.targetId, friendlies, PULSE_RANGE, useGame.getState().aimMode);
+    const objectiveAllowed = useGame.getState().aimMode !== 'precision' || this.input.aiming;
+    const objective = objectiveAllowed && transmitter && (transmitter.hp ?? 0) > 0 && distance(transmitter, p) < PULSE_RANGE && !terrainImpact(p, transmitter) && !friendlyInLine(p, transmitter, friendlies) && (!this.input.aiming || Math.abs(angleDifference(Math.atan2(transmitter.x-p.x,transmitter.z-p.z),p.angle)) < .5) ? { ...transmitter, id: -sabotage!.id, hp: transmitter.hp!, maxHp: 180, kind: 1 as const, radius: 1.2, age: 0, timer: 0, elite: false } : undefined;
+    const primary = objective && this.input.aiming && Math.hypot(this.input.aimX-objective.x,this.input.aimZ-objective.z)<1.5 ? objective : hostile ?? objective;
+    this.targetId = primary?.id ?? 0;
     if (primary && !this.input.aiming) p.angle = turnTowards(p.angle, Math.atan2(primary.x - p.x, primary.z - p.z), dt * 6);
     const facingTarget = primary && Math.abs(angleDifference(Math.atan2(primary.x - p.x, primary.z - p.z), p.angle)) < (this.input.aiming ? 0.5 : 0.25);
+    const moduleAim = primary ? aimedPart(primary,this.input,p) : undefined, shotAim = moduleAim?.position ?? primary;
     if (this.input.rocket) this.requestRocket(); this.input.rocket = false;
     if (this.rocketPending > 0) {
       const lock = this.launcherLock(); this.rocketPending = Math.max(0, this.rocketPending - dt);
@@ -618,22 +675,22 @@ export class GameEngine {
     }
     this.shotTimer -= dt;
     if (primary && facingTarget && this.shotTimer <= 0) {
-      this.shotTimer = Math.max(0.1, 0.46 - this.weapons.pulse * 0.045) * this.haste * (this.overdriveTime > 0 ? 0.55 : 1); audio.shot();
+      this.shotTimer = Math.max(0.1, 0.46 - this.weapons.pulse * 0.045) * this.haste * (this.ship === 'vector' ? .92 : 1) * (this.overdriveTime > 0 ? 0.55 : 1); audio.shot();
       const count = Math.ceil(this.weapons.pulse / 2), muzzleLead = Math.min(0.8, Math.max(0.1, distance(primary, p) - primary.radius - 0.15));
       for (let i = 0; i < count && this.bolts.length < LIMITS.bolts; i++) {
         const side = (i - (count - 1) / 2) * 0.18, x = p.x + Math.sin(p.angle) * muzzleLead + Math.cos(p.angle) * side, z = p.z + Math.cos(p.angle) * muzzleLead - Math.sin(p.angle) * side;
         if (terrainImpact(p, { x, z })) continue;
-        const d = Math.hypot(primary.x - x, primary.z - z) || 1;
-        this.bolts.push({ x, z, vx: (primary.x - x) / d * 22, vz: (primary.z - z) / d * 22, enemy: false, age: 0, target: primary.id, damage: (15 + this.weapons.pulse * 4) * this.damage * (this.overdriveTime > 0 ? 1.35 : 1), pierce: this.piercing, hits: [], traveled: 0, range: PULSE_RANGE });
+        const d = Math.hypot(shotAim!.x - x, shotAim!.z - z) || 1;
+        this.bolts.push({ x, z, vx: (shotAim!.x - x) / d * 22, vz: (shotAim!.z - z) / d * 22, enemy: false, age: 0, target: primary.id, part: moduleAim?.part.kind, damage: (15 + this.weapons.pulse * 4) * this.damage * (this.overdriveTime > 0 ? 1.35 : 1), pierce: this.piercing + (evolved(this.weapons.pulse) ? 2 : 0), hits: [], traveled: 0, range: PULSE_RANGE });
       }
     }
     if (this.weapons.rail && primary && facingTarget && this.bolts.length < LIMITS.bolts && cadencePassed(this.time, dt, Math.max(1.2, 4 - this.weapons.rail * 0.32) * this.haste)) {
-      const angle = Math.atan2(primary.x - p.x, primary.z - p.z);
+      const angle = Math.atan2(shotAim!.x - p.x, shotAim!.z - p.z);
       this.bolts.push({ x: p.x + Math.sin(angle) * 0.8, z: p.z + Math.cos(angle) * 0.8, vx: Math.sin(angle) * 40, vz: Math.cos(angle) * 40, age: 0, enemy: false, target: 0, damage: (60 + this.weapons.rail * 14) * this.damage, pierce: 1 + Math.floor(this.weapons.rail / 2), hits: [], traveled: 0, range: 27, playerWeapon: 'rail' });
       audio.shot();
     }
     if (this.weapons.scatter && primary && distance(primary, p) < 12 && this.bolts.length <= LIMITS.bolts - 5 && cadencePassed(this.time, dt, Math.max(0.85, 2.6 - this.weapons.scatter * 0.2) * this.haste)) {
-      const center = Math.atan2(primary.x - p.x, primary.z - p.z);
+      const center = Math.atan2(shotAim!.x - p.x, shotAim!.z - p.z);
       for (let i = -2; i <= 2; i++) {
         const angle = center + i * 0.12;
         this.bolts.push({ x: p.x + Math.sin(angle) * 0.7, z: p.z + Math.cos(angle) * 0.7, vx: Math.sin(angle) * 20, vz: Math.cos(angle) * 20, age: 0, enemy: false, target: 0, damage: (5 + this.weapons.scatter * 2) * this.damage, traveled: 0, range: 11, playerWeapon: 'scatter' });
@@ -641,17 +698,18 @@ export class GameEngine {
       audio.shot();
     }
     this.cryoTimer -= dt;
-    if (this.weapons.cryo && primary && distance(primary, p) < 16 && this.cryoTimer <= 0) {
+    if (this.weapons.cryo && primary && primary.id > 0 && distance(primary, p) < 16 && this.cryoTimer <= 0) {
       this.cryoTimer = 6 * this.haste; this.vortices.push({ x: primary.x, z: primary.z, radius: 3.5 + this.weapons.cryo * 0.3, life: 3.5 }); audio.tone(100, 0.5, 'sine', 0.35, 400);
     }
     this.teslaTimer -= dt;
-    if (this.weapons.tesla && primary && distance(primary, p) < 15 && this.teslaTimer <= 0) {
+    if (this.weapons.tesla && primary && primary.id > 0 && distance(primary, p) < 15 && this.teslaTimer <= 0) {
       this.teslaTimer = 2 * this.haste; const points: [number, number][] = [[p.x, p.z]]; const hit = new Set<number>(); let origin: { x: number; z: number } = p;
       for (let i = 0; i < Math.min(5, 2 + this.weapons.tesla); i++) {
         let target: Entity | undefined = i === 0 ? primary : undefined, best = 7;
         if (i > 0) for (const e of this.enemies) { const d = distance(e, origin); if (e.hp > 0 && !hit.has(e.id) && d < best && !terrainImpact(origin, e) && !friendlyInLine(origin, e, friendlies)) { best = d; target = e; } }
         if (!target) break; hit.add(target.id); points.push([target.x, target.z]); this.hitEnemy(target, (22 + this.weapons.tesla * 12) * this.damage); origin = target;
       }
+      if (evolved(this.weapons.tesla)) for (const id of this.droneRack.airborne) { const unit = this.droneRack.units[id]; unit.battery = Math.min(100, unit.battery + 4); points.push([this.droneFormation.poses[id].x, this.droneFormation.poses[id].z]); }
       this.arcs.push({ points, life: 0.24 }); audio.tone(1600, 0.14, 'sawtooth', 0.18, 100);
     }
     if (useGame.getState().phase !== 'playing') return;
@@ -695,26 +753,43 @@ export class GameEngine {
       if (!b.enemy && b.drone === undefined) {
         const target = byId.get(b.target);
         if (target && target.hp > 0) {
-          const dx = target.x - b.x, dz = target.z - b.z, d = Math.hypot(dx, dz) || 1;
+          const aim = b.part && livePart(target,b.part) ? partPosition(target,b.part,p) : target;
+          const dx = aim.x - b.x, dz = aim.z - b.z, d = Math.hypot(dx, dz) || 1;
           const desired = Math.atan2(dx / d, dz / d), heading = Math.atan2(b.vx, b.vz), speed = Math.hypot(b.vx, b.vz);
           if (Math.abs(angleDifference(desired, heading)) < Math.PI * 0.55) { const angle = turnTowards(heading, desired, dt * 2.2); b.vx = Math.sin(angle) * speed; b.vz = Math.cos(angle) * speed; } else b.target = 0;
         }
       }
-      const oldX = b.x, oldZ = b.z, oldY = b.y ?? 0.7; b.x += b.vx * dt; b.z += b.vz * dt;
-      if (b.y !== undefined) b.y += (b.vy ?? 0) * dt;
+      const slow = b.enemy && evolved(this.weapons.cryo) && this.vortices.some(v => distance(v, b) < v.radius) ? .35 : 1;
+      const oldX = b.x, oldZ = b.z, oldY = b.y ?? 0.7; b.x += b.vx * dt * slow; b.z += b.vz * dt * slow;
+      if (b.y !== undefined) b.y += (b.vy ?? 0) * dt * slow;
       b.traveled = (b.traveled ?? 0) + Math.hypot(b.x - oldX, b.z - oldZ);
       const impact = terrainImpact({ x: oldX, z: oldZ }, b);
-      if (impact) { b.x = impact.x; b.z = impact.z; b.age = 10; this.burst(b.x, b.z, '#e0d2ad', 3); if (b.hostileWeapon === 'missile') this.blast(b.x, b.z, 1.2, '#ffbc65'); continue; }
+      if (impact) {
+        if (b.playerWeapon === 'scatter' && evolved(this.weapons.scatter) && !b.bounce) {
+          const epsilon = .08, nx = terrainImpact({ x: oldX, z: oldZ }, { x: b.x, z: oldZ }) ? -Math.sign(b.vx) : 0;
+          if (nx) b.vx *= -1; else b.vz *= -1;
+          b.x = oldX + Math.sign(b.vx) * epsilon; b.z = oldZ + Math.sign(b.vz) * epsilon; b.bounce = 1; b.target = 0; b.damage *= .8; continue;
+        }
+        b.x = impact.x; b.z = impact.z; b.age = 10; this.burst(b.x, b.z, '#e0d2ad', 3); if (b.hostileWeapon === 'missile') this.blast(b.x, b.z, 1.2, '#ffbc65'); continue;
+      }
+      const structure = structureContact({ x: oldX, z: oldZ }, b, this.structures);
+      if (structure) { this.hitStructure(structure.structure, b.damage); b.age = 10; continue; }
+      if (!b.enemy && this.missions.damageTarget({ x: oldX, z: oldZ }, b, b.damage)) { b.age = 10; this.burst(b.x, b.z, '#ffd073', 3); continue; }
       if (!b.enemy && (friendlyInLine({ x: oldX, z: oldZ }, b, b.drone !== undefined ? droneProtectedBodies : friendlies) || b.drone !== undefined && distance(b, p) < 1.15)) { b.age = 10; this.burst(b.x, b.z, '#89eadd', 3); continue; }
       if (b.drone !== undefined && droneInLine({ x: oldX, y: oldY, z: oldZ }, { x: b.x, y: b.y ?? 0.95, z: b.z }, this.droneFormation.poses, this.droneFormation.count, b.drone, this.droneRack.airborne)) { b.age = 10; this.burst(b.x, b.z, '#89eadd', 3); continue; }
       if (b.traveled > (b.range ?? Infinity)) { b.age = 10; continue; }
       if (b.enemy) {
         const contact = droneContact({ x: oldX, y: oldY, z: oldZ }, { x: b.x, y: b.y ?? 0.7, z: b.z }, this.droneFormation.poses, this.droneRack.airborne);
         if (contact) { this.hitDrone(contact.id, b.damage); b.age = 10; }
+        else if (this.missions.hurtFriendly({x:oldX,y:oldY,z:oldZ},b,b.damage)) { b.age=10; this.burst(b.x,b.z,'#ffbc8a',3); }
         else if (coreContact({ x: oldX, y: oldY, z: oldZ }, { x: b.x, y: b.y ?? 0.7, z: b.z }, p)) { const protectedHit = this.barrier > 0 || p.invulnerable > 0; this.hurt(b.damage, b); b.age = 10; if (b.hostileWeapon === 'ion' && !protectedHit) { this.surge = Math.max(0, this.surge - 18); this.shieldDelay = Math.max(this.shieldDelay, 6); } if (b.hostileWeapon === 'missile') { this.blast(b.x, b.z, 1.2, '#ffbc65'); this.wave(b.x, b.z, 2, '#ffbc65'); } }
       }
       else for (const e of this.enemies) if (e.hp > 0 && !b.hits?.includes(e.id) && distance(b, e) < e.radius + 0.25) {
-        const critical = this.random() < this.criticalChance; this.hitEnemy(e, b.damage * (critical ? 2 : 1), critical); (b.hits ??= []).push(e.id);
+        const critical = this.random() < this.criticalChance; this.hitEnemy(e, b.damage * (critical ? 2 : 1), critical, b.part && livePart(e,b.part) ? partPosition(e,b.part,p) : b); (b.hits ??= []).push(e.id);
+        if (b.playerWeapon === 'rail' && evolved(this.weapons.rail) && !b.split && this.bolts.length <= LIMITS.bolts - 3) {
+          b.split = true; const center = Math.atan2(b.vx, b.vz);
+          for (const offset of [-.2, 0, .2]) { const angle = center + offset; this.bolts.push({ ...b, x: b.x, z: b.z, vx: Math.sin(angle) * 32, vz: Math.cos(angle) * 32, target: 0, age: 0, traveled: 0, range: 10, damage: b.damage * .35, pierce: 1, hits: [e.id], split: true }); }
+        }
         if ((b.pierce ?? 0) <= 0) b.age = 10; else { b.pierce!--; b.target = 0; }
         break;
       }
@@ -729,7 +804,7 @@ export class GameEngine {
     this.gems = this.gems.filter(g => g.value > 0 && g.age < 60);
     for (const h of this.hazards) {
       h.age += dt;
-      if (!h.detonated && h.age >= h.delay) { h.detonated = true; this.blast(h.x, h.z, h.radius * 0.7, '#ff6b9c', true); this.wave(h.x, h.z, h.radius * 1.5, '#ff658d'); this.burst(h.x, h.z, '#ff6488', 35); if (distance(h, p) < h.radius) this.hurt(24, h); }
+      if (!h.detonated && (h.age >= h.delay || h.mine && h.age >= 2 && (distance(h, p) < h.radius || friendlies.some(t=>distance(h,t)<h.radius)))) { h.detonated = true; h.delay = h.age; this.blast(h.x, h.z, h.radius * 0.7, '#ff6b9c', true); this.wave(h.x, h.z, h.radius * 1.5, '#ff658d'); this.burst(h.x, h.z, '#ff6488', 35); if (distance(h, p) < h.radius) this.hurt(24, h); }
     }
     this.hazards = this.hazards.filter(h => h.age < h.delay + h.duration);
     for (const s of this.supplies) { s.age += dt; if (distance(s, p) < 1.1) this.collectSupply(s); }
@@ -738,14 +813,23 @@ export class GameEngine {
     this.caches = this.caches.filter(c => c.age < 90);
     this.checkLevel();
     if (useGame.getState().phase === 'playing' && this.rewards.tick(dt)) { this.publishRewards(); this.publish(); }
-    if (useGame.getState().phase === 'playing') for (const event of this.missions.tick(dt, p, this.kills, () => this.random())) {
+    if (useGame.getState().phase === 'playing' && !this.service && !this.bossSpawned) for (const event of this.missions.tick(dt, p, this.kills, () => this.random(), { enemies: this.enemies, recentHit: this.shieldDelay > 2.5, hazards: this.hazards })) {
       const mission = this.missions.mission!;
-      if (event === 'started') this.announce(mission.title, mission.description);
+      if (event === 'started') {
+        this.announce(mission.title, mission.description);
+        for(const target of mission.targets)clearStructurePosition(target,2,this.structures);
+        if(mission.evacuation)clearStructurePosition(mission.evacuation,3,this.structures);
+        if (['rescue', 'escort', 'sabotage'].includes(mission.kind)) for (let i = 0; i < 2; i++) {
+          const t = mission.targets[i % mission.targets.length]; this.spawn(0, t.x + (i ? -5 : 5), t.z + 3, false, i ? 'minelayer' : 'hunter');
+        }
+      }
+      if (event === 'secured') this.announce('PILOT STABILIZED', 'Crew follows at walking speed. Keep them close and reach the green evacuation zone.');
       if (event === 'rescued') { this.wave(p.x, p.z, 4, '#ffd797'); this.burst(p.x, p.z, '#ffe4a6', 18); audio.salvage(); }
       if (event === 'complete') {
         this.director.recover();
         this.salvage += mission.reward; this.score += 1500; this.surge = Math.min(100, this.surge + 25); this.player.hp = Math.min(this.player.maxHp, this.player.hp + 15);
         this.announce('MISSION COMPLETE', `+${mission.reward} credits · +15 integrity · +25 EMP charge.`); this.wave(p.x, p.z, 6, '#82ffc5'); audio.salvage(); this.publish();
+        if (mission.kind === 'sabotage') for (const e of this.enemies) { e.ranged = undefined; e.cannon = undefined; e.jammed = e.age + 5; }
       }
       if (event === 'failed') this.announce('SIGNAL LOST', 'The window closed. A new operation will follow.');
     }
@@ -764,6 +848,7 @@ export class GameEngine {
   }
 
   private tickRanged(e: Entity, dt: number) {
+    if ((e.jammed ?? 0) > e.age || !livePart(e,'leftGun') && !livePart(e,'rightGun')) { e.ranged = undefined; return; }
     const weapon = enemyWeapon(e), rule = HOSTILE_WEAPONS[weapon], d = distance(e, this.player);
     if (!e.ranged) {
       if (e.timer > 0 || d < rule.min - 0.5 || d > rule.range || terrainImpact(e, this.player)) return;
@@ -772,7 +857,7 @@ export class GameEngine {
         let charging = 0;
         for (const other of this.enemies) if (other.kind === 0 && other.hp > 0 && other.ranged && ++charging >= INTERCEPTOR.maxWindups) return;
       }
-      const antiAir = e.age >= (e.escortShotAt ?? 0) + 4 ? this.droneRack.airborne
+      const antiAir = e.age >= (e.escortShotAt ?? 0) + (e.role === 'hunter' ? 1.5 : 4) ? this.droneRack.airborne
         .map(id => this.droneFormation.poses[id]).filter(p => distance(e, p) < 12 && !terrainImpact(e, p))
         .sort((a, b) => distance(e, a) - distance(e, b))[0] : undefined;
       const lead = e.kind === 0 && !antiAir ? Math.min(0.22, d / rule.speed * 0.2) : 0;
@@ -797,10 +882,45 @@ export class GameEngine {
     else { e.ranged = undefined; e.timer = rule.reload; }
   }
 
+  hitStructure(structure: Structure, damage: number) {
+    if (structure.hp <= 0) return;
+    structure.hp = Math.max(0, structure.hp - damage);
+    if (structure.hp > 0) return;
+    this.blast(structure.x, structure.z, structure.kind === 'fuel' ? 1.8 : .8);
+    this.burst(structure.x, structure.z, '#ffc07b', 12);
+    if (structure.kind === 'fuel') {
+      this.wave(structure.x, structure.z, 4, '#ffba6c');
+      for (const enemy of [...this.enemies]) if (enemy.hp > 0 && distance(enemy, structure) < 4 && !terrainImpact(structure, enemy)) this.hitEnemy(enemy, 140 * this.damage);
+      for (const other of this.structures) if (other !== structure && other.hp > 0 && distance(other, structure) < 4) this.hitStructure(other, 80);
+    }
+  }
+  private damageObjectives(x: number, z: number, radius: number, damage: number) {
+    const m = this.missions.mission;
+    if (m?.kind === 'sabotage' && m.status === 'active' && distance(m.targets[0], { x, z }) < radius) this.missions.damageTarget(m.targets[0], m.targets[0], damage);
+    for (const s of this.structures) if (s.hp > 0 && distance(s, { x, z }) < radius) this.hitStructure(s, damage);
+  }
+  private tickRole(e: Entity, dt: number) {
+    if (!e.role || (e.jammed ?? 0) > e.age) return;
+    e.specialTimer = (e.specialTimer ?? 4) - dt;
+    if (e.specialTimer > 0 || distance(e, this.player) > 26) return;
+    e.specialTimer = e.role === 'carrier' ? 9 : e.role === 'bomber' ? 7 : 5;
+    if (e.role === 'minelayer' && this.hazards.length < LIMITS.hazards - 2) {
+      this.addHazard(e.x, e.z, 1.8, 20); this.hazards.at(-1)!.mine = true;
+    }
+    if (e.role === 'bomber') {
+      const p = this.player, angle = Math.atan2(p.vx || p.x-e.x, p.vz || p.z-e.z);
+      for (let i = -1; i <= 1; i++) this.addHazard(p.x + Math.sin(angle) * i * 3, p.z + Math.cos(angle) * i * 3, 1.8, 1.8);
+      this.wave(p.x, p.z, 5, '#ff7f91', .35);
+    }
+    if (e.role === 'carrier' && livePart(e, 'generator') && this.enemies.filter(child => child.parent === e.id && child.hp > 0).length <= 4 && this.enemies.length <= LIMITS.enemies - 2) {
+      for (const side of [-1, 1]) { this.spawn(0, e.x + side * (e.radius + 1.2), e.z); const child = this.enemies.at(-1)!; child.parent = e.id; child.timer = 3; }
+    }
+  }
   private tickGoliath(e: Entity, dt: number) {
+    if ((e.jammed ?? 0) > e.age || !livePart(e, 'leftGun') && !livePart(e, 'rightGun')) { e.cannon = undefined; return; }
     const d = distance(e, this.player);
     if (e.cannon) {
-      const aim = { x: e.cannon.aimX, z: e.cannon.aimZ }, side = (e.cannonShots ?? 0) % 2 === 0 ? -1 : 1, muzzle = goliathMuzzle(e, aim, side);
+      const aim = { x: e.cannon.aimX, z: e.cannon.aimZ }, side = !livePart(e, 'leftGun') ? 1 : !livePart(e, 'rightGun') ? -1 : (e.cannonShots ?? 0) % 2 === 0 ? -1 : 1, muzzle = goliathMuzzle(e, aim, side);
       if (d < GOLIATH.holdMin || d > GOLIATH.fireRange || terrainImpact(e, muzzle) || terrainImpact(muzzle, aim)) { e.cannon = undefined; e.timer = GOLIATH.retry; return; }
       e.cannon.remaining -= dt;
       if (e.cannon.remaining > 1e-8) return;
@@ -851,6 +971,7 @@ export class GameEngine {
   private detonateCharge(charge: GroundCharge) {
     if (charge.detonated || useGame.getState().phase !== 'playing') return;
     charge.detonated = true;
+    this.damageObjectives(charge.x, charge.z, CHARGE_RULES.radius, CHARGE_RULES.damage * this.damage);
     this.blast(charge.x, charge.z, 4.5, '#ffb167'); this.burst(charge.x, charge.z, '#ffac65', 70);
     this.wave(charge.x, charge.z, CHARGE_RULES.radius, '#ffbc75', 0.85);
     this.trauma = Math.max(this.trauma, 0.65); this.hitStop = Math.max(this.hitStop, 0.05); audio.explosion();
@@ -860,6 +981,7 @@ export class GameEngine {
 
   private detonateRover(rover: GroundRover) {
     if (useGame.getState().phase !== 'playing') return;
+    this.damageObjectives(rover.x, rover.z, ROVER_RULES.blastRadius, ROVER_RULES.damage * this.damage);
     this.blast(rover.x, rover.z, 2.8, '#ffb878'); this.burst(rover.x, rover.z, '#ffb36b', 36);
     this.wave(rover.x, rover.z, ROVER_RULES.blastRadius, '#ffca89', 0.7);
     this.trauma = Math.max(this.trauma, 0.35); this.hitStop = Math.max(this.hitStop, 0.05); audio.explosion();
@@ -899,7 +1021,7 @@ export class GameEngine {
       gun.yaw = heading; gun.barrel = side; gun.flash = DRONE_FIRE.flashDuration; gun.shots++;
       gun.cooldown = Math.max(DRONE_FIRE.minInterval, DRONE_FIRE.interval * this.haste * (this.overdriveTime > 0 ? 0.8 : 1));
       const flight = Math.max(0.06, distance(muzzle, aim) / DRONE_FIRE.speed);
-      this.bolts.push({ ...muzzle, vx: Math.sin(heading) * DRONE_FIRE.speed, vz: Math.cos(heading) * DRONE_FIRE.speed, vy: (target.radius * 0.75 + 0.3 - muzzle.y) / flight, enemy: false, age: 0, target: target.id, damage: droneDamage(this.weapons.glaive) * this.damage * (this.overdriveTime > 0 ? 1.35 : 1), drone: i, traveled: 0, range: DRONE_FIRE.range });
+      this.bolts.push({ ...muzzle, vx: Math.sin(heading) * DRONE_FIRE.speed, vz: Math.cos(heading) * DRONE_FIRE.speed, vy: (target.radius * 0.75 + 0.3 - muzzle.y) / flight, enemy: false, age: 0, target: target.id, damage: droneDamage(this.weapons.glaive) * this.damage * (this.ship === 'bastion' ? 1.2 : 1) * (evolved(this.weapons.glaive) ? 1.25 : 1) * (this.overdriveTime > 0 ? 1.35 : 1), drone: i, traveled: 0, range: DRONE_FIRE.range });
       this.droneRack.spendShot(i);
       audio.droneShot();
     }

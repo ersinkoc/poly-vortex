@@ -2,7 +2,7 @@
 
 [Play the game](https://poly-vortex.oxog.dev) · [Inspect the fleet](https://poly-vortex.oxog.dev/hangar/) · [GitHub](https://github.com/ersinkoc/poly-vortex)
 
-**Source version:** `1.34.0` (in development, not tagged or released). See [CHANGELOG.md](CHANGELOG.md) for changes since `1.33.0`.
+**Source version:** `1.35.0` (in development, not tagged or released). See [CHANGELOG.md](CHANGELOG.md) for changes since `1.33.0`.
 
 A procedural 3D roguelite bullet heaven, built with Next.js 16, React 19, TypeScript 7, React Three Fiber, Drei, Three.js, Zustand, Framer Motion, and Tailwind CSS. All models, effects, terrain, and audio are generated locally. No external fonts, models, textures, or audio files are fetched.
 
@@ -14,7 +14,7 @@ Use Node.js 20.9 or newer and Bun 1.4.3 or newer. Development output is kept in 
 
 Use `MAJOR.MINOR.PATCH` consistently. Bug fixes, balance adjustments, and documentation changes advance `PATCH` (`1.34.0` → `1.34.1` → `1.34.2`); compatible new gameplay features advance `MINOR` (`1.34.2` → `1.35.0`); incompatible save formats or other breaking changes advance `MAJOR`. A feature no longer needs its own minor version, so fixes and smaller updates can have intermediate releases.
 
-Record notable changes under **Unreleased** in [CHANGELOG.md](CHANGELOG.md) as they land. The version in `package.json` is the next intended release; it does not mean that version has been published. To finalize a release, pass `bun run typecheck`, `bun run test`, `bun run build`, and `bun run verify:export`, then move the Unreleased notes into a dated version entry and create the matching `vX.Y.Z` Git tag. The earlier `1.33.1` patch was prepared but never tagged; its fixes are included in the current unreleased `1.34.0` source. GitHub Pages deploys successful pushes to `main` independently of version tags.
+Record notable changes under **Unreleased** in [CHANGELOG.md](CHANGELOG.md) as they land. The version in `package.json` is the next intended release; it does not mean that version has been published. To finalize a release, pass `bun run typecheck`, `bun run test`, `bun run build`, and `bun run verify:export`, then move the Unreleased notes into a dated version entry and create the matching `vX.Y.Z` Git tag. The earlier `1.33.1` patch was prepared but never tagged; its fixes are included in the current unreleased `1.35.0` source. GitHub Pages deploys successful pushes to `main` independently of version tags.
 
 ## Run
 
@@ -42,6 +42,7 @@ The custom domain is `poly-vortex.oxog.dev`, configured in `public/CNAME` and Gi
 ## Play
 
 - **WASD / arrows:** Move with smooth inertia.
+- **Shift:** Hold for slow escort pace when leading rescued crew. On touch, use light joystick input.
 - **Mouse:** Aim your ship and dash direction. Weapons target automatically.
 - **F / targeting button:** Switch Assisted targeting and Precision targeting. Precision requires the cursor in the arena and never falls back to an automatic target.
 - **Space / right-click:** Phase shift. A brief invulnerable dash with a three-second base cooldown.
@@ -52,6 +53,20 @@ The custom domain is `poly-vortex.oxog.dev`, configured in `public/CNAME` and Gi
 - **Touch:** Use the on-screen movement joystick and dash button.
 
 Collect cyan XP prisms. A compact side reel automatically installs one randomized common, rare, or overclocked upgrade without pausing combat. Mix pulse lasers, escort drones, cryo-singularities, Tesla arcs, rail lances, and scatter arrays. At three minutes the Vortex Sentinel arrives. Classic extracts immediately on its defeat; Expedition opens a service and extraction window, then continues into another front. Standard and Overdrive difficulties are available. Every run awards core credits, saved in browser local storage, for permanent armor, damage, and speed upgrades. There are no accounts or server dependencies.
+
+## Tactical battlefield and staged rescue — 1.35.0 (unreleased)
+
+Heavy Goliaths and Sentinels carry four destructible modules. Aim at the two gun mounts to suppress cannon fire or reduce boss barrages, the engine to reduce movement, or the generator to disable armor and support systems. Module pieces disappear when destroyed and leave small bounded wreck effects. Ordinary hull damage and rewards continue separately.
+
+Five specialist roles join normal patrols: Mine weavers leave proximity mines, Aegis tenders protect ships within 5m, Line bombers warn along three ground strikes, Hive carriers launch pairs of interceptors with six live escorts per carrier, and Escort hunters acquire airborne drones more often. Colored identification markers and Drydock entries explain their behavior. Destroying a tender/carrier generator disables its special function.
+
+Each weapon evolves at level 6: pulse bolts gain two penetrations; the escort wing gains 25% laser damage; Cryo fields slow hostile rounds to 35% travel speed; Tesla discharges recharge airborne escort batteries; Rail impacts split once into three fragments; Scatter pellets rebound once from stone cover. Tactical overview and Armory explain the evolutions. Vector cycles its pulse cannon 8% faster; Wraith dashes break charged locks for 2.5s; Aegis protection lasts 5s; Nova gains 30% damage from charged close passes; Bastion starts with an escort module and 20% stronger escort lasers.
+
+The procedural world has open dunes, dense wreck canyons, flat relay yards and deeper crater basins, with continuous ground transitions. Fuel depots can chain explosions into nearby hostile ships. Barricades block vehicle movement and rounds until destroyed. Both use bounded instanced batches.
+
+Rescue operations now have three stages. Clear each pilot's perimeter and stop within 2.4m to stabilize them for 2s, or 3s for the wounded pilot. Moving, nearby hostiles and fresh damage interrupt preparation. The wounded pilot starts at 65% health; stabilization restores 25 health. Hold Shift for escort pace. Stabilized crew follow at walking speed; driving more than 10m away leaves them behind until you regroup. Lead them to the green evacuation zone, clear hostiles within 5m, and hold still for 3s with the crew nearby. Rescue counts increase only after actual evacuation. Enemy rounds, close hostiles and detonated hazards can injure the crew; losing a pilot or missing the deadline fails the operation. Tactical overview shows health, preparation, following and evacuation state. Mission clocks hold during Sentinel duels and service.
+
+Convoy protection, moving salvage interception and transmitter sabotage expand the field-operation cycle. Convoys advance while the core stays close and their path is clear. Salvage runners must be caught before escape. Transmitters take actual weapon/ordnance damage, award salvage and jam hostile charged locks for 5s. New mission, module and evolution states survive flight checkpoints; older checkpoints resume with the new transient fields empty.
 
 ## Expanded fleet and arsenal — 1.34.0 (unreleased)
 

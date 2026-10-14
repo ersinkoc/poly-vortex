@@ -1,20 +1,30 @@
 import * as THREE from 'three';
 
 export const TERRAIN_CELL = 16;
+export const districtAt = (x: number, z: number) => ((Math.floor(x / 64) + Math.floor(z / 64)) % 4 + 4) % 4;
 export type TerrainProp = { x: number; z: number; radius: number; height: number; angle: number; ruin: boolean };
 const hash = (x: number, z: number, salt = 0) => {
   let n = Math.imul(x, 374761393) ^ Math.imul(z, 668265263) ^ salt; n = Math.imul(n ^ n >>> 13, 1274126177); return ((n ^ n >>> 16) >>> 0) / 4294967296;
 };
+const DISTRICT_RELIEF = [.12,.12,.035,.12], DISTRICT_CRATERS = [1,1.4,.25,1.55];
+function districtBlend(bx:number,bz:number,u:number,v:number,values:readonly number[]) {
+  const a=values[((bx+bz)%4+4)%4],b=values[((bx+bz+1)%4+4)%4],c=values[((bx+bz+2)%4+4)%4];
+  return (a*(1-u)+b*u)*(1-v)+(b*(1-u)+c*u)*v;
+}
 export function terrainHeight(x: number, z: number) {
   const cx = Math.floor(x / TERRAIN_CELL), cz = Math.floor(z / TERRAIN_CELL);
   const dx = x - (cx * TERRAIN_CELL + 4 + hash(cx, cz, 91) * 8), dz = z - (cz * TERRAIN_CELL + 4 + hash(cx, cz, 17) * 8);
   const r = Math.hypot(dx, dz), crater = Math.max(0, 1 - r / 3.8);
-  return -0.16 - 0.12 * (Math.sin(x * 0.22) * Math.cos(z * 0.19) + 1) - crater ** 2 * 1.4 - Math.sin(x * 1.1 + z * 0.7) ** 2 * 0.04;
+  // Interpolate district characteristics so crossing a region never creates a cliff.
+  const gx=x/64-.5,gz=z/64-.5,bx=Math.floor(gx),bz=Math.floor(gz),fx=gx-bx,fz=gz-bz;
+  const u=fx*fx*(3-2*fx),v=fz*fz*(3-2*fz);
+  return -0.16 - districtBlend(bx,bz,u,v,DISTRICT_RELIEF) * (Math.sin(x * 0.22) * Math.cos(z * 0.19) + 1) - crater ** 2 * districtBlend(bx,bz,u,v,DISTRICT_CRATERS) - Math.sin(x * 1.1 + z * 0.7) ** 2 * 0.04;
 }
 export function terrainProp(cx: number, cz: number): TerrainProp | null {
   const x = cx * TERRAIN_CELL + 3 + hash(cx, cz, 3) * 10, z = cz * TERRAIN_CELL + 3 + hash(cx, cz, 11) * 10;
-  if (Math.hypot(x, z) < 9 || hash(cx, cz, 55) < 0.17) return null;
-  return { x, z, radius: 1.1 + hash(cx, cz, 23) * 1.4, height: 0.8 + hash(cx, cz, 47) * 2.1, angle: hash(cx, cz, 37) * Math.PI * 2, ruin: hash(cx, cz, 93) > 0.68 };
+  const region = districtAt(x, z);
+  if (Math.hypot(x, z) < 9 || hash(cx, cz, 55) < (region === 0 ? .45 : region === 1 ? .06 : .17)) return null;
+  return { x, z, radius: 1.1 + hash(cx, cz, 23) * (region === 1 ? 2 : 1.4), height: 0.8 + hash(cx, cz, 47) * 2.1, angle: hash(cx, cz, 37) * Math.PI * 2, ruin: region === 1 || region === 2 || hash(cx, cz, 93) > 0.68 };
 }
 export function clearTerrainPosition(body: { x: number; z: number }, radius: number) {
   const cx = Math.floor(body.x / TERRAIN_CELL), cz = Math.floor(body.z / TERRAIN_CELL);

@@ -7,6 +7,13 @@ export const FLIGHTFRAMES = {
   bastion: { name: 'Bastion', code: 'MK.05', role: 'FORTRESS CARRIER', color: '#8bb9ff', hull: 155, shield: 82, speed: .72, damage: .94, portrait: '/ships/bastion.svg', description: 'A broad armored carrier with six drive outlets. Its massive hull and shield hold a line at the cost of mobility.' },
 } as const;
 export const SHIP_IDS = Object.keys(FLIGHTFRAMES) as ShipId[];
+export const SHIP_TRAITS: Record<ShipId, { name: string; detail: string }> = {
+  vector: { name: 'Synchronized battery', detail: 'Pulse cannon cycles are 8% shorter from deployment.' },
+  wraith: { name: 'Ghost shift', detail: 'Dashing breaks charged enemy locks and jams reacquisition for 2.5s.' },
+  aegis: { name: 'Extended Aegis', detail: 'Aegis protection lasts 5s instead of 4s.' },
+  nova: { name: 'Danger reactor', detail: 'Fast close passes charge the reactor for +30% damage. Charge fades in safety.' },
+  bastion: { name: 'Carrier wing', detail: 'Starts with an escort module; escort lasers deal 20% more damage.' },
+};
 export const shipId = (value: unknown): ShipId => typeof value === 'string' && Object.hasOwn(FLIGHTFRAMES, value) ? value as ShipId : 'vector';
 /** Model-local nozzle coordinates, including each nacelle's rear outlet. */
 export const FRAME_ENGINES: Record<ShipId, readonly (readonly [number, number, number])[]> = {

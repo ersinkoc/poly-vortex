@@ -22,6 +22,7 @@ import { loadSave, claimResume } from '@/game/local-save';
 
 import { useShipSync } from './use-ship-sync';
 import { WEAPONS, type Profile, type WeaponId } from '@/game/types';
+import { EVOLUTIONS } from '@/game/battlefield';
 
 const Arena = dynamic(() => import('./arena'), { ssr: false, loading: () => <div className="arena-loading"><Hexagon size={32} /><span>INITIALIZING THE VORTEX</span><i /></div> });
 type Panel = 'protocol' | 'controls' | 'armory' | 'ships' | 'settings' | 'core' | 'records' | 'ordnance' | null;
@@ -59,7 +60,7 @@ function PanelContent({ panel }: { panel: Exclude<Panel, null> }) {
   if (panel === 'protocol') return <FlightManual />;
   if (panel === 'armory') return <>
     <p className="panel-intro">Select your starting module. The pulse cannon is always equipped. Find and evolve every system during your run.</p>
-    <div className="armory-list">{(Object.keys(WEAPONS) as WeaponId[]).map(id => { const w = WEAPONS[id], Icon = weaponIcons[id]; return <button className={`weapon-option ${loadout === id ? 'selected' : ''}`} style={{ '--weapon-color': w.color } as React.CSSProperties} key={id} onClick={() => useGame.setState({ loadout: id })}><span className="weapon-option-icon"><Icon size={27} /></span><div><span className="micro">{w.code}</span><h3>{w.name}</h3><p>{w.description}</p></div><span className="select-indicator">{loadout === id && <Check size={13} />}</span></button>; })}</div>
+    <div className="armory-list">{(Object.keys(WEAPONS) as WeaponId[]).map(id => { const w = WEAPONS[id], Icon = weaponIcons[id]; return <button className={`weapon-option ${loadout === id ? 'selected' : ''}`} style={{ '--weapon-color': w.color } as React.CSSProperties} key={id} onClick={() => useGame.setState({ loadout: id })}><span className="weapon-option-icon"><Icon size={27} /></span><div><span className="micro">{w.code}</span><h3>{w.name}</h3><p>{w.description}</p><p><strong>LEVEL 6 · {EVOLUTIONS[id].name}</strong><br/>{EVOLUTIONS[id].detail}</p></div><span className="select-indicator">{loadout === id && <Check size={13} />}</span></button>; })}</div>
     <div className="panel-footnote"><CircleDot size={13} /> CHANGES APPLY TO YOUR NEXT DEPLOYMENT</div>
     <a className="fleet-link" href="/hangar" target="_blank" rel="noreferrer">INSPECT THE FLEET <ArrowUpRight size={15} /></a>
   </>;

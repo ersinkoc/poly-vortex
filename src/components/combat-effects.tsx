@@ -70,7 +70,7 @@ function Battlefield() {
     if (danger.current) {
       engine.hazards.forEach((h, i) => {
         transform.position.set(h.x, 0.07, h.z); transform.rotation.set(-Math.PI / 2, 0, clock.elapsedTime * 0.6); transform.scale.setScalar(h.radius); transform.updateMatrix(); danger.current!.setMatrixAt(i, transform.matrix);
-        danger.current!.setColorAt(i, tint.set('#ff497b').multiplyScalar(h.detonated ? 4 : 0.65 + Math.sin(clock.elapsedTime * (h.age / h.delay * 9 + 3)) * 0.3 + h.age / h.delay));
+        danger.current!.setColorAt(i, tint.set(h.mine&&!h.detonated?'#ffbb72':'#ff497b').multiplyScalar(h.detonated ? 4 : 0.65 + Math.sin(clock.elapsedTime * (h.age / h.delay * 9 + 3)) * 0.3 + h.age / h.delay));
       }); danger.current.count = active ? engine.hazards.length : 0; danger.current.instanceMatrix.needsUpdate = true; if (danger.current.instanceColor) danger.current.instanceColor.needsUpdate = true;
     }
     if (elite.current) {

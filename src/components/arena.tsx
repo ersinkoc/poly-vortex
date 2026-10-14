@@ -22,6 +22,7 @@ import CinematicEffects from './cinematic-effects';
 import EnemyWeaponSignals from './enemy-weapon-signals';
 import { hostileBoltColor } from '@/game/enemy-weapons';
 import ServiceBeacon from './service-beacon';
+import BattlefieldActors from './battlefield-actors';
 
 const dummy = new THREE.Object3D();
 const color = new THREE.Color();
@@ -217,7 +218,7 @@ export default function Arena() {
     <color attach="background" args={['#080e15']} />
     <fog attach="fog" args={['#080e15', 28, 72]} />
     <ShipLighting followPlayer />
-    <SceneController /><Terrain /><ShipFleet />
+    <SceneController /><Terrain /><ShipFleet /><BattlefieldActors />
     {phase !== 'menu' && <><MissionActors /><WorldLifeActors /><ServiceBeacon /><TargetMarker /><ProtocolRing /><Projectiles /><EnemyWeaponSignals /><Effects /><CombatEffects /><CinematicEffects /><Stars radius={65} depth={35} count={600} factor={1.3} saturation={0} fade speed={0.1} /></>}
     <PostFX />
   </Canvas>;

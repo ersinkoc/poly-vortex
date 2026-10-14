@@ -16,6 +16,28 @@ afterEach(() => { useGame.setState(previous); audio.enabled = sound; });
 function boss() { game.time = RUN_DURATION; game.bossSpawned = true; game.spawn(3, 0, -14); return game.enemies.at(-1)!; }
 function maxBuild() { game.damage = 4; game.haste = 0.28; game.criticalChance = 0.75; game.weapons = { pulse: 6, glaive: 6, cryo: 6, tesla: 6, rail: 6, scatter: 6 }; game.droneRack.install(6); }
 
+test('Sentinel death does not freeze the simulation or draw an oversized volume in either mode', () => {
+  for (const mode of ['expedition', 'classic'] as const) {
+    useGame.setState({ phase: 'playing', runMode: mode }); game.reset();
+    const sentinel = boss(); game.hitEnemy(sentinel, 1e9);
+    expect(game.hitStop).toBe(0);
+    expect(game.blasts.at(-1)?.size).toBeLessThanOrEqual(2.5);
+    expect(game.sentinels).toBe(1);
+  }
+});
+
+test('ordinary heavy enemy impacts retain their brief hit pause', () => {
+  game.spawn(2, 0, -10); game.hitEnemy(game.enemies[0], 1e9);
+  expect(game.hitStop).toBe(0.05);
+});
+
+test('a finishing rocket does not leave a Sentinel hit pause behind', () => {
+  const sentinel = boss(); sentinel.hp = 1;
+  game.explodeRocket({ x: sentinel.x, z: sentinel.z, vx: 0, vz: 0, age: 0, target: sentinel.id, traveled: 0, trail: 0 }, sentinel.id);
+  expect(game.sentinels).toBe(1);
+  expect(game.hitStop).toBe(0);
+});
+
 test('two upgraded ordnance impacts cannot erase a late-run Sentinel', () => {
   game.time = RUN_DURATION; game.damage = 4; game.haste = 0.28; game.criticalChance = 0.75;
   game.weapons = { pulse: 6, glaive: 6, cryo: 6, tesla: 6, rail: 6, scatter: 6 }; game.spawn(3, 0, -18); const boss = game.enemies[0];
