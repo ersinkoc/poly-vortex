@@ -32,7 +32,7 @@ export default function RunPersistence() {
     const storage = (event: StorageEvent) => {
       if (event.key !== SAVE_KEY) return;
       const state = useGame.getState(), document = loadSave();
-      useGame.setState({ profile: readProfile(), lastFlight: document?.lastFlight ?? null, ...(state.phase === 'menu' ? { savedFlight: savedFlightSummary() } : {}) });
+      useGame.setState({ profile: readProfile(), lastFlight: document?.lastFlight ?? null, lastVictory: document?.lastVictory ?? null, lastAchievement: document?.lastAchievement ?? null, lastSavedAt: document?.updatedAt ?? 0, ...(state.phase === 'menu' ? { savedFlight: savedFlightSummary() } : {}) });
       if (document && state.runKey && (document.currentRun !== state.runKey || document.ownerId !== LOCAL_WRITER_ID) && ['playing', 'paused'].includes(state.phase)) { useGame.setState({ phase: 'paused', saveStatus: 'conflict' }); }
     };
     const interval = setInterval(() => { if (useGame.getState().phase === 'playing') schedule(); }, 2000);
