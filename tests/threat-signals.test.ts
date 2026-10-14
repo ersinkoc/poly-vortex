@@ -48,3 +48,35 @@ test('warning slots stay bounded and prioritize imminent core threats over safe 
   for (let i = 0; i < slots.length; i++) expect(signals.slots[i]).toBe(slots[i]);
   expect(readWeaponThreat(urgent, core, signals.slots[0])).toBe(true);
 });
+
+test('dense locks share three distinct direction warnings while retaining the full danger count', () => {
+  const wave = Array.from({ length: 16 }, (_, i) => {
+    const e = hostile(i + 1), angle = i < 4 ? 0 : i < 8 ? Math.PI / 2 : Math.PI;
+    e.x = Math.sin(angle) * 7; e.z = Math.cos(angle) * 7; e.ranged!.remaining = 0.1 + i * 0.02;
+    return e;
+  });
+  const signals = new ThreatSignals(); signals.tick(wave, core);
+  expect(signals.locks).toBe(16);
+  expect(signals.directions).toHaveLength(3);
+  expect(signals.directions.map(t => t.id)).toEqual([1, 5, 9]);
+  expect(signals.targets).toHaveLength(0);
+});
+
+test('ground aim markers leave the core clear and stale marks cannot displace imminent directions', () => {
+  const signals = new ThreatSignals(), urgent = hostile(1), stale = Array.from({ length: 10 }, (_, i) => {
+    const e = hostile(i + 2); e.ranged!.aimX = 6; return e;
+  });
+  signals.tick([...stale, urgent], core);
+  expect(signals.directions.map(t => t.id)).toEqual([1]);
+  expect(signals.targets).toHaveLength(1);
+  for (const mark of signals.targets) expect(Math.hypot(mark.x, mark.z)).toBeGreaterThanOrEqual(3);
+});
+
+test('directions merge across the bearing wrap and release immediately after dodging', () => {
+  const a = hostile(1), b = hostile(2); a.x = -0.1; a.z = -7; b.x = 0.1; b.z = -7;
+  const signals = new ThreatSignals(); signals.tick([a, b], core);
+  expect(signals.locks).toBe(2); expect(signals.directions).toHaveLength(1);
+  signals.tick([a, b], { x: 4, z: 0 });
+  expect(signals.locks).toBe(0); expect(signals.directions).toHaveLength(0);
+  signals.tick([], core); expect(signals.targets).toHaveLength(0);
+});

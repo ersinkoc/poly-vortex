@@ -3,7 +3,7 @@ import { coreContact, enemyWeapon, HOSTILE_WEAPONS, rangedMuzzle } from './enemy
 import { GOLIATH, goliathMuzzle } from './goliath-ai';
 import { terrainImpact } from './terrain';
 
-export const THREAT_SIGNALS = { capacity: 12 } as const;
+export const THREAT_SIGNALS = { capacity: 12, directions: 3, targets: 4, coreClearance: 3, directionGap: 0.6, targetGap: 0.9 } as const;
 export type WeaponThreat = { id: number; x: number; z: number; bearing: number; remaining: number; progress: number; dangerous: boolean; color: string };
 const emptyThreat = (): WeaponThreat => ({ id: 0, x: 0, z: 0, bearing: 0, remaining: 0, progress: 0, dangerous: false, color: '#ff718b' });
 
@@ -37,6 +37,8 @@ export function readWeaponThreat(e: Entity, player: { x: number; z: number }, ou
 export class ThreatSignals {
   readonly slots = Array.from({ length: THREAT_SIGNALS.capacity }, emptyThreat);
   private readonly scratch = emptyThreat();
+  readonly directions: WeaponThreat[] = [];
+  readonly targets: WeaponThreat[] = [];
   count = 0; locks = 0; soonest = Infinity;
   tick(enemies: readonly Entity[], player: { x: number; z: number }) {
     this.count = 0; this.locks = 0; this.soonest = Infinity;
@@ -50,6 +52,18 @@ export class ThreatSignals {
       this.count = Math.min(this.slots.length, this.count + 1);
       for (let i = this.count - 1; i > at; i--) Object.assign(this.slots[i], this.slots[i - 1]);
       Object.assign(this.slots[at], next);
+    }
+    // Render a few urgent bearings, rather than stacking every lock on the hull.
+    // These reuse sorted slots; all locks still contribute to the alarm/countdown.
+    this.directions.length = 0; this.targets.length = 0;
+    for (let i = 0; i < this.count; i++) {
+      const threat = this.slots[i];
+      if (threat.dangerous && this.directions.length < THREAT_SIGNALS.directions && !this.directions.some(shown => {
+        const angle = threat.bearing - shown.bearing;
+        return Math.abs(Math.atan2(Math.sin(angle), Math.cos(angle))) < THREAT_SIGNALS.directionGap;
+      })) this.directions.push(threat);
+      if (this.targets.length < THREAT_SIGNALS.targets && Math.hypot(threat.x - player.x, threat.z - player.z) >= THREAT_SIGNALS.coreClearance
+        && !this.targets.some(shown => Math.hypot(threat.x - shown.x, threat.z - shown.z) < THREAT_SIGNALS.targetGap)) this.targets.push(threat);
     }
   }
 }

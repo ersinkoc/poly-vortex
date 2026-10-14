@@ -59,7 +59,7 @@ function Effects() {
   const vortex = useRef<THREE.InstancedMesh>(null), arcs = useRef<THREE.LineSegments>(null);
   const arcPositions = useMemo(() => new Float32Array(600), []);
   useFrame(({ clock }) => {
-    if (reticle.current) { reticle.current.position.set(engine.input.aimX, 0.04, engine.input.aimZ); reticle.current.visible = useGame.getState().phase === 'playing' && engine.input.aiming; reticle.current.rotation.y = clock.elapsedTime * 0.5; }
+    if (reticle.current) { reticle.current.position.set(engine.input.aimX, 0.04, engine.input.aimZ); reticle.current.visible = useGame.getState().phase === 'playing' && engine.input.aiming && Math.hypot(engine.input.aimX - engine.player.x, engine.input.aimZ - engine.player.z) > 2.3; reticle.current.rotation.y = clock.elapsedTime * 0.5; }
     if (vortex.current) {
       let n = 0;
       for (const v of engine.vortices) for (let j = 0; j < 5 && n < 30; j++) {

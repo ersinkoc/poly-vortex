@@ -45,6 +45,10 @@ The custom domain is `poly-vortex.oxog.dev`, configured in `public/CNAME` and Gi
 
 Collect cyan XP prisms. A compact side reel automatically installs one randomized common, rare, or overclocked upgrade without pausing combat. Mix pulse lasers, escort drones, cryo-singularities, and Tesla arcs. At three minutes the Vortex Sentinel arrives. Classic extracts immediately on its defeat; Expedition opens a service and extraction window, then continues into another front. Standard and Overdrive difficulties are available. Every run awards core credits, saved in browser local storage, for permanent armor, damage, and speed upgrades. There are no accounts or server dependencies.
 
+## Clear hull and compact threat warnings — 1.33.0
+
+Incoming fire uses up to three thin directional chevrons outside the hull, merging nearby bearings and prioritizing the earliest shot. A small offset countdown retains the full number of dangerous locks. Ground aim marks stay at least 3m from the core, share nearby positions, and cap at four; aim assist and cursor visuals also leave the hull clear. Indicators no longer add a strong bloom halo over the ship. Dodging or using cover still clears warnings based on the actual locked trajectory.
+
 ## Sentinel service panel placement — 1.32.0
 
 The post-Sentinel service countdown, docking progress, and extraction button stay fully inside the left edge of the flight HUD. The tactical overview keeps its separate, full-width service card layout on desktop and mobile.
