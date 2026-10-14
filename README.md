@@ -45,6 +45,10 @@ The custom domain is `poly-vortex.oxog.dev`, configured in `public/CNAME` and Gi
 
 Collect cyan XP prisms. A compact side reel automatically installs one randomized common, rare, or overclocked upgrade without pausing combat. Mix pulse lasers, escort drones, cryo-singularities, and Tesla arcs. At three minutes the Vortex Sentinel arrives. Classic extracts immediately on its defeat; Expedition opens a service and extraction window, then continues into another front. Standard and Overdrive difficulties are available. Every run awards core credits, saved in browser local storage, for permanent armor, damage, and speed upgrades. There are no accounts or server dependencies.
 
+## Sentinel service panel placement — 1.32.0
+
+The post-Sentinel service countdown, docking progress, and extraction button stay fully inside the left edge of the flight HUD. The tactical overview keeps its separate, full-width service card layout on desktop and mobile.
+
 ## Aegis Overdrive and resumable local flights — 1.31.0
 
 Press **R** or tap **AEGIS** for four seconds of full core protection against contact, projectiles and ground strikes. Its 90-second recharge counts from activation and is independent of weapon haste. The temporary full hex shell and action countdown show when protection is active. Ordinary regenerating shields continue separately; airborne drones retain their own hull. Pause/hit-stop freeze the ability, and saved flights retain both the remaining protection and cooldown.
