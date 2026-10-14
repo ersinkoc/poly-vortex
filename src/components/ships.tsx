@@ -96,7 +96,7 @@ function EnemyShips({ kind, asset, shadow }: { kind: 0 | 1 | 2 | 3; asset: Actor
       if (e.kind !== kind) continue;
       const orbit = menu ? clock.elapsedTime * 0.035 : 0;
       const x = e.x * Math.cos(orbit) - e.z * Math.sin(orbit), z = e.x * Math.sin(orbit) + e.z * Math.cos(orbit);
-      const heavy = !menu ? kind === 2 ? goliathPose(e, engine.player) : kind === 1 ? rangedPose(e, engine.player) : null : null;
+      const heavy = !menu ? kind === 2 ? goliathPose(e, engine.player) : kind === 0 || kind === 1 ? rangedPose(e, engine.player) : null : null;
       const yaw = heavy?.yaw ?? (kind === 1 ? clock.elapsedTime * 0.25 + e.id : Math.atan2((menu ? 0 : engine.player.x) - x, (menu ? 0 : engine.player.z) - z));
       const scale = e.radius * (menu ? 1.45 : 1);
       matrixObject.position.set(x, e.radius * 0.75 + 0.3 + Math.sin(clock.elapsedTime * 2 + e.id) * 0.045, z);

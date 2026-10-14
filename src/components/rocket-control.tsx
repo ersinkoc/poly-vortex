@@ -5,7 +5,7 @@ import { engine } from '@/game/engine';
 import { useGame } from '@/game/store';
 import { LAUNCHER_COPY, ROCKET_RULES } from '@/game/launcher';
 
-const targets = ['CHASER', 'ORBITER', 'GOLIATH', 'SENTINEL'];
+const targets = ['INTERCEPTOR', 'ORBITER', 'GOLIATH', 'SENTINEL'];
 export default function RocketControl({ onHelp, compact = false }: { onHelp: () => void; compact?: boolean }) {
   const s = useGame(), ready = s.rocketReady && s.phase === 'playing', pending = s.rocketPending > 0;
   const copy = LAUNCHER_COPY[s.launcherStatus];

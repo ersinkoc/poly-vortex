@@ -1,6 +1,6 @@
 'use client';
 
-import { hostileBoltColor } from '@/game/enemy-weapons';
+import { hostileBoltColor, rangedPose } from '@/game/enemy-weapons';
 import { useFrame } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
@@ -170,8 +170,9 @@ function Exhaust() {
     if (renderQuality(s) === 'high') for (const e of engine.enemies) {
       if (e.kind !== 0 && e.kind !== 2) continue;
       const orbit = menu ? clock.elapsedTime * 0.035 : 0, x = e.x * Math.cos(orbit) - e.z * Math.sin(orbit), z = e.x * Math.sin(orbit) + e.z * Math.cos(orbit);
-      const yaw = Math.atan2((menu ? 0 : p.x) - x, (menu ? 0 : p.z) - z), size = e.radius * (menu ? 1.45 : 1);
-      const height = e.radius * 0.75 + 0.3 + Math.sin(clock.elapsedTime * 2 + e.id) * 0.045;
+      const gunship = !menu && e.kind === 0 ? rangedPose(e, p) : null;
+      const yaw = gunship?.yaw ?? Math.atan2((menu ? 0 : p.x) - x, (menu ? 0 : p.z) - z), size = e.radius * (menu ? 1.45 : 1);
+      const height = gunship?.y ?? e.radius * 0.75 + 0.3 + Math.sin(clock.elapsedTime * 2 + e.id) * 0.045;
       const pitch = Math.sin(e.age + e.id) * 0.025, roll = Math.cos(e.age * 1.5 + e.id) * (e.kind === 0 ? 0.09 : 0.025);
       if (e.kind === 0) for (const side of [-1, 1]) add(x, z, height, yaw, size, side * 0.37, -0.05, 0.862, 0.75, pitch, roll);
       else for (const side of [-1, 1]) { add(x, z, height, yaw, size, side * 0.74, -0.03, 1.03, 0.6, pitch, roll); add(x, z, height, yaw, size, side * 0.32, -0.13, 0.949, 0.48, pitch, roll); }

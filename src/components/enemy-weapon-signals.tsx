@@ -17,7 +17,7 @@ export default function EnemyWeaponSignals() {
   useFrame(() => {
     let beamCount = 0, lightCount = 0; const state = useGame.getState(), { pose, color } = scratch;
     if (state.phase === 'playing' || state.phase === 'paused') for (const e of engine.enemies) {
-      if (e.kind !== 1 || e.hp <= 0) continue;
+      if ((e.kind !== 0 && e.kind !== 1) || e.hp <= 0) continue;
       const rule = HOSTILE_WEAPONS[enemyWeapon(e)], charge = e.ranged;
       const flash = e.weaponFlash && e.age - e.weaponFlash.at < 0.16 ? e.weaponFlash : null;
       if (!charge && !flash) continue;

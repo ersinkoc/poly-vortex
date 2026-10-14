@@ -17,7 +17,7 @@ import { DRONE_FIRE, DroneFormation, DroneRack, createDroneGuns, droneClearance,
 import { droneDockPose } from './player-pose';
 import { CHARGE_RULES, chargeRemaining, type GroundCharge } from './ground-charges';
 import { RoverBay, ROVER_RULES, type GroundRover } from './ground-rovers';
-import { coreContact, enemyWeapon, hostileBand, HOSTILE_WEAPONS, rangedMuzzle } from './enemy-weapons';
+import { coreContact, enemyWeapon, hostileBand, HOSTILE_WEAPONS, INTERCEPTOR, rangedMuzzle } from './enemy-weapons';
 import { SENTINEL, sentinelDefense, sentinelHealth } from './sentinel';
 import { FLIGHTFRAMES, type ShipId } from './flightframes';
 import { GOLIATH, goliathMuzzle, goliathRadial } from './goliath-ai';
@@ -84,6 +84,7 @@ export class GameEngine {
   private hudTimer = 0; private comboTimer = 0; private seed: number; private overdrive = false;
   private hazardTimer = 37; private supplyTimer = 24; private repairTimer = SUPPLY_RULES.repair.first as number; private ammoTimer = SUPPLY_RULES.ammo.first as number;
   private lastCombatSupply = -25;
+  private nextInterceptorSalvo = 0;
   constructor(seed = Date.now()) {
     this.seed = seed >>> 0;
     this.roverBay = new RoverBay(this.seed);
@@ -124,6 +125,7 @@ export class GameEngine {
     this.damage = frame.damage * (1 + s.profile.upgrades.reactor * 0.08); this.speed = frame.speed * (1 + s.profile.upgrades.thrusters * 0.06);
     this.magnet = 1; this.haste = 1; this.overdrive = s.difficulty === 'overdrive';
     this.uid = 0; this.spawnTimer = 0; this.shotTimer = 0; this.cryoTimer = 2; this.teslaTimer = 1; this.hudTimer = 0; this.comboTimer = 0;
+    this.nextInterceptorSalvo = 0;
     this.droneRack.reset(this.weapons.glaive);
     this.droneFormation.reset(this.player, this.droneRack.slots.length);
     this.input.keys.clear(); this.input.dash = false; this.input.moveX = 0; this.input.moveZ = 0; this.input.aiming = false;
@@ -356,7 +358,7 @@ export class GameEngine {
       rocketNotice: this.rocketNotice, rocketNoticeKind: this.rocketNoticeKind, rocketNoticeTime: this.rocketNoticeTime,
       encounter: this.director.phase, encounterRemaining: this.director.remaining, encounterRound: this.director.round, combatPressure: this.director.stress,
       rocketAmmo: this.rocketAmmo, rocketCapacity: ROCKET_CAPACITY, rocketCooldown: this.rocketCooldown, rocketReady: lock.status === 'ready',
-      targeting: this.input.aiming ? 'aim' : 'auto', target: target ? { id: target.id, kind: target.kind, weapon: target.kind === 1 ? enemyWeapon(target) : undefined, distance: distance(target, this.player), hp: target.hp, maxHp: target.maxHp } : null,
+      targeting: this.input.aiming ? 'aim' : 'auto', target: target ? { id: target.id, kind: target.kind, weapon: target.kind === 0 || target.kind === 1 ? enemyWeapon(target) : undefined, distance: distance(target, this.player), hp: target.hp, maxHp: target.maxHp } : null,
       time: this.time, hp: this.player.hp, maxHp: this.player.maxHp, xp: this.xp, nextXp: this.nextXp, level: this.level, score: this.score, kills: this.kills, combo: this.combo, dash: this.player.dashCooldown, enemies: this.enemies.length, weapons: { ...this.weapons },
       shield: this.shield, maxShield: this.maxShield, surge: this.surge, sector: this.sector, bossPhase: this.bossPhase, peakCombo: this.peakCombo, elites: this.eliteKills, caches: this.caches.length, salvage: this.salvage, overdrive: this.overdriveTime, repair: this.repairTime, announcement: this.announcement, announcementDetail: this.announcementDetail, announcementTime: this.announcementTime,
       mission: this.missions.snapshot(), missionsCompleted: this.missions.completed, rescued: this.missions.rescued,
@@ -485,9 +487,22 @@ export class GameEngine {
     for (const e of this.enemies) {
       if (e.hp <= 0) continue;
       e.age += dt; e.timer -= dt;
-      const dx = p.x - e.x, dz = p.z - e.z, d = Math.hypot(dx, dz) || 0.01;
+      let dx = p.x - e.x, dz = p.z - e.z;
+      const d = Math.hypot(dx, dz) || 0.01;
+      // A coincident spawn or gravity pull still has a deterministic escape heading.
+      if (e.kind === 0 && Math.hypot(dx, dz) < 1e-6) { dx = Math.sin(e.id * 2.39996) * d; dz = Math.cos(e.id * 2.39996) * d; }
       const speed = [2.8, 2.1, 1.4, 1.15][e.kind] * motionScale * (e.kind === 0 ? chaserScale : 1) * (this.overdrive ? 1.2 : 1) * (e.elite ? 1.14 : 1);
       let vx = dx / d * speed, vz = dz / d * speed;
+      if (e.kind === 0) {
+        const band = hostileBand(e), radial = d > band.max ? speed : d < band.min ? -speed * INTERCEPTOR.retreat : 0;
+        const side = (e.id + Math.floor(e.age / (5 + e.id % 3))) % 2 ? 1 : -1;
+        const strafe = speed * (e.ranged ? 0.12 : d < band.max + 4 ? 0.5 : 0.22) * side;
+        vx = dx / d * radial - dz / d * strafe; vz = dz / d * radial + dx / d * strafe;
+        // Slide around nearby cover instead of driving straight into its collision shell.
+        if (d > band.max && terrainImpact(e, { x: e.x + vx * 0.6, z: e.z + vz * 0.6 }, e.radius)) {
+          vx = -dz / d * speed * side; vz = dx / d * speed * side;
+        }
+      }
       if (e.kind === 2) { const radial = e.cannon && d >= GOLIATH.holdMin ? 0 : goliathRadial(d, speed); vx = dx / d * radial; vz = dz / d * radial; }
       if (e.kind === 1 || e.kind === 3) {
         const band = hostileBand(e), radial = d > band.max ? speed : d < band.min ? -speed * 0.85 : 0;
@@ -503,8 +518,8 @@ export class GameEngine {
         }
       }
       const band = e.kind === 2 ? { min: GOLIATH.holdMin, max: GOLIATH.holdMax } : hostileBand(e);
-      if (e.kind !== 0 && d <= band.max) {
-        const radial = vx * dx / d + vz * dz / d, limit = d < band.min ? -speed * (e.kind === 2 ? GOLIATH.retreat : 0.85) : 0;
+      if (d <= band.max) {
+        const radial = vx * dx / d + vz * dz / d, limit = d < band.min ? -speed * (e.kind === 0 ? INTERCEPTOR.retreat : e.kind === 2 ? GOLIATH.retreat : 0.85) : 0;
         if (radial > limit) { vx -= dx / d * (radial - limit); vz -= dz / d * (radial - limit); }
       }
       for (const v of this.vortices) { const vd = distance(e, v); if (vd < v.radius && vd > 0.1) { vx += (v.x - e.x) / vd * 5; vz += (v.z - e.z) / vd * 5; this.hitEnemy(e, dt * (12 + this.weapons.cryo * 7) * this.damage); } }
@@ -512,8 +527,8 @@ export class GameEngine {
       e.x += vx * dt; e.z += vz * dt; e.vx = vx; e.vz = vz;
       clearTerrainPosition(e, e.radius);
       if (e.kind === 2) this.tickGoliath(e, dt);
-      if (e.kind === 1) this.tickRanged(e, dt);
-      if (d < e.radius + 0.6) this.hurt([10, 14, 24, 35][e.kind], e);
+      if (e.kind === 0 || e.kind === 1) this.tickRanged(e, dt);
+      if (distance(e, p) < e.radius + 0.6) this.hurt([10, 14, 24, 35][e.kind], { x: e.x, z: e.z });
       if (e.kind === 3) {
         const stage = e.hp / e.maxHp > 0.66 ? 1 : e.hp / e.maxHp > 0.33 ? 2 : 3;
         if (stage !== this.bossPhase) {
@@ -696,11 +711,19 @@ export class GameEngine {
     const weapon = enemyWeapon(e), rule = HOSTILE_WEAPONS[weapon], d = distance(e, this.player);
     if (!e.ranged) {
       if (e.timer > 0 || d < rule.min - 0.5 || d > rule.range || terrainImpact(e, this.player)) return;
+      if (e.kind === 0) {
+        if (this.time < this.nextInterceptorSalvo) return;
+        let charging = 0;
+        for (const other of this.enemies) if (other.kind === 0 && other.hp > 0 && other.ranged && ++charging >= INTERCEPTOR.maxWindups) return;
+      }
       const antiAir = e.age >= (e.escortShotAt ?? 0) + 4 ? this.droneRack.airborne
         .map(id => this.droneFormation.poses[id]).filter(p => distance(e, p) < 12 && !terrainImpact(e, p))
         .sort((a, b) => distance(e, a) - distance(e, b))[0] : undefined;
-      const aim = antiAir ?? this.player;
+      const lead = e.kind === 0 && !antiAir ? Math.min(0.22, d / rule.speed * 0.2) : 0;
+      const aim = antiAir ?? { x: this.player.x + this.player.vx * lead, z: this.player.z + this.player.vz * lead };
+      if (terrainImpact(e, aim)) return;
       e.ranged = { remaining: rule.windup, aimX: aim.x, aimY: antiAir?.y ?? 0.95, aimZ: aim.z, rounds: rule.rounds };
+      if (e.kind === 0) this.nextInterceptorSalvo = this.time + INTERCEPTOR.salvoSpacing;
       if (antiAir) e.escortShotAt = e.age;
       return;
     }

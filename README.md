@@ -45,6 +45,12 @@ The custom domain is `poly-vortex.oxog.dev`, configured in `public/CNAME` and Gi
 
 Collect cyan XP prisms. A compact side reel automatically installs one randomized common, rare, or overclocked upgrade without pausing combat. Mix pulse lasers, escort drones, cryo-singularities, and Tesla arcs. At three minutes the Vortex Sentinel arrives. Classic extracts immediately on its defeat; Expedition opens a service and extraction window, then continues into another front. Standard and Overdrive difficulties are available. Every run awards core credits, saved in browser local storage, for permanent armor, damage, and speed upgrades. There are no accounts or server dependencies.
 
+## Flanking interceptor gunships — 1.29.0
+
+Small enemies are now twin-gun skirmishers instead of contact pursuers. They approach at an angle, maintain a 5.5–8m firing band, strafe with varied reversal intervals, and retreat faster when the core closes in. Local separation cannot push them inward through their firing boundary; a coincident spawn has a finite escape direction. A short obstacle lookahead helps incoming ships slide around nearby cover without adding global pathfinding.
+
+Pink firing lanes telegraph a 0.55s windup, followed by two straight 4-damage rounds 0.2s apart and a 4.2s reload. A short, capped velocity lead is sampled when the warning starts; the aim point then locks, allowing sideways dodges. Stone cover, escaping weapon range, pause and hit-stop respect the same weapon checks as the other ranged classes. Bullets and muzzle flashes originate at the small model's actual alternating barrels. The fleet admits at most four simultaneous interceptor windups, spaced at least 0.35s apart, to limit crossfire in large waves. Physical contact still hurts if the player drives into a hostile; its shield patch follows the contact position rather than the ship's retreat velocity. Existing orbiter, siege carrier and Sentinel weapons keep their timings.
+
 ## Live fleet intro — 1.28.0
 
 The desktop launch screen again shows the selected warship surrounded by the original slowly rotating enemy formation: interceptors, ranged craft and heavy armored vehicles. The camera opens out to show both sides while keeping the direct ship-selection cards and deployment controls. The existing instanced fleet renderer handles the thirty preview actors; menu actors do not fire, run combat AI or advance the run. Mobile keeps the lightweight portrait-based launch screen.

@@ -2,7 +2,7 @@ export type RunMode = 'expedition' | 'classic';
 export const EXPEDITION = { combatDuration: 180, serviceDuration: 30, dockDuration: 3, dockRadius: 3.4 } as const;
 export const DOCTRINES = [
   { name: 'BALANCED FRONT', detail: 'Mixed patrols. Find your rhythm.', heavy: 0.09, orbiter: 0.19, speed: 1, color: '#baff72' },
-  { name: 'INTERCEPTOR PACK', detail: 'More fast chasers. Keep an escape lane.', heavy: 0.06, orbiter: 0.12, speed: 1.12, color: '#ffab65' },
+  { name: 'INTERCEPTOR PACK', detail: 'Fast gunships flank in packs. Dodge their pink firing lanes.', heavy: 0.06, orbiter: 0.12, speed: 1.12, color: '#ffab65' },
   { name: 'ARTILLERY LINE', detail: 'More orbiters. Use stone cover against crossfire.', heavy: 0.08, orbiter: 0.38, speed: 1, color: '#bc92ff' },
   { name: 'ARMORED COLUMN', detail: 'More goliaths. Chain their death blasts.', heavy: 0.26, orbiter: 0.18, speed: 0.95, color: '#72dcff' },
 ] as const;

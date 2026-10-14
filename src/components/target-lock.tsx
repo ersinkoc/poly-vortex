@@ -22,7 +22,7 @@ export function TargetMarker() {
   </>;
 }
 
-const names = ['CHASER', 'ORBITER', 'GOLIATH', 'SENTINEL'];
+const names = ['INTERCEPTOR', 'ORBITER', 'GOLIATH', 'SENTINEL'];
 export default function TargetReadout() {
   const s = useGame();
   return <div className={`target-readout ${s.target ? 'locked' : ''}`} aria-label="Weapon targeting status"><Crosshair size={14} /><div><span>{s.aimMode === 'precision' ? 'PRECISION' : s.targeting === 'aim' ? 'AIM ASSIST' : 'AUTO TRACKING'}</span><strong>{s.target ? `${s.target.weapon ? HOSTILE_WEAPONS[s.target.weapon].name : names[s.target.kind]} · ${Math.ceil(s.target.distance)}m` : s.aimMode === 'precision' && s.targeting === 'auto' ? 'MOVE CURSOR INTO ARENA TO AIM' : s.targeting === 'aim' ? 'NO CLEAR HOSTILE IN AIM' : 'SEARCHING FOR A CLEAR TARGET'}</strong>{s.target && <i><b style={{ width: `${s.target.hp / s.target.maxHp * 100}%` }} /></i>}</div><button aria-label="Toggle targeting mode" title="F: switch assisted / precision" onClick={() => { useGame.setState({ aimMode: s.aimMode === 'assisted' ? 'precision' : 'assisted' }); engine.targetId = 0; engine.publish(); }}><kbd>F</kbd></button></div>;

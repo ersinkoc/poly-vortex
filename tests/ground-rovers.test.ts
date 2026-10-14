@@ -82,7 +82,8 @@ test('chassis pitch and bank follow ground samples and four distinct wheel sites
 });
 
 test('rover blast clears ordinary hostiles, damages bosses finitely and protects friendlies', () => {
-  const g = engine(); g.spawn(0, 3.5, 0); g.spawn(3, 0, 3.4); const boss = g.enemies[1], hp = boss.hp;
+  // Keep the gunship inside the blast for this damage fixture despite its new retreat AI.
+  const g = engine(); g.spawn(0, 2.5, 0); g.spawn(3, 0, 3.4); const boss = g.enemies[1], hp = boss.hp;
   g.player.invulnerable = 0; g.player.hp = 37; g.shield = 12; g.shieldDelay = 10;
   g.missions.tick(8, g.player, 0, () => 0.5); const pilot = g.missions.mission!.targets[0]; pilot.x = 3; pilot.z = 0;
   g.roverBay.units = [rover({ state: 'primed', age: 2 })]; advance(g, 0.35);
