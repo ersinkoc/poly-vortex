@@ -14,11 +14,11 @@ beforeEach(() => {
 });
 afterEach(() => { useGame.setState(previous); audio.enabled = sound; });
 function boss() { game.time = RUN_DURATION; game.bossSpawned = true; game.spawn(3, 0, -14); return game.enemies.at(-1)!; }
-function maxBuild() { game.damage = 4; game.haste = 0.28; game.criticalChance = 0.75; game.weapons = { pulse: 6, glaive: 6, cryo: 6, tesla: 6 }; game.droneRack.install(6); }
+function maxBuild() { game.damage = 4; game.haste = 0.28; game.criticalChance = 0.75; game.weapons = { pulse: 6, glaive: 6, cryo: 6, tesla: 6, rail: 6, scatter: 6 }; game.droneRack.install(6); }
 
 test('two upgraded ordnance impacts cannot erase a late-run Sentinel', () => {
   game.time = RUN_DURATION; game.damage = 4; game.haste = 0.28; game.criticalChance = 0.75;
-  game.weapons = { pulse: 6, glaive: 6, cryo: 6, tesla: 6 }; game.spawn(3, 0, -18); const boss = game.enemies[0];
+  game.weapons = { pulse: 6, glaive: 6, cryo: 6, tesla: 6, rail: 6, scatter: 6 }; game.spawn(3, 0, -18); const boss = game.enemies[0];
   game.hitEnemy(boss, CHARGE_RULES.damage * game.damage); game.hitEnemy(boss, CHARGE_RULES.damage * game.damage);
   expect(boss.hp).toBeGreaterThan(0); expect(game.sentinels).toBe(0); expect(game.service).toBeNull();
 });

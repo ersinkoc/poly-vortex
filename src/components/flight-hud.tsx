@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect,useRef,useState } from 'react';
-import { Crosshair, Disc3, Layers3, Pause, Shield, Snowflake, Volume2, VolumeX, Wind, Zap } from 'lucide-react';
+import { Crosshair, Disc3, Layers3, Orbit, Pause, ScanLine, Shield, Snowflake, Volume2, VolumeX, Wind, Zap } from 'lucide-react';
 import { engine } from '@/game/engine';
 import { useGame } from '@/game/store';
 import { WEAPONS,type WeaponId } from '@/game/types';
@@ -15,7 +15,7 @@ import NavigationSignals from './navigation-signals';
 import ExpeditionHUD from './expedition-hud';
 import { TacticalSheet } from './mobile-hud';
 
-const icons={pulse:Crosshair,glaive:Disc3,cryo:Snowflake,tesla:Zap};
+const icons={pulse:Crosshair,glaive:Disc3,cryo:Snowflake,tesla:Zap,rail:ScanLine,scatter:Orbit};
 const clock=(s:number)=>`${Math.floor(s/60).toString().padStart(2,'0')}:${Math.floor(s%60).toString().padStart(2,'0')}`;
 export default function FlightHUD({intelOpen,onIntelOpen,onIntelClose,onHelp,resumeOnClose=true}:{intelOpen:boolean;onIntelOpen:()=>void;onIntelClose:()=>void;onHelp:()=>void;resumeOnClose?:boolean}){
   const s=useGame(),m=s.mission,boss=engine.enemies.some(e=>e.kind===3&&e.hp>0),f=FLIGHTFRAMES[s.activeShip];

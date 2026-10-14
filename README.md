@@ -2,7 +2,7 @@
 
 [Play the game](https://poly-vortex.oxog.dev) · [Inspect the fleet](https://poly-vortex.oxog.dev/hangar/) · [GitHub](https://github.com/ersinkoc/poly-vortex)
 
-**Source version:** `1.33.1` (prepared patch, not tagged or released). See [CHANGELOG.md](CHANGELOG.md) for changes since `1.33.0`.
+**Source version:** `1.34.0` (in development, not tagged or released). See [CHANGELOG.md](CHANGELOG.md) for changes since `1.33.0`.
 
 A procedural 3D roguelite bullet heaven, built with Next.js 16, React 19, TypeScript 7, React Three Fiber, Drei, Three.js, Zustand, Framer Motion, and Tailwind CSS. All models, effects, terrain, and audio are generated locally. No external fonts, models, textures, or audio files are fetched.
 
@@ -12,9 +12,9 @@ Use Node.js 20.9 or newer and Bun 1.4.3 or newer. Development output is kept in 
 
 ## Versions and changelog
 
-Starting with `1.33.1`, use `MAJOR.MINOR.PATCH` consistently. Bug fixes, balance adjustments, and documentation changes advance `PATCH` (`1.33.0` → `1.33.1` → `1.33.2`); compatible new gameplay features advance `MINOR` (`1.33.2` → `1.34.0`); incompatible save formats or other breaking changes advance `MAJOR`. A feature no longer needs its own minor version, so fixes and smaller updates can have intermediate releases.
+Use `MAJOR.MINOR.PATCH` consistently. Bug fixes, balance adjustments, and documentation changes advance `PATCH` (`1.34.0` → `1.34.1` → `1.34.2`); compatible new gameplay features advance `MINOR` (`1.34.2` → `1.35.0`); incompatible save formats or other breaking changes advance `MAJOR`. A feature no longer needs its own minor version, so fixes and smaller updates can have intermediate releases.
 
-Record notable changes under **Unreleased** in [CHANGELOG.md](CHANGELOG.md) as they land. The version in `package.json` is the next intended release; it does not mean that version has been published. To finalize a release, pass `bun run typecheck`, `bun run test`, `bun run build`, and `bun run verify:export`, then move the Unreleased notes into a dated version entry and create the matching `vX.Y.Z` Git tag. The current `1.33.1` source is still unreleased because production build/export validation has not completed. GitHub Pages deploys successful pushes to `main` independently of version tags.
+Record notable changes under **Unreleased** in [CHANGELOG.md](CHANGELOG.md) as they land. The version in `package.json` is the next intended release; it does not mean that version has been published. To finalize a release, pass `bun run typecheck`, `bun run test`, `bun run build`, and `bun run verify:export`, then move the Unreleased notes into a dated version entry and create the matching `vX.Y.Z` Git tag. The earlier `1.33.1` patch was prepared but never tagged; its fixes are included in the current unreleased `1.34.0` source. GitHub Pages deploys successful pushes to `main` independently of version tags.
 
 ## Run
 
@@ -51,7 +51,13 @@ The custom domain is `poly-vortex.oxog.dev`, configured in `public/CNAME` and Gi
 - **Module reel:** XP and elite salvage install upgrades automatically; keep moving.
 - **Touch:** Use the on-screen movement joystick and dash button.
 
-Collect cyan XP prisms. A compact side reel automatically installs one randomized common, rare, or overclocked upgrade without pausing combat. Mix pulse lasers, escort drones, cryo-singularities, and Tesla arcs. At three minutes the Vortex Sentinel arrives. Classic extracts immediately on its defeat; Expedition opens a service and extraction window, then continues into another front. Standard and Overdrive difficulties are available. Every run awards core credits, saved in browser local storage, for permanent armor, damage, and speed upgrades. There are no accounts or server dependencies.
+Collect cyan XP prisms. A compact side reel automatically installs one randomized common, rare, or overclocked upgrade without pausing combat. Mix pulse lasers, escort drones, cryo-singularities, Tesla arcs, rail lances, and scatter arrays. At three minutes the Vortex Sentinel arrives. Classic extracts immediately on its defeat; Expedition opens a service and extraction window, then continues into another front. Standard and Overdrive difficulties are available. Every run awards core credits, saved in browser local storage, for permanent armor, damage, and speed upgrades. There are no accounts or server dependencies.
+
+## Expanded fleet and arsenal — 1.34.0 (unreleased)
+
+Nova is a fast, fragile twin-boom striker with 72 hull, 26 shield and 125% damage. Bastion is a slow six-engine carrier with 155 hull and 82 shield. Both have distinct procedural models, selection portraits, drydock entries and saved-flight support. All five frames remain available from the start.
+
+The Rail lance fires a long-range slug that penetrates multiple hostiles; the Scatter array fires five short-range lanes across a nearby swarm. Either can be selected as the starting module or installed by the upgrade reel. Flak Raiders add a five-round spreading burst, while Ion Disruptors drain EMP charge and delay shield recharge on an unprotected hit. Their warning colors and drydock entries identify the new threats. Older local checkpoints remain resumable with the new modules offline.
 
 ## Clear hull and compact threat warnings — 1.33.0
 
@@ -325,4 +331,4 @@ bun run build
 bun run verify:export
 ```
 
-The Bun test suite covers movement, dash invulnerability, all four weapon systems, damage, bounded pools, guaranteed boss spawning, paused simulation, XP and upgrade sequencing, extraction, restart isolation, permanent progression purchases, and procedural GPU resources. Fleet tests verify finite complete vertex attributes, geometry budgets, deterministic textures, correct color spaces, shared PBR resources, and soft shadow edges.
+The Bun test suite covers movement, dash invulnerability, all six weapon systems, damage, bounded pools, guaranteed boss spawning, paused simulation, XP and upgrade sequencing, extraction, restart isolation, permanent progression purchases, and procedural GPU resources. Fleet tests verify finite complete vertex attributes, geometry budgets, deterministic textures, correct color spaces, shared PBR resources, and soft shadow edges.

@@ -30,11 +30,14 @@ export const LIMITS = { enemies: 280, bolts: 500, rockets: 16, particles: 1000, 
 export const RUN_DURATION = EXPEDITION.combatDuration;
 const colors = ['#ff567f', '#b58aff', '#ffab56', '#ff466d'];
 const distance = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.hypot(a.x - b.x, a.z - b.z);
+const cadencePassed = (time: number, dt: number, period: number) => Math.floor(Math.max(0, time - dt) / period) < Math.floor(time / period);
 const defs: Record<UpgradeId, [string, string]> = {
   pulse: ['Pulse laser', 'Add a homing bolt. Increase pulse damage and fire rate.'],
   glaive: ['Escort drones', 'Commission new escort capacity and increase laser damage. 40 hull each; reserve battery recalls them for charging. Lost units require field service.'],
   cryo: ['Cryo-singularity', 'Create a gravity well that pulls in and shatters the swarm.'],
   tesla: ['Tesla arc', 'Arc between nearby targets. More voltage. More damage.'],
+  rail: ['Rail lance', 'Fire a penetrating high-energy slug. More damage and shorter cycle.'],
+  scatter: ['Scatter array', 'Fan five close-range bolts across a swarm. More damage and faster bursts.'],
   damage: ['Reactor overclock', 'Increase all weapon damage by 20% per power level.'],
   speed: ['Vector thrusters', 'Increase movement speed by 12% per power level.'],
   magnet: ['Prism magnet', 'Extend XP collection range by 30% per power level.'],
@@ -83,7 +86,7 @@ export class GameEngine {
   shield = 40; maxShield = 40; surge = 100; sector = 0; bossPhase = 0; peakCombo = 1; eliteKills = 0; salvage = 0;
   criticalChance = 0.05; piercing = 0; overdriveTime = 0; repairTime = 0; shieldDelay = 0;
   announcement = ''; announcementDetail = ''; announcementTime = 0;
-  weapons: Record<WeaponId, number> = { pulse: 1, glaive: 0, cryo: 0, tesla: 0 };
+  weapons: Record<WeaponId, number> = { pulse: 1, glaive: 0, cryo: 0, tesla: 0, rail: 0, scatter: 0 };
   time = 0; xp = 0; nextXp = 12; level = 1; score = 0; kills = 0; combo = 1; streak = 0;
   trauma = 0; hitFlash = 0; hitStop = 0; pulse = { x: 0, z: 0, time: -10 };
   damage = 1; speed = 1; magnet = 1; haste = 1; bossSpawned = false;
@@ -137,7 +140,7 @@ export class GameEngine {
     this.shield = frame.shield; this.maxShield = frame.shield; this.surge = 100; this.sector = 0; this.bossPhase = 0; this.peakCombo = 1; this.eliteKills = 0; this.salvage = 0;
     this.criticalChance = 0.05; this.piercing = 0; this.overdriveTime = 0; this.repairTime = 0; this.shieldDelay = 0; this.hazardTimer = 37; this.supplyTimer = 24; this.repairTimer = SUPPLY_RULES.repair.first;
     this.announcement = ''; this.announcementDetail = ''; this.announcementTime = 0;
-    this.weapons = { pulse: 0, glaive: 0, cryo: 0, tesla: 0 }; this.weapons[s.loadout] = 1;
+    this.weapons = { pulse: 0, glaive: 0, cryo: 0, tesla: 0, rail: 0, scatter: 0 }; this.weapons[s.loadout] = 1;
     // Every core has a basic pulse cannon, even with a specialized starting module.
     this.weapons.pulse = Math.max(1, this.weapons.pulse);
     this.time = 0; this.xp = 0; this.nextXp = 12; this.level = 1; this.score = 0; this.kills = 0; this.streak = 0; this.combo = 1;
@@ -624,6 +627,19 @@ export class GameEngine {
         this.bolts.push({ x, z, vx: (primary.x - x) / d * 22, vz: (primary.z - z) / d * 22, enemy: false, age: 0, target: primary.id, damage: (15 + this.weapons.pulse * 4) * this.damage * (this.overdriveTime > 0 ? 1.35 : 1), pierce: this.piercing, hits: [], traveled: 0, range: PULSE_RANGE });
       }
     }
+    if (this.weapons.rail && primary && facingTarget && this.bolts.length < LIMITS.bolts && cadencePassed(this.time, dt, Math.max(1.2, 4 - this.weapons.rail * 0.32) * this.haste)) {
+      const angle = Math.atan2(primary.x - p.x, primary.z - p.z);
+      this.bolts.push({ x: p.x + Math.sin(angle) * 0.8, z: p.z + Math.cos(angle) * 0.8, vx: Math.sin(angle) * 40, vz: Math.cos(angle) * 40, age: 0, enemy: false, target: 0, damage: (60 + this.weapons.rail * 14) * this.damage, pierce: 1 + Math.floor(this.weapons.rail / 2), hits: [], traveled: 0, range: 27, playerWeapon: 'rail' });
+      audio.shot();
+    }
+    if (this.weapons.scatter && primary && distance(primary, p) < 12 && this.bolts.length <= LIMITS.bolts - 5 && cadencePassed(this.time, dt, Math.max(0.85, 2.6 - this.weapons.scatter * 0.2) * this.haste)) {
+      const center = Math.atan2(primary.x - p.x, primary.z - p.z);
+      for (let i = -2; i <= 2; i++) {
+        const angle = center + i * 0.12;
+        this.bolts.push({ x: p.x + Math.sin(angle) * 0.7, z: p.z + Math.cos(angle) * 0.7, vx: Math.sin(angle) * 20, vz: Math.cos(angle) * 20, age: 0, enemy: false, target: 0, damage: (5 + this.weapons.scatter * 2) * this.damage, traveled: 0, range: 11, playerWeapon: 'scatter' });
+      }
+      audio.shot();
+    }
     this.cryoTimer -= dt;
     if (this.weapons.cryo && primary && distance(primary, p) < 16 && this.cryoTimer <= 0) {
       this.cryoTimer = 6 * this.haste; this.vortices.push({ x: primary.x, z: primary.z, radius: 3.5 + this.weapons.cryo * 0.3, life: 3.5 }); audio.tone(100, 0.5, 'sine', 0.35, 400);
@@ -695,7 +711,7 @@ export class GameEngine {
       if (b.enemy) {
         const contact = droneContact({ x: oldX, y: oldY, z: oldZ }, { x: b.x, y: b.y ?? 0.7, z: b.z }, this.droneFormation.poses, this.droneRack.airborne);
         if (contact) { this.hitDrone(contact.id, b.damage); b.age = 10; }
-        else if (coreContact({ x: oldX, y: oldY, z: oldZ }, { x: b.x, y: b.y ?? 0.7, z: b.z }, p)) { this.hurt(b.damage, b); b.age = 10; if (b.hostileWeapon === 'missile') { this.blast(b.x, b.z, 1.2, '#ffbc65'); this.wave(b.x, b.z, 2, '#ffbc65'); } }
+        else if (coreContact({ x: oldX, y: oldY, z: oldZ }, { x: b.x, y: b.y ?? 0.7, z: b.z }, p)) { const protectedHit = this.barrier > 0 || p.invulnerable > 0; this.hurt(b.damage, b); b.age = 10; if (b.hostileWeapon === 'ion' && !protectedHit) { this.surge = Math.max(0, this.surge - 18); this.shieldDelay = Math.max(this.shieldDelay, 6); } if (b.hostileWeapon === 'missile') { this.blast(b.x, b.z, 1.2, '#ffbc65'); this.wave(b.x, b.z, 2, '#ffbc65'); } }
       }
       else for (const e of this.enemies) if (e.hp > 0 && !b.hits?.includes(e.id) && distance(b, e) < e.radius + 0.25) {
         const critical = this.random() < this.criticalChance; this.hitEnemy(e, b.damage * (critical ? 2 : 1), critical); (b.hits ??= []).push(e.id);
@@ -772,7 +788,7 @@ export class GameEngine {
     if (d < rule.min - 0.5 || d > rule.range || terrainImpact(e, muzzle) || terrainImpact(muzzle, aim)) { e.ranged = undefined; e.timer = 1.5; return; }
     charge.remaining -= dt; if (charge.remaining > 1e-8) return;
     if (this.bolts.length >= LIMITS.bolts) { e.ranged = undefined; e.timer = rule.reload; return; }
-    const dx = aim.x - muzzle.x, dz = aim.z - muzzle.z, flight = Math.max(0.1, Math.hypot(dx, dz) / rule.speed), angle = Math.atan2(dx, dz);
+    const dx = aim.x - muzzle.x, dz = aim.z - muzzle.z, flight = Math.max(0.1, Math.hypot(dx, dz) / rule.speed), angle = Math.atan2(dx, dz) + (weapon === 'flak' ? (rule.rounds - charge.rounds - 2) * 0.11 : 0);
     this.bolts.push({ x: muzzle.x, y: muzzle.y, z: muzzle.z, vx: Math.sin(angle) * rule.speed, vz: Math.cos(angle) * rule.speed, vy: (charge.aimY - muzzle.y) / flight, enemy: true, age: 0, target: 0, damage: rule.damage, range: rule.range, hostileWeapon: weapon });
     e.weaponFlash = { at: e.age, aimX: aim.x, aimZ: aim.z, side }; e.weaponShots = (e.weaponShots ?? 0) + 1;
     if (weapon === 'missile') audio.cannonShot(); else audio.shot();

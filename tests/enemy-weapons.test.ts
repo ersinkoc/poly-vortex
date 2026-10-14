@@ -34,7 +34,7 @@ test('the opening wave contains ranged threats before fourteen seconds', () => {
   game.service = null; advance(12); expect(game.enemies.some(e => e.kind === 1)).toBe(true);
 });
 
-for (const weapon of ['plasma', 'laser', 'missile'] as const) {
+for (const weapon of ['plasma', 'laser', 'missile', 'flak', 'ion'] as const) {
   test(`${weapon} warns, locks a dodgeable aim point and emits its own salvo and reload`, () => {
     const e = hostile(weapon), rule = HOSTILE_WEAPONS[weapon]; game.tick(1 / 60);
     expect(e.ranged?.remaining).toBe(rule.windup); expect(game.bolts).toHaveLength(0);

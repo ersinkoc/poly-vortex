@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
-import { ArrowRight, ArrowUpRight, Check, CircleDot, Cpu, Crosshair, Disc3, Hexagon, Pause, Play, Rocket, RotateCcw, Shield, SlidersHorizontal, Snowflake, Trophy, Wind, X, Zap } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Check, CircleDot, Cpu, Crosshair, Disc3, Hexagon, Orbit, Pause, Play, Rocket, RotateCcw, ScanLine, Shield, SlidersHorizontal, Snowflake, Trophy, Wind, X, Zap } from 'lucide-react';
 import MobileHUD from './mobile-hud';
 import { useCompactHUD } from './use-compact-hud';
 import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -25,7 +25,7 @@ import { WEAPONS, type Profile, type WeaponId } from '@/game/types';
 
 const Arena = dynamic(() => import('./arena'), { ssr: false, loading: () => <div className="arena-loading"><Hexagon size={32} /><span>INITIALIZING THE VORTEX</span><i /></div> });
 type Panel = 'protocol' | 'controls' | 'armory' | 'ships' | 'settings' | 'core' | 'records' | 'ordnance' | null;
-const weaponIcons = { pulse: Crosshair, glaive: Disc3, cryo: Snowflake, tesla: Zap };
+const weaponIcons = { pulse: Crosshair, glaive: Disc3, cryo: Snowflake, tesla: Zap, rail: ScanLine, scatter: Orbit };
 const panelTitles = { protocol: 'The protocol', controls: 'Visual flight manual', armory: 'Choose your arsenal', ships: 'Choose your warship', settings: 'System settings', core: 'Core modifications', records: 'Flight record', ordnance: 'Rocket flight manual' };
 const number = (n: number) => Math.floor(n).toLocaleString('en-US');
 const time = (n: number) => `${Math.floor(n / 60).toString().padStart(2, '0')}:${Math.floor(n % 60).toString().padStart(2, '0')}`;

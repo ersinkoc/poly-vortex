@@ -16,12 +16,15 @@ import PerformanceGovernor from './performance-governor';
 import { useShipSync } from './use-ship-sync';
 
 const catalog = [
-  ...SHIP_IDS.map((id, i) => ({ name: FLIGHTFRAMES[id].name, code: FLIGHTFRAMES[id].code + ' / FLIGHTFRAME', role: FLIGHTFRAMES[id].role, color: FLIGHTFRAMES[id].color, icon: [Crosshair, Wind, Shield][i], copy: FLIGHTFRAMES[id].description })),
+  ...SHIP_IDS.map((id, i) => ({ name: FLIGHTFRAMES[id].name, code: FLIGHTFRAMES[id].code + ' / FLIGHTFRAME', role: FLIGHTFRAMES[id].role, color: FLIGHTFRAMES[id].color, icon: [Crosshair, Wind, Shield, Orbit, Hexagon][i], copy: FLIGHTFRAMES[id].description })),
   { name: 'Interceptor', code: 'CX.01 / STRIKE GUNSHIP', role: 'FLANKING ATTACK', color: '#ff5774', icon: Wind, copy: 'A fast twin-gun skirmisher. It flanks at 5.5–8m and retreats when you close in. Thin outer chevrons and a compact countdown warn before a two-round salvo. Dodge sideways; amber brackets mark the old aim point.' },
   { name: 'Orbiter', code: 'OR.02 / RECON PLATFORM', role: 'RANGED CONTROL', color: '#a685ff', icon: Orbit, copy: 'A standoff weapons platform: pink plasma bursts, violet charged lasers, or amber unguided rockets. Target brackets and directional warning chevrons signal a prepared shot. Evade sideways or use stone cover to clear the red lock.' },
   { name: 'Goliath', code: 'GT.03 / SIEGE CARRIER', role: 'HEAVY ARMOR', color: '#ffae50', icon: Shield, copy: 'A heavy hover carrier with overlapping ceramic armor, reinforced engine nacelles, cooling grilles, and a twin-barrel siege turret.' },
   { name: 'Vortex Sentinel', code: 'VS.00 / DREADNOUGHT', role: 'PROTOCOL GUARDIAN', color: '#ff3a5d', icon: Skull, copy: 'A guardian calibrated to your arsenal. Blue sealed armor resists hits; the amber exposed reactor rewards timed bursts. Three barrage phases add increasingly dangerous telegraphed ground strikes.' },
+  { name: 'Flak Raider', code: 'FR.04 / ASSAULT PLATFORM', role: 'CLOSE BURST', color: '#ff8d64', icon: Crosshair, copy: 'A close-range platform firing five staggered fragments across a spreading cone. Break the lock or clear the burst lane.' },
+  { name: 'Ion Disruptor', code: 'ID.05 / CONTROL PLATFORM', role: 'ENERGY DENIAL', color: '#69e5ff', icon: Orbit, copy: 'A cyan disruption round that drains EMP charge and delays shield recharge when it reaches the core.' },
 ];
+const enemyKinds = [0, 1, 2, 3, 1, 1] as const;
 
 function DisplayShip({ selected }: { selected: number }) {
   const group = useRef<THREE.Group>(null);
@@ -29,14 +32,14 @@ function DisplayShip({ selected }: { selected: number }) {
     const textures = buildSurfaceTextures(), shadow = buildShadowTexture();
     return { textures, shadow };
   }, []);
-  const actor = useMemo(() => ({ model: selected < 3 ? buildPlayerShip(SHIP_IDS[selected]) : buildEnemyShip((selected - 3) as 0 | 1 | 2 | 3), materials: buildShipMaterials(catalog[selected].color, selected < 3, resources.textures) }), [selected, resources.textures]);
+  const actor = useMemo(() => ({ model: selected < SHIP_IDS.length ? buildPlayerShip(SHIP_IDS[selected]) : buildEnemyShip(enemyKinds[selected - SHIP_IDS.length]), materials: buildShipMaterials(catalog[selected].color, selected < SHIP_IDS.length, resources.textures) }), [selected, resources.textures]);
   useEffect(() => () => { Object.values(actor.model).forEach(g => g.dispose()); Object.values(actor.materials).forEach(m => m.dispose()); }, [actor]);
   useEffect(() => () => {
     Object.values(resources.textures).forEach(t => t.dispose()); resources.shadow.dispose();
   }, [resources]);
   useFrame(({ clock }) => { if (group.current) { group.current.rotation.y = -0.5 + Math.sin(clock.elapsedTime * 0.16) * 0.15; group.current.position.y = 0.9 + Math.sin(clock.elapsedTime * 1.5) * 0.03; } });
   return <>
-    <group ref={group} scale={selected < 3 ? 1.15 : 1.65} dispose={null}>{SURFACES.map(surface => <mesh key={`${selected}-${surface}`} geometry={actor.model[surface]} material={actor.materials[surface]} />)}</group>
+    <group ref={group} scale={selected < SHIP_IDS.length ? 1.15 : 1.65} dispose={null}>{SURFACES.map(surface => <mesh key={`${selected}-${surface}`} geometry={actor.model[surface]} material={actor.materials[surface]} />)}</group>
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.12, 0]} scale={[5, 5, 1]}><planeGeometry args={[1, 1]} /><meshBasicMaterial map={resources.shadow} transparent opacity={0.9} depthWrite={false} /></mesh>
     <mesh position={[0, 0, 0]}><cylinderGeometry args={[2.65, 2.7, 0.2, 80]} /><meshStandardMaterial color="#171e22" roughness={0.4} metalness={0.65} /></mesh>
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.11, 0]}><ringGeometry args={[2.47, 2.48, 96]} /><meshBasicMaterial color={catalog[selected].color} toneMapped={false} /></mesh>
@@ -59,6 +62,6 @@ export default function ShipHangar() {
     </Canvas></div>
     <header className="hangar-header"><Link href="/" className="hangar-back"><ArrowLeft size={17} /> COMMAND CENTER</Link><span><Hexagon size={18} /> POLY-VORTEX / DRYDOCK</span><small>FLEET IDENTIFICATION SYSTEM</small></header>
     <aside className="hangar-catalog"><span className="micro">ENGINEERED FOR THE VORTEX</span><h1>THE<br /><span>FLEET.</span></h1><div>{catalog.map((ship, i) => { const Icon = ship.icon; return <button key={ship.name} className={selected === i ? 'selected' : ''} style={{ '--ship-accent': ship.color } as React.CSSProperties} onClick={() => setSelected(i)} aria-pressed={selected === i}><Icon size={22} /><div><strong>{ship.name}</strong><span>{ship.role}</span></div><ArrowUpRight size={16} /></button>; })}</div></aside>
-    <div className="hangar-info"><span style={{ color: item.color }}>{item.code}</span><h2>{item.name}</h2><p>{item.copy}</p>{selected < 3 && <button className="hangar-deploy" onClick={() => useGame.getState().selectShip(SHIP_IDS[selected])}>{chosen === SHIP_IDS[selected] ? 'ACTIVE FLIGHTFRAME' : `SELECT ${item.name.toUpperCase()}`}</button>}<small><MousePointer2 size={14} /> DRAG TO ROTATE <i /> SCROLL TO INSPECT</small></div>
+    <div className="hangar-info"><span style={{ color: item.color }}>{item.code}</span><h2>{item.name}</h2><p>{item.copy}</p>{selected < SHIP_IDS.length && <button className="hangar-deploy" onClick={() => useGame.getState().selectShip(SHIP_IDS[selected])}>{chosen === SHIP_IDS[selected] ? 'ACTIVE FLIGHTFRAME' : `SELECT ${item.name.toUpperCase()}`}</button>}<small><MousePointer2 size={14} /> DRAG TO ROTATE <i /> SCROLL TO INSPECT</small></div>
   </main>;
 }

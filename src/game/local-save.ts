@@ -1,7 +1,7 @@
 import { EMPTY_PROFILE, type Profile } from './types';
 import { ACHIEVEMENTS } from './progression';
 import type { EngineCheckpoint, JsonObject } from './checkpoint';
-import type { ShipId } from './flightframes';
+import { SHIP_IDS, type ShipId } from './flightframes';
 
 export const SAVE_KEY = 'poly-vortex-save-v2', SAVE_BACKUP_KEY = 'poly-vortex-save-v2-backup';
 export const SAVE_LIMIT = 512_000;
@@ -23,7 +23,7 @@ export function normalizeProfile(raw: unknown): Profile {
 function legacy(key: string): unknown { try { return JSON.parse(localStorage.getItem(key) ?? 'null') as unknown; } catch { return null; } }
 function checksum(text: string) { let hash = 2166136261; for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619); return (hash >>> 0).toString(16); }
 function validResult(v: unknown) {
-  return plain(v) && typeof v.runKey === 'string' && typeof v.won === 'boolean' && ['vector', 'wraith', 'aegis'].includes(String(v.ship)) && Array.isArray(v.achievements) && v.achievements.every(id => typeof id === 'string' && ACHIEVEMENTS.some(a => a.id === id)) && ['time', 'score', 'kills', 'level', 'chapter', 'sentinels', 'rescued', 'endedAt'].every(k => typeof v[k] === 'number' && Number.isFinite(v[k]));
+  return plain(v) && typeof v.runKey === 'string' && typeof v.won === 'boolean' && SHIP_IDS.includes(v.ship as ShipId) && Array.isArray(v.achievements) && v.achievements.every(id => typeof id === 'string' && ACHIEVEMENTS.some(a => a.id === id)) && ['time', 'score', 'kills', 'level', 'chapter', 'sentinels', 'rescued', 'endedAt'].every(k => typeof v[k] === 'number' && Number.isFinite(v[k]));
 }
 export function encodeSave(document: SaveDocument) { const data = JSON.stringify(document); if (data.length > SAVE_LIMIT) throw new Error('Save is too large'); return JSON.stringify({ data, checksum: checksum(data) }); }
 export function decodeSave(text: string | null): SaveDocument | null {
@@ -33,7 +33,7 @@ export function decodeSave(text: string | null): SaveDocument | null {
     if (!plain(envelope) || typeof envelope.data !== 'string' || envelope.data.length > SAVE_LIMIT || checksum(envelope.data) !== envelope.checksum) return null;
     const doc: unknown = JSON.parse(envelope.data);
     if (!plain(doc) || doc.schema !== 2 || typeof doc.deviceId !== 'string' || typeof doc.revision !== 'number' || !Number.isSafeInteger(doc.revision) || doc.revision < 0 || doc.revision >= Number.MAX_SAFE_INTEGER || !Number.isFinite(doc.updatedAt) || !plain(doc.profile) || !plain(doc.settings) || doc.currentRun !== null && typeof doc.currentRun !== 'string' || doc.ownerId !== null && typeof doc.ownerId !== 'string') return null;
-    if (doc.checkpoint !== null && (!plain(doc.checkpoint) || typeof doc.checkpoint.runKey !== 'string' || doc.checkpoint.runKey !== doc.currentRun || !plain(doc.checkpoint.payload) || doc.checkpoint.payload.schema !== 1 || !plain(doc.checkpoint.payload.state) || !plain(doc.checkpoint.payload.systems) || !['vector', 'wraith', 'aegis'].includes(String(doc.checkpoint.ship)) || !['time', 'level', 'chapter', 'savedAt'].every(k => typeof (doc.checkpoint as Record<string, unknown>)[k] === 'number' && Number.isFinite((doc.checkpoint as Record<string, unknown>)[k])))) return null;
+    if (doc.checkpoint !== null && (!plain(doc.checkpoint) || typeof doc.checkpoint.runKey !== 'string' || doc.checkpoint.runKey !== doc.currentRun || !plain(doc.checkpoint.payload) || doc.checkpoint.payload.schema !== 1 || !plain(doc.checkpoint.payload.state) || !plain(doc.checkpoint.payload.systems) || !SHIP_IDS.includes(doc.checkpoint.ship as ShipId) || !['time', 'level', 'chapter', 'savedAt'].every(k => typeof (doc.checkpoint as Record<string, unknown>)[k] === 'number' && Number.isFinite((doc.checkpoint as Record<string, unknown>)[k])))) return null;
     if (doc.lastFlight !== null && !validResult(doc.lastFlight)) return null;
     if (doc.lastVictory !== null && (!validResult(doc.lastVictory) || (doc.lastVictory as Record<string, unknown>).won !== true)) return null;
     if (doc.lastAchievement !== null && (!plain(doc.lastAchievement) || typeof doc.lastAchievement.runKey !== 'string' || !Number.isFinite(doc.lastAchievement.unlockedAt) || !ACHIEVEMENTS.some(a => a.id === (doc.lastAchievement as Record<string, unknown>).id))) return null;

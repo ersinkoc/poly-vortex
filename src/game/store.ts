@@ -1,6 +1,6 @@
 import type { EnemyWeapon } from './enemy-weapons';
 import { create } from 'zustand';
-import { EMPTY_PROFILE, type Difficulty, type Phase, type Profile, type WeaponId } from './types';
+import { EMPTY_PROFILE, WEAPONS, type Difficulty, type Phase, type Profile, type WeaponId } from './types';
 import type { RewardRoll } from './reward-reel';
 import type { Mission } from './missions';
 import { ROCKET_CAPACITY } from './supplies';
@@ -65,7 +65,7 @@ export const useGame = create<GameStore>((set, get) => ({
   mission: null, missionsCompleted: 0, rescued: 0,
   phase: 'menu', difficulty: 'standard', loadout: 'pulse', sound: true, quality: 'high',
   time: 0, hp: 100, maxHp: 100, xp: 0, nextXp: 12, level: 1, kills: 0, score: 0, combo: 1, dash: 0,
-  enemies: 0, fps: 60, weapons: { pulse: 1, glaive: 0, cryo: 0, tesla: 0 }, reward: null, rewardQueued: 0, profile: EMPTY_PROFILE, earned: 0, runId: 0,
+  enemies: 0, fps: 60, weapons: { pulse: 1, glaive: 0, cryo: 0, tesla: 0, rail: 0, scatter: 0 }, reward: null, rewardQueued: 0, profile: EMPTY_PROFILE, earned: 0, runId: 0,
   shield: 40, maxShield: 40, surge: 100, sector: 0, bossPhase: 0, peakCombo: 1, elites: 0, caches: 0, overdrive: 0, repair: 0, salvage: 0,
   announcement: '', announcementDetail: '', announcementTime: 0,
   barrier: 0, barrierCooldown: 0,
@@ -88,7 +88,7 @@ export const useGame = create<GameStore>((set, get) => ({
         sound: typeof settings.sound === 'boolean' ? settings.sound : true,
         quality: settings.quality === 'performance' ? 'performance' : 'high',
         difficulty: settings.difficulty === 'overdrive' ? 'overdrive' : 'standard',
-        loadout: typeof settings.loadout === 'string' && ['pulse', 'glaive', 'cryo', 'tesla'].includes(settings.loadout) ? settings.loadout as WeaponId : 'pulse',
+        loadout: typeof settings.loadout === 'string' && Object.hasOwn(WEAPONS, settings.loadout) ? settings.loadout as WeaponId : 'pulse',
         aimMode: settings.aimMode === 'precision' ? 'precision' : 'assisted',
         reducedEffects: typeof settings.reducedEffects === 'boolean' ? settings.reducedEffects : prefersCalm,
       });

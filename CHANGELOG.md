@@ -1,8 +1,17 @@
 # Changelog
 
-Notable changes are recorded here from version `1.33.1` onward. Versions follow `MAJOR.MINOR.PATCH`: patch for fixes and small compatible changes, minor for compatible features, and major for breaking changes. A version becomes a release only after its validation passes and its `vX.Y.Z` tag is created.
+Notable changes are recorded here from the `1.34.0` development cycle onward. Versions follow `MAJOR.MINOR.PATCH`: patch for fixes and small compatible changes, minor for compatible features, and major for breaking changes. A version becomes a release only after its validation passes and its `vX.Y.Z` tag is created.
 
-## Unreleased — target `1.33.1`
+## Unreleased — target `1.34.0`
+
+The prepared `1.33.1` patch was never tagged. Its fixes remain in this pending minor release.
+
+### Added
+
+- Add Nova and Bastion flightframes with distinct stats, procedural hulls, portraits and drydock selection.
+- Add Rail lance and Scatter array as starting and upgradeable automatic weapons.
+- Add Flak Raider and Ion Disruptor platform variants with distinct salvos, warning colors and combat effects.
+- Preserve older local checkpoints by restoring missing levels for the two new modules as offline.
 
 ### Fixed
 

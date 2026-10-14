@@ -105,7 +105,7 @@ function EnemyShips({ kind, asset, shadow }: { kind: 0 | 1 | 2 | 3; asset: Actor
       matrixObject.scale.setScalar(scale); matrixObject.updateMatrix();
       for (let i = 0; i < layers.current.length; i++) {
         const mesh = layers.current[i]; mesh?.setMatrixAt(count, matrixObject.matrix);
-        if (kind === 1 && SURFACES[i] === 'signal') mesh?.setColorAt(count, weaponTint.set(HOSTILE_WEAPONS[enemyWeapon(e)].color));
+        if (kind === 1 && (SURFACES[i] === 'signal' || SURFACES[i] === 'armor')) mesh?.setColorAt(count, weaponTint.set(HOSTILE_WEAPONS[enemyWeapon(e)].color));
         if (kind === 3 && SURFACES[i] === 'signal') mesh?.setColorAt(count, weaponTint.set(sentinelDefense(e.age).armored ? '#82c6ef' : '#ffbd62'));
         if (kind === 3 && SURFACES[i] === 'armor') {
           const boost = !state.reducedEffects && e.sentinelHit !== undefined && e.age - e.sentinelHit < 0.14 ? 1.7 : 1;

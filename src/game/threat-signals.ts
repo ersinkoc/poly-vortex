@@ -12,7 +12,7 @@ export function readWeaponThreat(e: Entity, player: { x: number; z: number }, ou
   if (e.hp <= 0) return false;
   const charge = e.kind === 2 ? e.cannon : e.kind === 0 || e.kind === 1 ? e.ranged : undefined;
   if (!charge) return false;
-  const heavy = e.kind === 2, rule = HOSTILE_WEAPONS[enemyWeapon(e)];
+  const heavy = e.kind === 2, weapon = enemyWeapon(e), rule = HOSTILE_WEAPONS[weapon];
   const aimY = heavy ? 0.95 : e.ranged!.aimY;
   // Airborne escort locks get their own gun flash, never a false core alarm.
   if (Math.abs(aimY - 0.95) > 0.7) return false;
@@ -23,12 +23,24 @@ export function readWeaponThreat(e: Entity, player: { x: number; z: number }, ou
   const dx = aim.x - muzzle.x, dz = aim.z - muzzle.z, length = Math.hypot(dx, dz);
   if (length < 0.01) return false;
   const range = heavy ? GOLIATH.shellRange : rule.range;
-  const endpoint = { x: muzzle.x + dx / length * range, y: muzzle.y + (aimY - muzzle.y) / length * range, z: muzzle.z + dz / length * range };
+  const heading = Math.atan2(dx, dz) + (!heavy && weapon === 'flak' ? (rule.rounds - e.ranged!.rounds - 2) * 0.11 : 0);
+  const endpoint = { x: muzzle.x + Math.sin(heading) * range, y: muzzle.y + (aimY - muzzle.y) / length * range, z: muzzle.z + Math.cos(heading) * range };
   out.id = e.id; out.x = aim.x; out.z = aim.z; out.bearing = Math.atan2(e.x - player.x, e.z - player.z);
   out.remaining = Math.max(0, charge.remaining);
   const betweenRounds = !heavy && e.ranged!.rounds < rule.rounds;
   out.progress = betweenRounds ? 1 : Math.max(0, Math.min(1, 1 - out.remaining / (heavy ? GOLIATH.windup : rule.windup)));
   out.dangerous = coreContact(muzzle, endpoint, player) && !terrainImpact(muzzle, player);
+  if (!heavy && weapon === 'flak' && !out.dangerous) {
+    for (let shot = 1; shot < e.ranged!.rounds; shot++) {
+      const nextSide = ((e.weaponShots ?? 0) + shot) % 2 === 0 ? -1 : 1;
+      const nextMuzzle = rangedMuzzle(e, aim, nextSide);
+      const nextLength = Math.hypot(aim.x - nextMuzzle.x, aim.z - nextMuzzle.z);
+      if (nextLength < 0.01 || terrainImpact(nextMuzzle, aim)) continue;
+      const nextHeading = Math.atan2(aim.x - nextMuzzle.x, aim.z - nextMuzzle.z) + (rule.rounds - e.ranged!.rounds + shot - 2) * 0.11;
+      const nextEndpoint = { x: nextMuzzle.x + Math.sin(nextHeading) * range, y: nextMuzzle.y + (aimY - nextMuzzle.y) / nextLength * range, z: nextMuzzle.z + Math.cos(nextHeading) * range };
+      if (coreContact(nextMuzzle, nextEndpoint, player) && !terrainImpact(nextMuzzle, player)) { out.dangerous = true; break; }
+    }
+  }
   out.color = heavy ? '#ffc280' : rule.color;
   return true;
 }

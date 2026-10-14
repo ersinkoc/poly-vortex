@@ -75,6 +75,8 @@ class ShipBuilder {
 }
 
 export function buildPlayerShip(id: ShipId = 'vector'): ShipModel {
+  if (id === 'nova') return buildNova();
+  if (id === 'bastion') return buildBastion();
   if (id !== 'vector') return buildFlightframe(id);
   const b = new ShipBuilder();
   b.plate('hull', [[0, 1.7], [-0.29, 0.9], [-0.43, -0.8], [-0.24, -1.25], [0.24, -1.25], [0.43, -0.8], [0.29, 0.9]], 0.28);
@@ -120,6 +122,46 @@ function buildFlightframe(id: 'wraith' | 'aegis'): ShipModel {
   }
   b.box('signal',[.1,.02,.035],[0,heavy?.31:.22,1.07],[0,0,0],.004);
   b.box('engine',[.15,.025,.1],[0,.23,-.44],[0,0,0],.005);
+  return b.finish();
+}
+
+function buildNova(): ShipModel {
+  const b = new ShipBuilder();
+  b.plate('hull', [[0,1.85],[-.17,.92],[-.25,-.92],[-.12,-1.38],[.12,-1.38],[.25,-.92],[.17,.92]], .18);
+  b.plate('armor', [[0,1.48],[-.13,.75],[-.17,-.58],[0,-.86],[.17,-.58],[.13,.75]], .055, .18);
+  b.add('glass', new THREE.SphereGeometry(1,16,8,0,Math.PI*2,0,Math.PI/2), [0,.24,.43], [0,0,0], [.17,.18,.54]);
+  b.pipe('metal', [[0,.27,1.1],[0,.45,.62],[0,.43,.08],[0,.22,-.74]], .012);
+  for (const side of [-1,1]) {
+    b.plate('hull', [[side*.18,.65],[side*.66,.05],[side*1.32,-.52],[side*1.22,-1.22],[side*.29,-.86]], .075, -.04);
+    b.plate('armor', [[side*.46,-.16],[side*1.21,-.6],[side*1.11,-.92],[side*.48,-.58]], .035, .06);
+    b.box('metal', [.075,.22,.93], [side*.95,.03,-.86], [.07,0,side*-.12], .012);
+    b.box('signal', [.035,.023,.62], [side*1.17,.1,-.78], [0,side*.14,0], .005);
+    b.thruster(side*.95,-.06,-1.04,.19);
+    b.gun(side*.51,-.02,.28,.7);
+    b.vents([side*.42,.15,-.48],.12,4,.06);
+    b.bolts([[side*.32,.2,.62],[side*.86,.11,-.66]]);
+  }
+  b.box('signal',[.07,.025,.32],[0,.245,1.2],[0,0,0],.005);
+  return b.finish();
+}
+
+function buildBastion(): ShipModel {
+  const b = new ShipBuilder();
+  b.plate('hull', [[0,1.36],[-.63,.98],[-1.13,.06],[-1.12,-1.15],[1.12,-1.15],[1.13,.06],[.63,.98]], .38);
+  b.plate('armor', [[0,1.13],[-.52,.78],[-.88,-.08],[-.7,-.94],[.7,-.94],[.88,-.08],[.52,.78]], .1, .27);
+  b.add('glass', new THREE.SphereGeometry(1,18,9,0,Math.PI*2,0,Math.PI/2), [0,.39,.39], [0,0,0], [.34,.25,.43]);
+  b.pipe('metal', [[0,.43,.97],[0,.62,.65],[0,.67,.03],[0,.46,-.62]], .016);
+  for (const side of [-1,1]) {
+    b.plate('hull', [[side*.6,.8],[side*1.48,.15],[side*1.48,-1.18],[side*.66,-1.06]], .23, -.04);
+    b.plate('armor', [[side*.79,.48],[side*1.39,.06],[side*1.35,-.91],[side*.74,-.83]], .07, .16);
+    b.box('metal',[.19,.36,.96],[side*1.05,.06,-.62],[0,0,side*-.07],.025);
+    b.box('signal',[.055,.025,.7],[side*1.39,.19,-.52],[0,side*.1,0],.006);
+    for (const x of [.2,.62,1.04]) b.thruster(side*x,-.08,x===1.04?-1.02:x===.62?-1.09:-1.12,.2);
+    b.gun(side*.92,.16,.33,1.02);
+    b.vents([side*.56,.39,-.44],.2,5,.065);
+    b.bolts([[side*.52,.37,.68],[side*1.2,.26,-.72]]);
+  }
+  b.box('signal',[.13,.03,.06],[0,.39,1.05],[0,0,0],.006);
   return b.finish();
 }
 

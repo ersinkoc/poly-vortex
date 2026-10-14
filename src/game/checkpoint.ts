@@ -1,4 +1,6 @@
 import type { GameEngine } from './engine';
+import { SHIP_IDS } from './flightframes';
+import { WEAPONS } from './types';
 
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 export type JsonObject = { [key: string]: Json };
@@ -10,7 +12,7 @@ const record = (v: unknown): v is JsonObject => !!v && typeof v === 'object' && 
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= 1e15;
 const numbers = (v: unknown, keys: string[]) => record(v) && keys.every(k => finite(v[k]));
 const optionalNumbers = (v: JsonObject, keys: string[]) => keys.every(k => v[k] === undefined || finite(v[k]));
-const weapon = (v: Json | undefined) => v === undefined || member(v, ['autocannon', 'plasma', 'laser', 'missile']);
+const weapon = (v: Json | undefined) => v === undefined || member(v, ['autocannon', 'plasma', 'laser', 'missile', 'flak', 'ion']);
 const member = (v: unknown, values: readonly (string | number)[]) => values.includes(v as string | number);
 const rows = (v: unknown, max: number, check: (row: Json) => boolean): v is Json[] => Array.isArray(v) && v.length <= max && v.every(check);
 const safeTree = (v: unknown, depth = 0): v is Json => depth <= 18 && (v === null || typeof v === 'boolean' || typeof v === 'string' && v.length <= 2000 || finite(v) || Array.isArray(v) && v.length <= 2048 && v.every(x => safeTree(x, depth + 1)) || record(v) && Object.keys(v).length <= 140 && Object.entries(v).every(([k, x]) => !['__proto__', 'prototype', 'constructor'].includes(k) && safeTree(x, depth + 1)));
@@ -39,10 +41,10 @@ export function validateCheckpoint(value: unknown, engine: GameEngine): value is
   const s = value.state, systems = value.systems;
   if (!sameFields(s, own(engine, OMIT)) || !SYSTEMS.every(k => record(systems[k]) && sameFields(systems[k] as JsonObject, engine[k]))) return false;
   if (!numbers(s.player, ['x', 'z', 'vx', 'vz', 'angle', 'hp', 'maxHp', 'hullHit', 'invulnerable', 'dashTime', 'dashCooldown']) || !record(s.player) || Number(s.player.hp) <= 0 || Number(s.player.hp) > Number(s.player.maxHp)) return false;
-  if (!member(s.ship, ['vector', 'wraith', 'aegis']) || !member(s.startingLoadout, ['pulse', 'glaive', 'cryo', 'tesla']) || !member(s.runMode, ['classic', 'expedition']) || Number(s.time) < 0 || Number(s.level) < 1 || Number(s.chapter) < 1) return false;
-  if (!numbers(s.weapons, ['pulse', 'glaive', 'cryo', 'tesla']) || !record(s.weapons) || !Object.values(s.weapons).every(n => finite(n) && Number.isInteger(n) && n >= 0 && n <= 6)) return false;
+  if (!member(s.ship, SHIP_IDS) || !member(s.startingLoadout, Object.keys(WEAPONS)) || !member(s.runMode, ['classic', 'expedition']) || Number(s.time) < 0 || Number(s.level) < 1 || Number(s.chapter) < 1) return false;
+  if (!numbers(s.weapons, ['pulse', 'glaive', 'cryo', 'tesla']) || !record(s.weapons) || !optionalNumbers(s.weapons, ['rail', 'scatter']) || !Object.values(s.weapons).every(n => finite(n) && Number.isInteger(n) && n >= 0 && n <= 6)) return false;
   if (!rows(s.enemies, 280, e => numbers(e, ['id', 'x', 'z', 'hp', 'maxHp', 'radius', 'age', 'timer']) && record(e) && Number(e.maxHp) > 0 && member(e.kind, [0, 1, 2, 3]) && typeof e.elite === 'boolean' && weapon(e.weapon) && optionalNumbers(e, ['vx', 'vz', 'weaponShots', 'cannonShots', 'escortShotAt', 'sentinelStrike', 'sentinelHit']) && attack(e.ranged) && attack(e.cannon, true))) return false;
-  if (!rows(s.bolts, 500, b => numbers(b, ['x', 'z', 'vx', 'vz', 'age', 'target', 'damage']) && record(b) && typeof b.enemy === 'boolean' && weapon(b.hostileWeapon) && optionalNumbers(b, ['y', 'vy', 'pierce', 'range', 'traveled', 'drone', 'heavy']))) return false;
+  if (!rows(s.bolts, 500, b => numbers(b, ['x', 'z', 'vx', 'vz', 'age', 'target', 'damage']) && record(b) && typeof b.enemy === 'boolean' && weapon(b.hostileWeapon) && (b.playerWeapon === undefined || member(b.playerWeapon, ['rail', 'scatter'])) && optionalNumbers(b, ['y', 'vy', 'pierce', 'range', 'traveled', 'drone', 'heavy']))) return false;
   const pools: [string, number, string[]][] = [
     ['rockets', 16, ['x', 'z', 'vx', 'vz', 'age', 'target', 'traveled', 'trail']], ['particles', 1000, ['x', 'y', 'z', 'vx', 'vy', 'vz', 'life', 'maxLife', 'size']],
     ['gems', 400, ['x', 'z', 'value', 'age']], ['vortices', 20, ['x', 'z', 'life', 'radius']], ['shockwaves', 40, ['x', 'z', 'radius', 'life', 'maxLife']],
@@ -67,7 +69,7 @@ export function validateCheckpoint(value: unknown, engine: GameEngine): value is
   if (!rows(reward.pending, 1024, request)) return false;
   if (reward.active !== null) {
     const r = reward.active;
-    if (!request(r) || !record(r) || !numbers(r, ['id', 'winner', 'elapsed']) || typeof r.installed !== 'boolean' || !rows(r.choices, 3, c => record(c) && member(c.id, ['pulse', 'glaive', 'cryo', 'tesla', 'damage', 'speed', 'magnet', 'repair', 'haste', 'shield', 'critical', 'pierce']) && member(c.rarity, ['COMMON', 'RARE', 'OVERCLOCKED']) && finite(c.power) && typeof c.title === 'string' && typeof c.description === 'string') || (r.choices as Json[]).length !== 3 || !Number.isInteger(r.winner) || Number(r.winner) < 0 || Number(r.winner) >= 3 || !rows(r.changes, 20, c => record(c) && ['label', 'before', 'after'].every(k => typeof c[k] === 'string'))) return false;
+    if (!request(r) || !record(r) || !numbers(r, ['id', 'winner', 'elapsed']) || typeof r.installed !== 'boolean' || !rows(r.choices, 3, c => record(c) && member(c.id, ['pulse', 'glaive', 'cryo', 'tesla', 'rail', 'scatter', 'damage', 'speed', 'magnet', 'repair', 'haste', 'shield', 'critical', 'pierce']) && member(c.rarity, ['COMMON', 'RARE', 'OVERCLOCKED']) && finite(c.power) && typeof c.title === 'string' && typeof c.description === 'string') || (r.choices as Json[]).length !== 3 || !Number.isInteger(r.winner) || Number(r.winner) < 0 || Number(r.winner) >= 3 || !rows(r.changes, 20, c => record(c) && ['label', 'before', 'after'].every(k => typeof c[k] === 'string'))) return false;
   }
   return true;
 }
@@ -75,7 +77,7 @@ export function validateCheckpoint(value: unknown, engine: GameEngine): value is
 export function restoreCheckpoint(engine: GameEngine, checkpoint: unknown) {
   if (!validateCheckpoint(checkpoint, engine)) return false;
   const copy = clone(checkpoint);
-  Object.assign(engine, copy.state);
+  Object.assign(engine, { ...copy.state, weapons: { ...engine.weapons, ...(copy.state.weapons as JsonObject) } });
   for (const key of SYSTEMS) Object.assign(engine[key], copy.systems[key]);
   engine.droneRack.refresh();
   engine.input.keys.clear(); engine.input.dash = false; engine.input.surge = false; engine.input.rocket = false; engine.input.bomb = false; engine.input.barrier = false; engine.input.moveX = 0; engine.input.moveZ = 0; engine.input.aiming = false;

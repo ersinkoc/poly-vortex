@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { ArrowRight, Check, Cpu, Crosshair, Disc3, Orbit, Shield, Snowflake, Sparkles, Wind, Zap } from 'lucide-react';
+import { ArrowRight, Check, Cpu, Crosshair, Disc3, Orbit, ScanLine, Shield, Snowflake, Sparkles, Wind, Zap } from 'lucide-react';
 import { engine } from '@/game/engine';
 import { useGame } from '@/game/store';
 import { reelPosition, REEL_TIMING, type RewardRoll } from '@/game/reward-reel';
 import type { UpgradeId } from '@/game/types';
 
-const icons: Record<UpgradeId, typeof Cpu> = { pulse: Crosshair, glaive: Disc3, cryo: Snowflake, tesla: Zap, damage: Cpu, speed: Wind, magnet: Orbit, repair: Shield, haste: Wind, shield: Shield, critical: Crosshair, pierce: ArrowRight };
+const icons: Record<UpgradeId, typeof Cpu> = { pulse: Crosshair, glaive: Disc3, cryo: Snowflake, tesla: Zap, rail: ScanLine, scatter: Orbit, damage: Cpu, speed: Wind, magnet: Orbit, repair: Shield, haste: Wind, shield: Shield, critical: Crosshair, pierce: ArrowRight };
 const ROW_HEIGHT = 64;
 
 function Reel({ roll }: { roll: RewardRoll }) {

@@ -16,6 +16,14 @@ test('core warnings use the real locked shot and release when a sideways dodge c
   signals.tick([e], { x: 0, z: -1 }); expect(signals.locks).toBe(1);
 });
 
+test('flak warns for a later pellet in the locked spread and clears after a sideways dodge', () => {
+  const raider = hostile(); raider.kind = 1; raider.radius = 0.62; raider.weapon = 'flak'; raider.ranged!.rounds = 5;
+  const signals = new ThreatSignals(); signals.tick([raider], core);
+  expect(signals.locks).toBe(1); expect(signals.directions).toHaveLength(1);
+  signals.tick([raider], { x: 5, z: 0 });
+  expect(signals.locks).toBe(0); expect(signals.directions).toHaveLength(0);
+});
+
 test('dead enemies, idle guns, escort locks and intervening cover cannot show a false core alarm', () => {
   const signals = new ThreatSignals(), dead = hostile(1), idle = hostile(2), escort = hostile(3);
   dead.hp = 0; idle.ranged = undefined; escort.ranged!.aimY = 3.5;

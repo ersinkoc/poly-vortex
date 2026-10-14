@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 300" role="img" aria-label="Bastion armored carrier">
+  <defs>
+    <radialGradient id="bg"><stop stop-color="#23394f"/><stop offset="1" stop-color="#071018"/></radialGradient>
+    <linearGradient id="hull" x2="1" y2="1"><stop stop-color="#d4e8f5"/><stop offset=".45" stop-color="#6685a8"/><stop offset="1" stop-color="#273955"/></linearGradient>
+    <linearGradient id="armor" x2="1" y2="1"><stop stop-color="#8fbfff"/><stop offset="1" stop-color="#324c72"/></linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="10"/></filter>
+  </defs>
+  <rect width="420" height="300" fill="url(#bg)"/>
+  <g stroke="#8dbbff" stroke-opacity=".14" fill="none"><ellipse cx="210" cy="166" rx="168" ry="95"/><ellipse cx="210" cy="166" rx="126" ry="70"/><path d="M0 166h420M210 0v300"/></g>
+  <ellipse cx="210" cy="225" rx="142" ry="33" fill="#6ca6ff" opacity=".25" filter="url(#glow)"/>
+  <g transform="translate(210 158)">
+    <path d="M0-86-64-66-143-9-146 80-74 96H74L146 80 143-9 64-66Z" fill="url(#hull)" stroke="#c5ddfa" stroke-width="3"/>
+    <path d="M0-65-52-47-111 6-105 69-57 78H57L105 69 111 6 52-47Z" fill="url(#armor)" stroke="#a5cfff" stroke-width="2"/>
+    <path d="M0-51-31-24-35 33 0 52 35 33 31-24Z" fill="#253d5d" stroke="#d4eeff" stroke-width="3"/>
+    <path d="M-129 4-105 12-103 71-138 66ZM129 4 105 12 103 71 138 66Z" fill="#344d71" stroke="#8dbbff" stroke-width="2"/>
+    <path d="M-111 89v19M-73 94v22M-34 96v24M34 96v24M73 94v22M111 89v19" stroke="#66a6ff" stroke-width="14" stroke-linecap="round" filter="url(#glow)"/>
+    <path d="M-111 85v16M-73 91v18M-34 94v18M34 94v18M73 91v18M111 85v16" stroke="#c3e8ff" stroke-width="7" stroke-linecap="round"/>
+    <path d="M-90 2h-28M90 2h28M-73-23l-21 15M73-23l21 15M0-75v20" stroke="#e5f3ff" stroke-opacity=".7" stroke-width="3"/>
+  </g>
+</svg>

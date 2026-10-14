@@ -30,8 +30,8 @@ function Projectiles() {
   useFrame(({ clock }) => {
     if (bolts.current) {
       engine.bolts.forEach((b, i) => {
-        dummy.position.set(b.x, b.y ?? 0.7, b.z); dummy.rotation.set(-Math.atan2(b.vy ?? 0, Math.hypot(b.vx, b.vz)), Math.atan2(b.vx, b.vz), 0, 'YXZ'); dummy.scale.set(b.hostileWeapon === 'laser' ? 0.045 : b.hostileWeapon === 'missile' ? 0.13 : b.heavy !== undefined ? 0.16 : b.enemy ? 0.17 : b.drone !== undefined ? 0.055 : 0.08, b.hostileWeapon === 'laser' ? 0.045 : b.heavy !== undefined ? 0.16 : 0.08, b.hostileWeapon === 'laser' ? 1.1 : b.hostileWeapon === 'missile' ? 0.48 : b.heavy !== undefined ? 0.36 : b.enemy ? 0.17 : 0.6); dummy.updateMatrix();
-        bolts.current!.setMatrixAt(i, dummy.matrix); bolts.current!.setColorAt(i, color.set(b.enemy ? hostileBoltColor(b) : b.drone !== undefined ? '#78e8ff' : '#b5ff62').multiplyScalar(3));
+        dummy.position.set(b.x, b.y ?? 0.7, b.z); dummy.rotation.set(-Math.atan2(b.vy ?? 0, Math.hypot(b.vx, b.vz)), Math.atan2(b.vx, b.vz), 0, 'YXZ'); dummy.scale.set(b.playerWeapon === 'rail' ? 0.1 : b.playerWeapon === 'scatter' ? 0.075 : b.hostileWeapon === 'laser' ? 0.045 : b.hostileWeapon === 'missile' ? 0.13 : b.heavy !== undefined ? 0.16 : b.enemy ? 0.17 : b.drone !== undefined ? 0.055 : 0.08, b.hostileWeapon === 'laser' ? 0.045 : b.heavy !== undefined ? 0.16 : 0.08, b.playerWeapon === 'rail' ? 1.15 : b.playerWeapon === 'scatter' ? 0.24 : b.hostileWeapon === 'laser' ? 1.1 : b.hostileWeapon === 'missile' ? 0.48 : b.heavy !== undefined ? 0.36 : b.enemy ? 0.17 : 0.6); dummy.updateMatrix();
+        bolts.current!.setMatrixAt(i, dummy.matrix); bolts.current!.setColorAt(i, color.set(b.enemy ? hostileBoltColor(b) : b.playerWeapon === 'rail' ? '#ff7bcd' : b.playerWeapon === 'scatter' ? '#8bffdc' : b.drone !== undefined ? '#78e8ff' : '#b5ff62').multiplyScalar(3));
       });
       bolts.current.count = engine.bolts.length; bolts.current.instanceMatrix.needsUpdate = true; if (bolts.current.instanceColor) bolts.current.instanceColor.needsUpdate = true;
     }

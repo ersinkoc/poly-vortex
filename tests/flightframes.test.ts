@@ -39,12 +39,12 @@ test('preferences from another tab survive unrelated setting changes and selecte
     useGame.setState({ship:'vector'});memory.set('poly-vortex-settings-v1',JSON.stringify(saved));useGame.getState().hydrate();expect(useGame.getState().ship).toBe('aegis');expect(useGame.getState().adaptiveQuality).toBe(false);
   }finally{if(original)Object.defineProperty(globalThis,'localStorage',original);else Reflect.deleteProperty(globalThis,'localStorage')}
 });
-test('all three frames have distinct complete finite procedural geometry within the existing docking/flight scale', () => {
+test('all five frames have distinct complete finite procedural geometry within the existing docking/flight scale', () => {
   const signatures = new Set<string>();
   for(const id of SHIP_IDS){const model=buildPlayerShip(id);try{
     expect(Object.keys(model)).toEqual([...SURFACES]);let triangles=0;
     for(const g of Object.values(model)){const p=g.getAttribute('position');expect(p.count).toBeGreaterThan(0);expect(Array.from(p.array).every(Number.isFinite)).toBe(true);triangles+=p.count/3;}
     expect(triangles).toBeLessThan(30000); signatures.add(JSON.stringify(Array.from(model.hull.getAttribute('position').array).slice(0,30)));
   }finally{Object.values(model).forEach(g=>g.dispose())}}
-  expect(signatures.size).toBe(3);
+  expect(signatures.size).toBe(SHIP_IDS.length);
 });

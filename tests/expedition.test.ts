@@ -130,7 +130,7 @@ test('a long deployment unlocks depth and endurance milestones without duplicate
 });
 
 test('twelve simulated minutes cross three fronts with finite bounded combat and live missions', () => {
-  game.weapons = { pulse: 6, glaive: 6, cryo: 6, tesla: 6 }; game.damage = 4; game.xp = 100000;
+  game.weapons = { pulse: 6, glaive: 6, cryo: 6, tesla: 6, rail: 6, scatter: 6 }; game.damage = 4; game.xp = 100000;
   for (let frame = 0; frame < 12 * 60 * 60; frame++) {
     game.input.keys.clear(); game.input.keys.add(['KeyD', 'KeyS', 'KeyA', 'KeyW'][Math.floor(frame / 180) % 4]);
     game.tick(1 / 60);

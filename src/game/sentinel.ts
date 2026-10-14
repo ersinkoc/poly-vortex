@@ -17,7 +17,9 @@ export function sentinelHealth(build: SentinelBuild) {
   const escort = Math.min(build.escorts, w.glaive > 0 ? w.glaive + 1 : 0) * droneDamage(w.glaive) / Math.max(DRONE_FIRE.minInterval, DRONE_FIRE.interval * haste);
   const cryo = w.cryo > 0 ? (12 + w.cryo * 7) * 3.5 / (6 * haste) : 0;
   const tesla = w.tesla > 0 ? (22 + w.tesla * 12) / (2 * haste) : 0;
-  const sustained = (pulse * 0.75 + escort * 0.55 + cryo * 0.55 + tesla * 0.85) * damage;
+  const rail = w.rail > 0 ? (60 + w.rail * 14) / (Math.max(1.2, 4 - w.rail * 0.32) * haste) : 0;
+  const scatter = w.scatter > 0 ? (5 + w.scatter * 2) * 3 / (Math.max(0.85, 2.6 - w.scatter * 0.2) * haste) : 0;
+  const sustained = (pulse * 0.75 + escort * 0.55 + cryo * 0.55 + tesla * 0.85 + rail * 0.75 + scatter * 0.6) * damage;
   const front = 1 + Math.min(1.2, Math.log2(Math.max(1, build.chapter)) * 0.16);
   return Math.ceil(Math.max(5500 * front + sustained * 20, CHARGE_RULES.damage * damage * 8) * (build.overdrive ? 1.25 : 1));
 }
