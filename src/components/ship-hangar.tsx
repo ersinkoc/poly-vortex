@@ -17,8 +17,8 @@ import { useShipSync } from './use-ship-sync';
 
 const catalog = [
   ...SHIP_IDS.map((id, i) => ({ name: FLIGHTFRAMES[id].name, code: FLIGHTFRAMES[id].code + ' / FLIGHTFRAME', role: FLIGHTFRAMES[id].role, color: FLIGHTFRAMES[id].color, icon: [Crosshair, Wind, Shield][i], copy: FLIGHTFRAMES[id].description })),
-  { name: 'Interceptor', code: 'CX.01 / STRIKE GUNSHIP', role: 'FLANKING ATTACK', color: '#ff5774', icon: Wind, copy: 'A fast twin-gun skirmisher. It flanks at 5.5–8m and retreats when you close in. A pink aim line warns before a two-round salvo; dodge sideways or use stone cover.' },
-  { name: 'Orbiter', code: 'OR.02 / RECON PLATFORM', role: 'RANGED CONTROL', color: '#a685ff', icon: Orbit, copy: 'A standoff weapons platform: pink plasma bursts, violet charged lasers, or amber unguided rockets. Its aim line warns before firing; evade sideways or use stone cover.' },
+  { name: 'Interceptor', code: 'CX.01 / STRIKE GUNSHIP', role: 'FLANKING ATTACK', color: '#ff5774', icon: Wind, copy: 'A fast twin-gun skirmisher. It flanks at 5.5–8m and retreats when you close in. Red chevrons and a TARGET LOCK countdown warn before a two-round salvo. Dodge sideways; amber brackets mark the old aim point.' },
+  { name: 'Orbiter', code: 'OR.02 / RECON PLATFORM', role: 'RANGED CONTROL', color: '#a685ff', icon: Orbit, copy: 'A standoff weapons platform: pink plasma bursts, violet charged lasers, or amber unguided rockets. Target brackets and directional warning chevrons signal a prepared shot. Evade sideways or use stone cover to clear the red lock.' },
   { name: 'Goliath', code: 'GT.03 / SIEGE CARRIER', role: 'HEAVY ARMOR', color: '#ffae50', icon: Shield, copy: 'A heavy hover carrier with overlapping ceramic armor, reinforced engine nacelles, cooling grilles, and a twin-barrel siege turret.' },
   { name: 'Vortex Sentinel', code: 'VS.00 / DREADNOUGHT', role: 'PROTOCOL GUARDIAN', color: '#ff3a5d', icon: Skull, copy: 'A guardian calibrated to your arsenal. Blue sealed armor resists hits; the amber exposed reactor rewards timed bursts. Three barrage phases add increasingly dangerous telegraphed ground strikes.' },
 ];

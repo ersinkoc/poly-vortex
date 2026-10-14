@@ -17,3 +17,5 @@
 .launch-tools button.launch-help{display:none}.launch-cannon{display:block;font:8px var(--mono);color:#99b4a5;margin-top:7px}@media(max-width:900px){.launch-tools button.launch-help{display:grid}}
 
 .flight-event{position:absolute;top:141px;left:50%;transform:translateX(-50%);padding:8px 12px;border:1px solid #9dbf8755;border-radius:6px;background:#102119e6;color:#d5efba;font:10px var(--mono);max-width:360px;text-align:center}.flight-event.boss-event{top:199px}.hud-clean .mobile-run-stats{grid-column:1/-1}
+
+.hostile-lock-readout{align-items:center;gap:7px;padding:6px 9px;border:1px solid #ff687d99;border-radius:5px;background:#240c13e6;color:#ff8393;white-space:nowrap;box-shadow:0 3px 16px #080a10a8;pointer-events:none}.hostile-lock-readout svg{width:22px;height:22px;flex-shrink:0}.hostile-lock-readout strong{display:block;font:600 9px var(--mono);letter-spacing:1px;color:#fff0ee}.hostile-lock-readout small{display:block;font:8px var(--mono);margin-top:3px;color:#ffb2b8}

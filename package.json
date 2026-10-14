@@ -1,6 +1,6 @@
 {
   "name": "poly-vortex-neon-protocol",
-  "version": "1.29.0",
+  "version": "1.30.0",
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0",
