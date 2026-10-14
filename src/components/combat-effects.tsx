@@ -8,6 +8,7 @@ import { useGame } from '@/game/store';
 import FirstAidSupplies from './first-aid-supplies';
 import Ordnance from './ordnance';
 import ImpactShield from './impact-shield';
+import BarrierShell from './barrier-shell';
 
 const transform = new THREE.Object3D(), tint = new THREE.Color(), right = new THREE.Vector3();
 const damageVertex = `attribute float aGlyph; attribute vec3 aTint; varying vec2 vUv; varying vec3 vTint; varying float vGlyph;
@@ -106,4 +107,4 @@ function Battlefield() {
   </>;
 }
 
-export default function CombatEffects() { return <><Battlefield /><ImpactShield /><FirstAidSupplies /><Ordnance /><DamageNumbers /></>; }
+export default function CombatEffects() { return <><Battlefield /><ImpactShield /><BarrierShell /><FirstAidSupplies /><Ordnance /><DamageNumbers /></>; }

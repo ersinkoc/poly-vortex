@@ -15,6 +15,10 @@ import ShipSelector from './ship-selector';
 import LaunchMenu from './launch-menu';
 import FlightHUD from './flight-hud';
 import FlightManual from './flight-manual';
+import RunPersistence from './run-persistence';
+import SaveNotice from './save-notice';
+import SaveRecord from './save-record';
+import { loadSave, claimResume } from '@/game/local-save';
 
 import { useShipSync } from './use-ship-sync';
 import { WEAPONS, type Profile, type WeaponId } from '@/game/types';
@@ -47,7 +51,7 @@ function PanelContent({ panel }: { panel: Exclude<Panel, null> }) {
   if (panel === 'ships') return <ShipSelector />;
   if (panel === 'ordnance') return <RocketGuide />;
   if (panel === 'records') return <>
-    <p className="panel-intro">Every deployment leaves a signal. Your flight record is saved with your core.</p>
+    <SaveRecord/><p className="panel-intro">Every deployment leaves a signal. Your flight record is saved with your core.</p>
     <div className="profile-stats flight-stats"><div><span>LIFETIME HOSTILES</span><strong>{number(profile.totalKills)}</strong></div><div><span>DEPLOYMENTS</span><strong>{profile.runs}</strong></div><div><span>EXTRACTIONS</span><strong>{profile.wins}</strong></div></div>
     <div className="achievement-list">{ACHIEVEMENTS.map(a => { const unlocked = profile.achievements.includes(a.id); return <div className={unlocked ? 'unlocked' : ''} key={a.id}><span>{unlocked ? <Trophy size={20} /> : <Hexagon size={20} />}</span><div><h3>{a.name}</h3><p>{a.description}</p></div>{unlocked ? <Check size={16} /> : <span className="achievement-lock">LOCKED</span>}</div>; })}</div>
   </>;
@@ -116,7 +120,8 @@ function TouchControls({ showDash = true }: { showDash?: boolean }) {
 
 function PauseOverlay({ open }: { open: (p: Panel) => void }) {
   const canExtract = useGame(s => s.canExtract);
-  return <motion.div className="game-overlay pause-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><div className="pause-card"><span className="eyebrow"><Pause size={14} /> SIGNAL SUSPENDED</span><h2>Paused.</h2><p>Enemies and mission timers are paused.</p><button className="primary-button" onClick={() => useGame.getState().setPhase('playing')}>RESUME PROTOCOL <Play size={17} fill="currentColor" /></button><button className="secondary-button" onClick={() => open('settings')}>SYSTEM SETTINGS <SlidersHorizontal size={15} /></button>{canExtract && <button className="secondary-button" onClick={() => engine.extract()}>EXTRACT & BANK CREDITS <ArrowUpRight size={14} /></button>}<button className="text-button" onClick={() => { engine.publish(); useGame.getState().saveRun(engine.score, engine.kills, false, engine.salvage); }}>END RUN <ArrowUpRight size={13} /></button><button className="secondary-button" onClick={() => open('controls')}>VISUAL FLIGHT MANUAL <Crosshair size={15} /></button><small>PRESS ESC TO RESUME</small></div></motion.div>;
+  const conflict = useGame(s => s.saveStatus === 'conflict');
+  return <motion.div className="game-overlay pause-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><div className="pause-card"><span className="eyebrow"><Pause size={14} /> SIGNAL SUSPENDED</span><h2>Paused.</h2><p>Enemies and mission timers are paused.</p><button className="primary-button" disabled={conflict} onClick={() => useGame.getState().setPhase('playing')}>RESUME PROTOCOL <Play size={17} fill="currentColor" /></button><button className="secondary-button" onClick={() => open('settings')}>SYSTEM SETTINGS <SlidersHorizontal size={15} /></button>{canExtract && <button className="secondary-button" onClick={() => engine.extract()}>EXTRACT & BANK CREDITS <ArrowUpRight size={14} /></button>}<button className="text-button" onClick={() => { engine.publish(); useGame.getState().saveRun(engine.score, engine.kills, false, engine.salvage); }}>END RUN <ArrowUpRight size={13} /></button><button className="secondary-button" onClick={() => open('controls')}>VISUAL FLIGHT MANUAL <Crosshair size={15} /></button>{conflict&&<button className="secondary-button" onClick={()=>useGame.getState().setPhase('menu')}>COMMAND CENTER <ArrowUpRight size={14}/></button>}<small>PRESS ESC TO RESUME</small></div></motion.div>;
 }
 
 function ResultOverlay({ start, open }: { start: () => void; open: (p: Panel) => void }) {
@@ -152,9 +157,16 @@ export default function GameShell() {
   useEffect(() => { audio.setEnabled(sound); }, [sound]);
   useEffect(() => { if (phase === 'playing') audio.startMusic(); else audio.stopMusic(); }, [phase]);
   const start = () => { setPanel(null); void audio.unlock().catch(() => { useGame.setState({ sound: false }); }); useGame.getState().start(); };
+  const resume = () => {
+    const flight = loadSave()?.checkpoint;
+    if (!flight || !engine.queueResume(flight)) { useGame.setState({ savedFlight: null, saveStatus: 'invalid' }); return; }
+    const status = claimResume(flight.runKey);
+    if (status !== 'saved') { useGame.setState({ saveStatus: status }); return; }
+    setPanel(null); void audio.unlock().catch(() => useGame.setState({ sound: false })); useGame.getState().resumeFlight(flight);
+  };
   return <MotionConfig reducedMotion={reducedEffects ? 'always' : 'user'}><div className={`app-shell ${phase === 'menu' ? 'is-menu' : 'is-game'} ${reducedEffects ? 'reduced-effects' : ''}`}>
-    <div className="arena-canvas"><ArenaBoundary>{(phase !== 'menu' || !compact) && <Arena />}</ArenaBoundary></div>
-    <AnimatePresence mode="wait">{phase === 'menu' ? <LaunchMenu key="menu" open={setPanel} start={start} /> : <motion.div key="game" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="game-interface">{compact ? <MobileHUD resumeOnClose={intelPaused.current} intelOpen={intelOpen} onIntelOpen={openIntel} onIntelClose={closeIntel} onHelp={intelHelp} movement={<TouchControls showDash={false} />} /> : <FlightHUD resumeOnClose={intelPaused.current} intelOpen={intelOpen} onIntelOpen={openIntel} onIntelClose={closeIntel} onHelp={intelHelp} />}<AnimatePresence>{phase === 'paused' && !intelOpen && <PauseOverlay key="pause" open={setPanel} />}{(phase === 'dead' || phase === 'won') && <ResultOverlay key="result" start={start} open={setPanel} />}</AnimatePresence></motion.div>}</AnimatePresence>
+    <RunPersistence/><SaveNotice/><div className="arena-canvas"><ArenaBoundary>{(phase !== 'menu' || !compact) && <Arena />}</ArenaBoundary></div>
+    <AnimatePresence mode="wait">{phase === 'menu' ? <LaunchMenu key="menu" open={setPanel} start={start} resume={resume} /> : <motion.div key="game" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="game-interface">{compact ? <MobileHUD resumeOnClose={intelPaused.current} intelOpen={intelOpen} onIntelOpen={openIntel} onIntelClose={closeIntel} onHelp={intelHelp} movement={<TouchControls showDash={false} />} /> : <FlightHUD resumeOnClose={intelPaused.current} intelOpen={intelOpen} onIntelOpen={openIntel} onIntelClose={closeIntel} onHelp={intelHelp} />}<AnimatePresence>{phase === 'paused' && !intelOpen && <PauseOverlay key="pause" open={setPanel} />}{(phase === 'dead' || phase === 'won') && <ResultOverlay key="result" start={start} open={setPanel} />}</AnimatePresence></motion.div>}</AnimatePresence>
     <AnimatePresence>{panel && <Modal key={panel} panel={panel} close={closePanel.current} />}</AnimatePresence>
   </div></MotionConfig>;
 }

@@ -113,7 +113,7 @@ function ProtocolRing() {
 }
 
 function SceneController() {
-  const { camera, gl, raycaster } = useThree();
+  const { camera, gl, raycaster, invalidate } = useThree();
   const target = useMemo(() => new THREE.Vector3(), []), aim = useMemo(() => new THREE.Vector3(), []);
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []);
   const pointer = useMemo(() => new THREE.Vector2(), []);
@@ -121,10 +121,10 @@ function SceneController() {
   const navigationPoint = useMemo(() => new THREE.Vector3(), []), navigationTimer = useRef(0);
   const accumulator = useRef(0), frames = useRef({ count: 0, time: 0 });
   const runId = useGame(s => s.runId), phase = useGame(s => s.phase);
-  useEffect(() => { if (runId) { engine.reset(); pointerInside.current = false; } }, [runId]);
+  useEffect(() => { if (runId) { engine.initializeRun(); pointerInside.current = false; invalidate(); } }, [runId, invalidate]);
   useEffect(() => {
     if (phase === 'menu') { engine.player.x = 0; engine.player.z = 0; engine.preview(); engine.bolts = []; engine.gems = []; engine.particles = []; engine.vortices = []; engine.arcs = []; }
-    if (phase !== 'playing') { engine.cancelRocket('SHOT CANCELLED · gameplay suspended. No ammunition spent.'); engine.input.bomb = false; engine.publish(); engine.input.keys.clear(); engine.input.dash = false; engine.input.surge = false; engine.input.rocket = false; engine.input.moveX = 0; engine.input.moveZ = 0; accumulator.current = 0; }
+    if (phase !== 'playing') { engine.cancelRocket('SHOT CANCELLED · gameplay suspended. No ammunition spent.'); engine.input.bomb = false; engine.publish(); engine.input.keys.clear(); engine.input.dash = false; engine.input.surge = false; engine.input.barrier = false; engine.input.rocket = false; engine.input.moveX = 0; engine.input.moveZ = 0; accumulator.current = 0; }
   }, [phase]);
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -135,6 +135,7 @@ function SceneController() {
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code)) e.preventDefault();
       engine.input.keys.add(e.code); if (e.code === 'Space') engine.input.dash = true;
       if (e.code === 'KeyQ' && !e.repeat) engine.input.surge = true;
+      if (e.code === 'KeyR' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); engine.input.barrier = true; }
       if (e.code === 'KeyE' && !e.repeat) engine.input.rocket = true;
       if (e.code === 'KeyB' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); engine.input.bomb = true; }
       if (e.code === 'KeyF' && !e.repeat) { useGame.setState({ aimMode: s.aimMode === 'assisted' ? 'precision' : 'assisted' }); engine.targetId = 0; engine.publish(); }

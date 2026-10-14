@@ -21,6 +21,9 @@ import { coreContact, enemyWeapon, hostileBand, HOSTILE_WEAPONS, INTERCEPTOR, ra
 import { SENTINEL, sentinelDefense, sentinelHealth } from './sentinel';
 import { FLIGHTFRAMES, type ShipId } from './flightframes';
 import { GOLIATH, goliathMuzzle, goliathRadial } from './goliath-ai';
+import { BARRIER } from './barrier';
+import { captureCheckpoint, restoreCheckpoint, validateCheckpoint, type EngineCheckpoint } from './checkpoint';
+import type { SavedFlight } from './local-save';
 import type { Arc, Bolt, Cache, DamageText, Entity, Gem, Hazard, Input, Particle, Rocket, Shockwave, Supply, Upgrade, UpgradeId, Vortex, WeaponId } from './types';
 
 export const LIMITS = { enemies: 280, bolts: 500, rockets: 16, particles: 1000, gems: 400, shockwaves: 40, damageTexts: 40, hazards: 12, supplies: 10, caches: 8 };
@@ -43,7 +46,10 @@ const defs: Record<UpgradeId, [string, string]> = {
 };
 
 export class GameEngine {
+  runKey = '';
+  private pendingResume: EngineCheckpoint | null = null;
   ship: ShipId = 'vector';
+  startingLoadout: WeaponId = 'pulse';
   readonly roverBay: RoverBay;
   charges: GroundCharge[] = []; chargeAmmo: number = CHARGE_RULES.capacity; chargeCooldown = 0; chargeNotice = ''; chargeNoticeTime = 0; private chargeUid = 0;
   droneGuns = createDroneGuns();
@@ -60,6 +66,7 @@ export class GameEngine {
     this.cancelRocket(); this.publish(); useGame.getState().saveRun(this.score, this.kills, true, this.salvage); return true;
   }
   shieldHits: ShieldHit[] = [];
+  barrier = 0; barrierCooldown = 0; private barrierHitCooldown = 0;
   readonly rewards: RewardReel;
   blasts: Blast[] = []; scorches: Scorch[] = []; private visualId = 0;
   director = new EncounterDirector();
@@ -91,12 +98,25 @@ export class GameEngine {
     this.rewards = new RewardReel(source => this.createChoices(source === 'salvage'), () => this.random(), choice => this.installUpgrade(choice));
   }
   random() { this.seed = (Math.imul(1664525, this.seed) + 1013904223) >>> 0; return this.seed / 4294967296; }
+  checkpoint() { return captureCheckpoint(this); }
+  queueResume(flight: SavedFlight) {
+    if (!validateCheckpoint(flight.payload, this) || flight.payload.state.runKey !== flight.runKey || flight.payload.state.ship !== flight.ship || flight.payload.state.time !== flight.time || flight.payload.state.level !== flight.level || flight.payload.state.chapter !== flight.chapter) return false;
+    this.pendingResume = flight.payload; return true;
+  }
+  initializeRun() {
+    const pending = this.pendingResume; this.pendingResume = null;
+    if (pending && pending.state.runKey === useGame.getState().runKey && restoreCheckpoint(this, pending)) { this.publishRewards(); this.publish(); return; }
+    this.reset();
+  }
   reset() {
+    this.pendingResume = null;
+    this.runKey = useGame.getState().runKey;
     this.roverBay.reset(this.seed);
     this.worldLife.reset(this.seed);
     this.charges = []; this.chargeAmmo = CHARGE_RULES.capacity; this.chargeCooldown = 0; this.chargeUid = 0; this.chargeNotice = ''; this.chargeNoticeTime = 0; this.input.bomb = false;
     this.droneGuns = createDroneGuns();
     this.shieldHits = [];
+    this.barrier = 0; this.barrierCooldown = 0; this.barrierHitCooldown = 0; this.input.barrier = false;
     this.rewards.reset(); this.publishRewards();
     this.blasts = []; this.scorches = []; this.visualId = 0;
     this.director.reset();
@@ -108,6 +128,7 @@ export class GameEngine {
     this.lastCombatSupply = -25;
     const s = useGame.getState();
     this.ship = s.activeShip;
+    this.startingLoadout = s.loadout;
     const frame = FLIGHTFRAMES[this.ship];
     this.runMode = s.runMode; this.chapter = 1; this.sentinels = 0; this.chapterStarted = 0; this.service = null;
     this.player = { x: 0, z: 0, vx: 0, vz: 0, angle: 0, hp: s.maxHp, maxHp: s.maxHp, hullHit: 0, invulnerable: 1.5, dashTime: 0, dashCooldown: 0 };
@@ -295,8 +316,23 @@ export class GameEngine {
       }
     }
   }
+  activateBarrier() {
+    if (useGame.getState().phase !== 'playing' || this.player.hp <= 0 || this.barrierCooldown > 0) return false;
+    this.barrier = BARRIER.duration; this.barrierCooldown = BARRIER.cooldown;
+    this.wave(this.player.x, this.player.z, 3.3, '#a6dfff', 0.5); audio.shield();
+    this.publish(); return true;
+  }
   hurt(amount: number, source?: HitSource) {
-    if (this.player.invulnerable > 0 || useGame.getState().phase !== 'playing') return;
+    if (useGame.getState().phase !== 'playing') return;
+    if (this.barrier > 0) {
+      if (this.barrierHitCooldown <= 0) {
+        this.barrierHitCooldown = BARRIER.hitInterval;
+        if (this.shieldHits.length >= SHIELD_IMPACT.capacity) this.shieldHits.shift();
+        this.shieldHits.push(shieldImpact(this.player, source, Math.min(40, amount), false));
+      }
+      return;
+    }
+    if (this.player.invulnerable > 0) return;
     const absorbed = Math.min(this.shield, amount); this.shield -= absorbed; this.shieldDelay = 4;
     const impact = absorbed > 0 ? shieldImpact(this.player, source, absorbed, this.shield === 0) : null;
     if (impact) { if (this.shieldHits.length >= SHIELD_IMPACT.capacity) this.shieldHits.shift(); this.shieldHits.push(impact); }
@@ -349,6 +385,7 @@ export class GameEngine {
     const target = this.enemies.find(e => e.id === this.targetId && e.hp > 0);
     const lock = this.launcherLock();
     useGame.setState({
+      barrier: this.barrier, barrierCooldown: this.barrierCooldown,
       droneHull: this.droneRack.units.slice(0, this.droneRack.capacity).map(u => u.hp),
       droneStatus: this.droneRack.snapshot(),
       roverMoving: this.roverBay.units.filter(r => r.state === 'rolling').length, roverArmed: this.roverBay.units.filter(r => r.state === 'armed' || r.state === 'primed').length, roverNextWave: this.roverBay.nextWave, roverWaves: this.roverBay.waves,
@@ -365,8 +402,10 @@ export class GameEngine {
     });
   }
   tick(dt: number) {
-    if (useGame.getState().phase !== 'playing') { this.input.bomb = false; this.cancelRocket('SHOT CANCELLED · gameplay suspended. No ammunition spent.'); return; }
+    if (useGame.getState().phase !== 'playing') { this.input.bomb = false; this.input.barrier = false; this.cancelRocket('SHOT CANCELLED · gameplay suspended. No ammunition spent.'); return; }
     if (this.hitStop > 0) { this.hitStop -= dt; return; }
+    this.barrier = this.barrier - dt > 1e-8 ? this.barrier - dt : 0; this.barrierCooldown = this.barrierCooldown - dt > 1e-8 ? this.barrierCooldown - dt : 0; this.barrierHitCooldown = Math.max(0, this.barrierHitCooldown - dt);
+    if (this.input.barrier) this.activateBarrier(); this.input.barrier = false;
     this.time += dt; const p = this.player;
     // Resolve the arena handoff before old contacts, bullets or strikes can tick.
     if (!this.service && this.chapterTime >= RUN_DURATION && !this.bossSpawned) this.engageSentinel();

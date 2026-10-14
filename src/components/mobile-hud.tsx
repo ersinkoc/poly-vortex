@@ -8,6 +8,7 @@ import { WEAPONS, type WeaponId } from '@/game/types';
 import { LAUNCHER_COPY } from '@/game/launcher';
 import SentinelMeter from './sentinel-meter';
 import ChargeControl from './charge-control';
+import BarrierControl from './barrier-control';
 import DroneStatus from './drone-status';
 import ExpeditionHUD from './expedition-hud';
 import MissionHUD from './mission-hud';
@@ -59,6 +60,7 @@ export default function MobileHUD({ intelOpen, onIntelOpen, onIntelClose, onHelp
       <button className={`mobile-action dash ${s.dash <= 0 ? 'ready' : ''}`} aria-label="Phase shift" disabled={!playable} onClick={() => { if (playable) engine.input.dash = true; }}><Wind size={22} /><span>{s.dash <= 0 ? 'DASH' : `${s.dash.toFixed(1)}s`}</span></button>
       <button className={`mobile-action rocket ${s.rocketReady ? 'ready' : ''} ${s.rocketPending > 0 ? 'queued' : ''}`} aria-label="Launch rocket" disabled={!playable} title={copy.hint} onClick={() => engine.requestRocket()}><Rocket size={22} /><span>{s.rocketPending > 0 ? 'LOCKING' : s.rocketCooldown > 0 ? `${s.rocketCooldown.toFixed(1)}s` : `${s.rocketAmmo}/${s.rocketCapacity}`}</span></button>
       <ChargeControl />
+      <BarrierControl mobile/>
       <button className={`mobile-action surge ${s.surge >= 100 ? 'ready' : ''}`} aria-label="Activate Vortex Surge" disabled={!playable || s.surge < 100} onClick={() => { engine.input.surge = true; }}><Zap size={22} /><span>{s.surge >= 100 ? 'EMP' : `${Math.floor(s.surge)}%`}</span></button>
     </div>
     <div className="mobile-xp"><span>LV {s.level}</span><i><b style={{ width: `${Math.min(100, s.xp / s.nextXp * 100)}%` }} /></i></div>

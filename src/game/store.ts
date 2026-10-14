@@ -2,7 +2,6 @@ import type { EnemyWeapon } from './enemy-weapons';
 import { create } from 'zustand';
 import { EMPTY_PROFILE, type Difficulty, type Phase, type Profile, type WeaponId } from './types';
 import type { RewardRoll } from './reward-reel';
-import { ACHIEVEMENTS } from './progression';
 import type { Mission } from './missions';
 import { ROCKET_CAPACITY } from './supplies';
 import type { EncounterPhase } from './director';
@@ -14,8 +13,12 @@ import { ROVER_RULES } from './ground-rovers';
 import type { DroneTelemetry } from './orbital-drones';
 import { FLIGHTFRAMES, shipId, type ShipId } from './flightframes';
 import type { BudgetLevel } from './render-budget';
+import { claimRun, newRunKey, readProfile, readSettings, savedFlightSummary, loadSave, saveProfile, saveSettings, type SaveSummary, type SavedFlight, type FlightResult, type SaveStatus, type LastAchievement } from './local-save';
 
 type GameStore = {
+  runKey: string; savedFlight: SaveSummary | null; lastFlight: FlightResult | null; saveStatus: SaveStatus; lastSavedAt: number;
+  lastVictory: FlightResult | null; lastAchievement: LastAchievement | null;
+  resumeFlight: (flight: SavedFlight) => void;
   ship: ShipId; activeShip: ShipId; selectShip: (ship: ShipId) => void;
   adaptiveQuality: boolean; renderBudget: BudgetLevel;
   droneHull: number[];
@@ -36,13 +39,16 @@ type GameStore = {
   kills: number; score: number; combo: number; dash: number; enemies: number; fps: number;
   weapons: Record<WeaponId, number>; reward: RewardRoll | null; rewardQueued: number; profile: Profile; earned: number; runId: number;
   shield: number; maxShield: number; surge: number; sector: number; bossPhase: number; peakCombo: number; elites: number; caches: number;
+  barrier: number; barrierCooldown: number;
   overdrive: number; repair: number; salvage: number; announcement: string; announcementDetail: string; announcementTime: number;
   setPhase: (phase: Phase) => void; start: () => void; hydrate: () => void;
   saveRun: (score: number, kills: number, won: boolean, bonus?: number) => void;
   purchase: (id: keyof Profile['upgrades']) => void;
 };
-const save = (profile: Profile) => { try { localStorage.setItem('poly-vortex-profile-v1', JSON.stringify(profile)); } catch { /* Storage can be unavailable in private browsing. */ } };
 export const useGame = create<GameStore>((set, get) => ({
+  runKey: '', savedFlight: null, lastFlight: null, saveStatus: 'saved', lastSavedAt: 0,
+  lastVictory: null, lastAchievement: null,
+  resumeFlight: flight => set(s => ({ runKey: flight.runKey, activeShip: flight.ship, phase: 'paused', runId: s.runId + 1, maxHp: Number((flight.payload.state.player as Record<string, unknown>).maxHp), runMode: flight.payload.state.runMode as RunMode, difficulty: flight.payload.state.overdrive ? 'overdrive' : 'standard', loadout: flight.payload.state.startingLoadout as WeaponId, savedFlight: null, earned: 0, saveStatus: 'saved' })),
   ship: 'vector', activeShip: 'vector', adaptiveQuality: true, renderBudget: 0,
   selectShip: ship => { if (get().phase === 'menu' || get().phase === 'dead' || get().phase === 'won') set({ ship: shipId(ship) }); },
   droneHull: [],
@@ -62,16 +68,19 @@ export const useGame = create<GameStore>((set, get) => ({
   enemies: 0, fps: 60, weapons: { pulse: 1, glaive: 0, cryo: 0, tesla: 0 }, reward: null, rewardQueued: 0, profile: EMPTY_PROFILE, earned: 0, runId: 0,
   shield: 40, maxShield: 40, surge: 100, sector: 0, bossPhase: 0, peakCombo: 1, elites: 0, caches: 0, overdrive: 0, repair: 0, salvage: 0,
   announcement: '', announcementDetail: '', announcementTime: 0,
+  barrier: 0, barrierCooldown: 0,
   setPhase: phase => {
     const current = get().phase;
+    if (phase === 'playing' && get().saveStatus === 'conflict') return;
     if (phase === 'paused' && current !== 'playing' || phase === 'playing' && current !== 'paused') return;
     set({ phase });
   },
-  start: () => set(s => ({ phase: 'playing', activeShip: s.ship, runId: s.runId + 1, time: 0, earned: 0, reward: null, rewardQueued: 0, hp: FLIGHTFRAMES[s.ship].hull + s.profile.upgrades.armor * 15, maxHp: FLIGHTFRAMES[s.ship].hull + s.profile.upgrades.armor * 15 })),
+  start: () => { const runKey = newRunKey(), saveStatus = claimRun(runKey); set(s => ({ runKey, saveStatus, savedFlight: null, phase: 'playing', activeShip: s.ship, runId: s.runId + 1, time: 0, earned: 0, reward: null, rewardQueued: 0, hp: FLIGHTFRAMES[s.ship].hull + s.profile.upgrades.armor * 15, maxHp: FLIGHTFRAMES[s.ship].hull + s.profile.upgrades.armor * 15 })); },
   hydrate: () => {
+    const saved = loadSave(); set({ profile: readProfile(), savedFlight: savedFlightSummary(), lastFlight: saved?.lastFlight ?? null, lastVictory: saved?.lastVictory ?? null, lastAchievement: saved?.lastAchievement ?? null, lastSavedAt: saved?.updatedAt ?? 0 });
     const prefersCalm = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
     try {
-      const settings = JSON.parse(localStorage.getItem('poly-vortex-settings-v1') || 'null');
+      const settings = readSettings();
       if (settings && typeof settings === 'object') set({
         ship: shipId(settings.ship),
         adaptiveQuality: typeof settings.adaptiveQuality === 'boolean' ? settings.adaptiveQuality : true,
@@ -79,20 +88,12 @@ export const useGame = create<GameStore>((set, get) => ({
         sound: typeof settings.sound === 'boolean' ? settings.sound : true,
         quality: settings.quality === 'performance' ? 'performance' : 'high',
         difficulty: settings.difficulty === 'overdrive' ? 'overdrive' : 'standard',
-        loadout: ['pulse', 'glaive', 'cryo', 'tesla'].includes(settings.loadout) ? settings.loadout : 'pulse',
+        loadout: typeof settings.loadout === 'string' && ['pulse', 'glaive', 'cryo', 'tesla'].includes(settings.loadout) ? settings.loadout as WeaponId : 'pulse',
         aimMode: settings.aimMode === 'precision' ? 'precision' : 'assisted',
         reducedEffects: typeof settings.reducedEffects === 'boolean' ? settings.reducedEffects : prefersCalm,
       });
       else set({ reducedEffects: prefersCalm });
     } catch { set({ reducedEffects: prefersCalm }); /* Corrupt preferences do not affect the flight record. */ }
-    try {
-      const raw = JSON.parse(localStorage.getItem('poly-vortex-profile-v1') || 'null');
-      if (!raw || typeof raw !== 'object') return;
-      const n = (v: unknown, max = 1e9) => typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(max, Math.floor(v))) : 0;
-      const recorded = Array.isArray(raw.achievements) ? raw.achievements.filter((id: unknown) => ACHIEVEMENTS.some(a => a.id === id)) as string[] : [];
-      const achievements = [...new Set([...recorded, ...(n(raw.runs) > 0 ? ['first-run'] : []), ...(n(raw.runs) >= 10 ? ['veteran'] : []), ...(n(raw.wins) > 0 ? ['breaker'] : []), ...(n(raw.wins) >= 3 ? ['ace'] : []), ...(n(raw.totalKills) >= 250 ? ['hunter'] : [])])];
-      set({ profile: { credits: n(raw.credits), best: n(raw.best), runs: n(raw.runs), wins: n(raw.wins), totalKills: n(raw.totalKills), achievements, upgrades: { armor: n(raw.upgrades?.armor, 5), reactor: n(raw.upgrades?.reactor, 5), thrusters: n(raw.upgrades?.thrusters, 5) } } });
-    } catch { /* A corrupt save starts a fresh profile. */ }
   },
   saveRun: (score, kills, won, bonus = 0) => {
     const s = get(); if (s.phase === 'dead' || s.phase === 'won') return;
@@ -100,13 +101,17 @@ export const useGame = create<GameStore>((set, get) => ({
     const totalKills = s.profile.totalKills + kills, runs = s.profile.runs + 1, wins = s.profile.wins + Number(won);
     const unlocked = ['first-run', ...(totalKills >= 250 ? ['hunter'] : []), ...(won ? ['breaker'] : []), ...(s.peakCombo >= 5 ? ['chain'] : []), ...(s.level >= 10 ? ['evolution'] : []), ...(runs >= 10 ? ['veteran'] : []), ...(wins >= 3 ? ['ace'] : []), ...(s.sentinels >= 3 ? ['deep-run'] : []), ...(s.time >= 600 ? ['endurance'] : [])];
     const profile = { ...s.profile, credits: s.profile.credits + earned, best: Math.max(s.profile.best, score), runs, wins, totalKills, achievements: [...new Set([...s.profile.achievements, ...unlocked])] };
-    save(profile); set({ profile, earned, phase: won ? 'won' : 'dead' });
+    const result: FlightResult = { runKey: s.runKey, endedAt: Date.now(), won, score, kills, time: s.time, ship: s.activeShip, level: s.level, chapter: s.chapter, sentinels: s.sentinels, rescued: s.rescued, achievements: unlocked.filter(id => !s.profile.achievements.includes(id)) };
+    const saveStatus = saveProfile(profile, result);
+    if (saveStatus === 'conflict') { set({ profile: readProfile(), earned: 0, phase: won ? 'won' : 'dead', saveStatus, savedFlight: savedFlightSummary() }); return; }
+    const achievement = result.achievements.at(-1);
+    set({ profile, earned, phase: won ? 'won' : 'dead', saveStatus, lastFlight: result, savedFlight: null, ...(won ? { lastVictory: result } : {}), ...(achievement ? { lastAchievement: { id: achievement, unlockedAt: result.endedAt, runKey: result.runKey } } : {}) });
   },
   purchase: id => {
     const p = get().profile; const level = p.upgrades[id]; const cost = 50 + level * 50;
     if (level >= 5 || p.credits < cost) return;
     const profile = { ...p, credits: p.credits - cost, upgrades: { ...p.upgrades, [id]: level + 1 } };
-    save(profile); set({ profile });
+    const saveStatus = saveProfile(profile); set({ profile, saveStatus });
   },
 }));
 
@@ -117,6 +122,7 @@ useGame.subscribe((s, previous) => {
   try {
     let saved: Record<string, unknown> = {};
     try { const raw = JSON.parse(localStorage.getItem('poly-vortex-settings-v1') || 'null'); if (raw && typeof raw === 'object') saved = raw; } catch { /* Replace corrupt preferences with a valid snapshot. */ }
-    localStorage.setItem('poly-vortex-settings-v1', JSON.stringify({ ship: s.ship, adaptiveQuality: s.adaptiveQuality, runMode: s.runMode, sound: s.sound, quality: s.quality, difficulty: s.difficulty, loadout: s.loadout, aimMode: s.aimMode, reducedEffects: s.reducedEffects, ...saved, ...changed }));
+    const settings = { ship: s.ship, adaptiveQuality: s.adaptiveQuality, runMode: s.runMode, sound: s.sound, quality: s.quality, difficulty: s.difficulty, loadout: s.loadout, aimMode: s.aimMode, reducedEffects: s.reducedEffects, ...saved, ...changed };
+    localStorage.setItem('poly-vortex-settings-v1', JSON.stringify(settings)); saveSettings(settings);
   } catch { /* Preferences are optional when storage is unavailable. */ }
 });

@@ -45,6 +45,14 @@ The custom domain is `poly-vortex.oxog.dev`, configured in `public/CNAME` and Gi
 
 Collect cyan XP prisms. A compact side reel automatically installs one randomized common, rare, or overclocked upgrade without pausing combat. Mix pulse lasers, escort drones, cryo-singularities, and Tesla arcs. At three minutes the Vortex Sentinel arrives. Classic extracts immediately on its defeat; Expedition opens a service and extraction window, then continues into another front. Standard and Overdrive difficulties are available. Every run awards core credits, saved in browser local storage, for permanent armor, damage, and speed upgrades. There are no accounts or server dependencies.
 
+## Aegis Overdrive and resumable local flights — 1.31.0
+
+Press **R** or tap **AEGIS** for four seconds of full core protection against contact, projectiles and ground strikes. Its 90-second recharge counts from activation and is independent of weapon haste. The temporary full hex shell and action countdown show when protection is active. Ordinary regenerating shields continue separately; airborne drones retain their own hull. Pause/hit-stop freeze the ability, and saved flights retain both the remaining protection and cooldown.
+
+The browser now saves a complete versioned flight checkpoint about every two seconds, and flushes on pause/background/exit. **CONTINUE FLIGHT** in Command Center restores the saved ship, weapons, missions, health, ammo, drones/rovers, active enemies/shots, reward queue, timers and random states into a paused flight. A fresh deployment replaces that local flight slot. v1 core credits/upgrades/achievements migrate to the v2 document. Finished flights cannot be resumed to collect rewards again; the latest completed flight, successful extraction and achievement are retained in Flight Log. A current backup/checksum protects against accidental corruption, and actual storage failures are reported. Flight Log can export a JSON backup.
+
+Saves currently belong to the browser origin. Google/GitHub login is planned, not enabled. [The account sync architecture](docs/save-sync-architecture.md) describes keeping GitHub Pages for the static game and using Supabase Auth/Postgres for provider login and private player rows, with Cloudflare Worker/D1 as an alternative. No account service or backend has been deployed by this change.
+
 ## Directional target lock warnings — 1.30.0
 
 Enemy targeting beams are replaced by contracting ground brackets at the actual locked aim point, red directional chevrons around the core and a small ship-anchored TARGET LOCK readout with the next release countdown. The segmented directional arc fills as the gun charges. A brief procedural chirp announces a newly acquired core threat with a 1.5s audio cooldown. Interceptor, orbiter and Goliath cannon windups use the same warning language.

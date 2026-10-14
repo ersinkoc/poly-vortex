@@ -18,7 +18,7 @@ export type Hazard = { x: number; z: number; radius: number; age: number; delay:
 export type Supply = { x: number; z: number; type: 'repair' | 'magnet' | 'overdrive' | 'ammo'; age: number };
 export type Cache = { x: number; z: number; age: number };
 export type Profile = { credits: number; best: number; runs: number; wins: number; totalKills: number; achievements: string[]; upgrades: { armor: number; reactor: number; thrusters: number } };
-export type Input = { keys: Set<string>; aimX: number; aimZ: number; aiming: boolean; dash: boolean; surge: boolean; rocket: boolean; bomb: boolean; moveX: number; moveZ: number };
+export type Input = { keys: Set<string>; aimX: number; aimZ: number; aiming: boolean; dash: boolean; surge: boolean; rocket: boolean; bomb: boolean; barrier?: boolean; moveX: number; moveZ: number };
 
 export const WEAPONS: Record<WeaponId, { name: string; code: string; description: string; color: string }> = {
   pulse: { name: 'Pulse laser', code: 'PL-01', description: 'Rapid-fire homing bolts. Precision, at the speed of light.', color: '#bbff57' },
