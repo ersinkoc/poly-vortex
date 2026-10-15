@@ -33,6 +33,10 @@ bun run start
 
 Requires a modern browser with WebGL 2 and hardware acceleration. Audio unlocks on the first player interaction. Muting and performance rendering are available in system settings. High quality caps pixel ratio at 1.5; performance quality uses pixel ratio 1 and disables multisampled postprocessing. Actual frame rate depends on hardware and resolution.
 
+On first launch, a device benchmark tests High, Performance and Low using the arena plus a fixed graphics load. Each tier warms up for 1.5 seconds and measures at least three seconds of frame times. Keep the game window visible and focused; hidden/unfocused intervals reset the current tier. Insufficient samples, resizing or context loss cannot produce a new recommendation. The test can be skipped, and manual settings are retained. AUTO adopts a successful recommendation and continues adjusting during play.
+
+Open **Settings → Graphics & Performance → Device benchmark** for WebGL limits, browser-reported logical cores/approximate RAM, average FPS, 95th-percentile frame time, and rerun/apply controls. Results are local, expire after seven days, and are invalidated on the next load if the viewport, pixel density or reported capabilities change. This calibration estimates initial graphics capacity; it does not benchmark the entire combat simulation or guarantee a particular frame rate.
+
 ## GitHub Pages
 
 The app is exported to `out/` with `output: 'export'` and directory-style URLs. No Node.js server is required in production. `.github/workflows/pages.yml` runs on pushes to `main`, pull requests, and manual dispatches. It installs from `bun.lock`, generates route types, runs strict TypeScript and regression tests, builds and verifies the export, and deploys successful `main` builds to the `github-pages` environment. Pull requests run validation without deploying. Action versions are pinned to verified commit SHAs.

@@ -6,12 +6,12 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { engine } from '@/game/engine';
 import { useGame } from '@/game/store';
-import { renderQuality } from '@/game/render-budget';
+import { renderShadows } from '@/game/render-budget';
 
 // A local studio reflection rig; no HDR image or network request is needed.
 export default function ShipLighting({ followPlayer = false }: { followPlayer?: boolean }) {
   const key = useRef<THREE.DirectionalLight>(null), target = useMemo(() => new THREE.Object3D(), []);
-  const quality = useGame(renderQuality);
+  const shadows = useGame(renderShadows);
   useEffect(() => { const light = key.current; return () => light?.shadow.dispose(); }, []);
   useFrame(() => {
     if (!key.current || !followPlayer) return;
@@ -21,7 +21,7 @@ export default function ShipLighting({ followPlayer = false }: { followPlayer?: 
   return <>
     <ambientLight intensity={0.32} />
     <primitive object={target} />
-    <directionalLight ref={key} target={target} position={[7, 17, 9]} intensity={3.6} color="#fff0db" castShadow={quality === 'high'} shadow-mapSize={[1024, 1024]} shadow-camera-left={-30} shadow-camera-right={30} shadow-camera-top={30} shadow-camera-bottom={-30} shadow-camera-near={0.5} shadow-camera-far={65} shadow-bias={-0.0004} shadow-normalBias={0.025} shadow-radius={2} />
+    <directionalLight ref={key} target={target} position={[7, 17, 9]} intensity={3.6} color="#fff0db" castShadow={shadows} shadow-mapSize={[1024, 1024]} shadow-camera-left={-30} shadow-camera-right={30} shadow-camera-top={30} shadow-camera-bottom={-30} shadow-camera-near={0.5} shadow-camera-far={65} shadow-bias={-0.0004} shadow-normalBias={0.025} shadow-radius={2} />
     <directionalLight position={[-8, 7, -5]} intensity={1.15} color="#729bc9" />
     <Environment resolution={128} frames={1} environmentIntensity={0.9}>
       <Lightformer form="rect" intensity={4} color="#fff3dd" position={[0, 8, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[12, 9, 1]} />

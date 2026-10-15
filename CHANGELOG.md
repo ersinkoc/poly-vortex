@@ -6,6 +6,7 @@ Notable changes are recorded here from the `1.34.0` development cycle onward. Ve
 
 ### Added
 
+- Add automatic device calibration across three graphics tiers, local capability/frame-time reports, cached recommendations and rerun/skip/apply controls while preserving manual preferences.
 - Add destructible heavy-ship gun mounts, engines and generators with visible modules and functional attack/defense changes.
 - Add Mine weaver, Aegis tender, Line bomber, Hive carrier and Escort hunter roles with bounded special attacks and Drydock identification.
 - Evolve all six weapons at level 6, including Rail fragments, Scatter ricochets, Cryo projectile stasis and Tesla/escort battery synergy.

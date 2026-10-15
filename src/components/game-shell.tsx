@@ -18,6 +18,8 @@ import FlightManual from './flight-manual';
 import RunPersistence from './run-persistence';
 import SaveNotice from './save-notice';
 import SaveRecord from './save-record';
+import GraphicsSettings from './graphics-settings';
+import BenchmarkStatus from './benchmark-status';
 import { loadSave, claimResume } from '@/game/local-save';
 
 import { useShipSync } from './use-ship-sync';
@@ -47,8 +49,7 @@ function Toggle({ active, onClick, label }: { active: boolean; onClick: () => vo
 function PanelContent({ panel }: { panel: Exclude<Panel, null> }) {
   const runMode = useGame(s => s.runMode);
   const aimMode = useGame(s => s.aimMode), reducedEffects = useGame(s => s.reducedEffects);
-  const profile = useGame(s => s.profile), sound = useGame(s => s.sound), quality = useGame(s => s.quality), difficulty = useGame(s => s.difficulty), loadout = useGame(s => s.loadout);
-  const adaptive = useGame(s => s.adaptiveQuality), budget = useGame(s => s.renderBudget);
+  const profile = useGame(s => s.profile), sound = useGame(s => s.sound), difficulty = useGame(s => s.difficulty), loadout = useGame(s => s.loadout);
   if (panel === 'ships') return <ShipSelector />;
   if (panel === 'ordnance') return <RocketGuide />;
   if (panel === 'records') return <>
@@ -70,7 +71,7 @@ function PanelContent({ panel }: { panel: Exclude<Panel, null> }) {
     <div className="setting-row"><div><h3>Targeting control</h3><p>{aimMode === 'precision' ? 'Only fire in your mouse aim cone. No automatic fallback.' : 'Mouse aim takes priority. Track automatically when the cursor leaves.'} Press F during flight.</p></div><div className="segmented"><button className={aimMode === 'assisted' ? 'active' : ''} onClick={() => useGame.setState({ aimMode: 'assisted' })}>ASSISTED</button><button className={aimMode === 'precision' ? 'active' : ''} onClick={() => useGame.setState({ aimMode: 'precision' })}>PRECISION</button></div></div>
     <div className="setting-row"><div><h3>Reduced effects</h3><p>Disable camera shake, hit distortion and interface motion. Combat warnings remain visible.</p></div><Toggle label="Reduced effects" active={reducedEffects} onClick={() => useGame.setState({ reducedEffects: !reducedEffects })} /></div>
     <div className="setting-row"><div><h3>Procedural audio</h3><p>Synth bassline, laser pulses, and reactive effects.</p></div><Toggle label="Procedural audio" active={sound} onClick={() => { useGame.setState({ sound: !sound }); void audio.unlock().catch(() => undefined); }} /></div>
-    <div className="setting-row"><div><h3>Render quality</h3><p>{adaptive ? `AUTO · ${['HIGH', 'BALANCED', 'LIGHT'][budget]} · Adapts resolution and detail for smooth combat.` : quality === 'high' ? 'Full shadows, layered smoke, debris and enhanced resolution.' : 'Light rendering with core lighting, bloom and combat signals retained.'}</p></div><div className="segmented"><button className={adaptive ? 'active' : ''} onClick={() => useGame.setState({ adaptiveQuality: true, quality: 'high', renderBudget: 0 })}>AUTO</button><button className={!adaptive && quality === 'high' ? 'active' : ''} onClick={() => useGame.setState({ adaptiveQuality: false, quality: 'high' })}>HIGH</button><button className={!adaptive && quality === 'performance' ? 'active' : ''} onClick={() => useGame.setState({ adaptiveQuality: false, quality: 'performance' })}>PERFORMANCE</button></div></div>
+    <GraphicsSettings />
     <div className="setting-label">DEPLOYMENT DIFFICULTY</div>
     <div className="difficulty-options"><button className={difficulty === 'standard' ? 'selected' : ''} onClick={() => useGame.setState({ difficulty: 'standard' })}><Shield size={23} /><strong>STANDARD</strong><p>The original protocol.<br />A fair fight against impossible odds.</p>{difficulty === 'standard' && <Check size={16} />}</button><button className={difficulty === 'overdrive' ? 'selected' : ''} onClick={() => useGame.setState({ difficulty: 'overdrive' })}><Zap size={23} /><strong>OVERDRIVE</strong><p>Faster swarms. Stronger enemies.<br />For cores that crave chaos.</p>{difficulty === 'overdrive' && <Check size={16} />}</button></div>
     <div className="panel-footnote"><CircleDot size={13} /> DIFFICULTY APPLIES TO YOUR NEXT RUN</div>
@@ -95,7 +96,7 @@ function Modal({ panel, close }: { panel: Exclude<Panel, null>; close: () => voi
     const key = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { e.stopImmediatePropagation(); close(); }
       if (e.key === 'Tab') {
-        const buttons = ref.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], summary, [tabindex="0"]'); if (!buttons?.length) return;
+        const buttons = ref.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), a[href], summary, [tabindex="0"]'); if (!buttons?.length) return;
         const first = buttons[0], last = buttons[buttons.length - 1];
         if (e.shiftKey && (document.activeElement === first || document.activeElement === ref.current)) { e.preventDefault(); last.focus(); }
         else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
@@ -134,6 +135,7 @@ export default function GameShell() {
   useShipSync();
   const phase = useGame(s => s.phase), sound = useGame(s => s.sound);
   const reducedEffects = useGame(s => s.reducedEffects);
+  const benchmarking = useGame(s => s.benchmarkStatus === 'running' || s.benchmarkStatus === 'idle');
   const [panel, setPanel] = useState<Panel>(null);
   const compact = useCompactHUD(), [intelOpen, setIntelOpen] = useState(false), intelPaused = useRef(false);
   const closeIntel = useCallback(() => {
@@ -157,8 +159,9 @@ export default function GameShell() {
   useEffect(() => { useGame.getState().hydrate(); return () => audio.stopMusic(); }, []);
   useEffect(() => { audio.setEnabled(sound); }, [sound]);
   useEffect(() => { if (phase === 'playing') audio.startMusic(); else audio.stopMusic(); }, [phase]);
-  const start = () => { setPanel(null); void audio.unlock().catch(() => { useGame.setState({ sound: false }); }); useGame.getState().start(); };
+  const start = () => { if (['idle', 'running'].includes(useGame.getState().benchmarkStatus)) return; setPanel(null); void audio.unlock().catch(() => { useGame.setState({ sound: false }); }); useGame.getState().start(); };
   const resume = () => {
+    if (['idle', 'running'].includes(useGame.getState().benchmarkStatus)) return;
     const flight = loadSave()?.checkpoint;
     if (!flight || !engine.queueResume(flight)) { useGame.setState({ savedFlight: null, saveStatus: 'invalid' }); return; }
     const status = claimResume(flight.runKey);
@@ -166,7 +169,7 @@ export default function GameShell() {
     setPanel(null); void audio.unlock().catch(() => useGame.setState({ sound: false })); useGame.getState().resumeFlight(flight);
   };
   return <MotionConfig reducedMotion={reducedEffects ? 'always' : 'user'}><div className={`app-shell ${phase === 'menu' ? 'is-menu' : 'is-game'} ${reducedEffects ? 'reduced-effects' : ''}`}>
-    <RunPersistence/><SaveNotice/><div className="arena-canvas"><ArenaBoundary>{(phase !== 'menu' || !compact) && <Arena />}</ArenaBoundary></div>
+    <BenchmarkStatus/><RunPersistence/><SaveNotice/><div className="arena-canvas"><ArenaBoundary>{(phase !== 'menu' || !compact || benchmarking) && <Arena />}</ArenaBoundary></div>
     <AnimatePresence mode="wait">{phase === 'menu' ? <LaunchMenu key="menu" open={setPanel} start={start} resume={resume} /> : <motion.div key="game" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="game-interface">{compact ? <MobileHUD resumeOnClose={intelPaused.current} intelOpen={intelOpen} onIntelOpen={openIntel} onIntelClose={closeIntel} onHelp={intelHelp} movement={<TouchControls showDash={false} />} /> : <FlightHUD resumeOnClose={intelPaused.current} intelOpen={intelOpen} onIntelOpen={openIntel} onIntelClose={closeIntel} onHelp={intelHelp} />}<AnimatePresence>{phase === 'paused' && !intelOpen && <PauseOverlay key="pause" open={setPanel} />}{(phase === 'dead' || phase === 'won') && <ResultOverlay key="result" start={start} open={setPanel} />}</AnimatePresence></motion.div>}</AnimatePresence>
     <AnimatePresence>{panel && <Modal key={panel} panel={panel} close={closePanel.current} />}</AnimatePresence>
   </div></MotionConfig>;

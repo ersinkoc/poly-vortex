@@ -11,7 +11,7 @@ import { buildEnemyShip, buildPlayerShip, buildShadowTexture, buildShipMaterials
 import ShipLighting from './ship-lighting';
 import { FLIGHTFRAMES, SHIP_IDS, SHIP_TRAITS } from '@/game/flightframes';
 import { useGame } from '@/game/store';
-import { renderDpr } from '@/game/render-budget';
+import { renderDpr, renderPostProcessing } from '@/game/render-budget';
 import PerformanceGovernor from './performance-governor';
 import { useShipSync } from './use-ship-sync';
 import { ENEMY_ROLES } from '@/game/battlefield';
@@ -53,14 +53,15 @@ export default function ShipHangar() {
   useShipSync();
   const [selected, setSelected] = useState(0); const item = catalog[selected];
   const chosen = useGame(s => s.ship), quality = useGame(s => s.quality), adaptiveQuality = useGame(s => s.adaptiveQuality), renderBudget = useGame(s => s.renderBudget);
+  const resolutionScale = useGame(s => s.resolutionScale), postProcessing = useGame(renderPostProcessing);
   useEffect(() => { useGame.getState().hydrate(); setSelected(SHIP_IDS.indexOf(useGame.getState().ship)); }, []);
   return <main className="hangar-shell">
-    <div className="hangar-canvas"><Canvas camera={{ position: [4.2, 3.7, 5.7], fov: 43 }} dpr={renderDpr({quality,adaptiveQuality,renderBudget})} gl={{ antialias: false, powerPreference: 'high-performance' }}>
+    <div className="hangar-canvas"><Canvas camera={{ position: [4.2, 3.7, 5.7], fov: 43 }} dpr={renderDpr({quality,adaptiveQuality,renderBudget,resolutionScale})} gl={{ antialias: false, powerPreference: 'high-performance' }}>
       <PerformanceGovernor />
       <color attach="background" args={['#080e13']} /><fog attach="fog" args={['#080e13', 15, 40]} />
       <ShipLighting /><DisplayShip selected={selected} />
       <OrbitControls makeDefault target={[0, 0.55, 0]} enablePan={false} minDistance={3.2} maxDistance={10} minPolarAngle={0.2} maxPolarAngle={Math.PI / 2.15} />
-      <EffectComposer multisampling={adaptiveQuality || quality === 'performance' ? 0 : 4}><Bloom intensity={0.55} luminanceThreshold={1.2} mipmapBlur /><Vignette darkness={0.55} offset={0.3} /></EffectComposer>
+      {postProcessing && <EffectComposer multisampling={!adaptiveQuality && quality === 'high' ? 4 : 0}><Bloom intensity={0.55} luminanceThreshold={1.2} mipmapBlur /><Vignette darkness={0.55} offset={0.3} /></EffectComposer>}
     </Canvas></div>
     <header className="hangar-header"><Link href="/" className="hangar-back"><ArrowLeft size={17} /> COMMAND CENTER</Link><span><Hexagon size={18} /> POLY-VORTEX / DRYDOCK</span><small>FLEET IDENTIFICATION SYSTEM</small></header>
     <aside className="hangar-catalog"><span className="micro">ENGINEERED FOR THE VORTEX</span><h1>THE<br /><span>FLEET.</span></h1><div>{catalog.map((ship, i) => { const Icon = ship.icon; return <button key={ship.name} className={selected === i ? 'selected' : ''} style={{ '--ship-accent': ship.color } as React.CSSProperties} onClick={() => setSelected(i)} aria-pressed={selected === i}><Icon size={22} /><div><strong>{ship.name}</strong><span>{ship.role}</span></div><ArrowUpRight size={16} /></button>; })}</div></aside>

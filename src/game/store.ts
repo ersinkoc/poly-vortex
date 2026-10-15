@@ -1,3 +1,4 @@
+import type { BenchmarkReport, BenchmarkStatus, BenchmarkTier, DeviceCapabilities } from './benchmark';
 import type { EnemyWeapon } from './enemy-weapons';
 import type { EnemyRole } from './battlefield';
 import { create } from 'zustand';
@@ -13,15 +14,16 @@ import { CHARGE_RULES, type GroundCharge } from './ground-charges';
 import { ROVER_RULES } from './ground-rovers';
 import type { DroneTelemetry } from './orbital-drones';
 import { FLIGHTFRAMES, shipId, type ShipId } from './flightframes';
-import type { BudgetLevel } from './render-budget';
+import { graphicsPreferences, type Quality, type BudgetLevel } from './render-budget';
 import { claimRun, newRunKey, readProfile, readSettings, savedFlightSummary, loadSave, saveProfile, saveSettings, type SaveSummary, type SavedFlight, type FlightResult, type SaveStatus, type LastAchievement } from './local-save';
 
 type GameStore = {
+  graphicsHydrated: boolean; benchmarkDevice: DeviceCapabilities | null; benchmarkWaiting: boolean; benchmarkStatus: BenchmarkStatus; benchmarkReport: BenchmarkReport | null; benchmarkTier: BenchmarkTier | null; benchmarkProgress: number; benchmarkRequest: number; benchmarkCached: boolean;
   runKey: string; savedFlight: SaveSummary | null; lastFlight: FlightResult | null; saveStatus: SaveStatus; lastSavedAt: number;
   lastVictory: FlightResult | null; lastAchievement: LastAchievement | null;
   resumeFlight: (flight: SavedFlight) => void;
   ship: ShipId; activeShip: ShipId; selectShip: (ship: ShipId) => void;
-  adaptiveQuality: boolean; renderBudget: BudgetLevel;
+  adaptiveQuality: boolean; renderBudget: BudgetLevel; resolutionScale: number; shadows: boolean; postProcessing: boolean;
   droneHull: number[];
   droneStatus: DroneTelemetry[];
   roverMoving: number; roverArmed: number; roverNextWave: number; roverWaves: number;
@@ -35,7 +37,7 @@ type GameStore = {
   rocketAmmo: number; rocketCapacity: number; rocketCooldown: number; rocketReady: boolean;
   targeting: 'aim' | 'auto'; target: { id: number; kind: 0 | 1 | 2 | 3; weapon?: EnemyWeapon; role?: EnemyRole; distance: number; hp: number; maxHp: number } | null;
   mission: Mission | null; missionsCompleted: number; rescued: number;
-  phase: Phase; difficulty: Difficulty; loadout: WeaponId; sound: boolean; quality: 'high' | 'performance';
+  phase: Phase; difficulty: Difficulty; loadout: WeaponId; sound: boolean; quality: Quality;
   time: number; hp: number; maxHp: number; xp: number; nextXp: number; level: number;
   kills: number; score: number; combo: number; dash: number; enemies: number; fps: number;
   weapons: Record<WeaponId, number>; reward: RewardRoll | null; rewardQueued: number; profile: Profile; earned: number; runId: number;
@@ -47,10 +49,11 @@ type GameStore = {
   purchase: (id: keyof Profile['upgrades']) => void;
 };
 export const useGame = create<GameStore>((set, get) => ({
+  graphicsHydrated: false, benchmarkDevice: null, benchmarkWaiting: false, benchmarkStatus: 'idle', benchmarkReport: null, benchmarkTier: null, benchmarkProgress: 0, benchmarkRequest: 0, benchmarkCached: false,
   runKey: '', savedFlight: null, lastFlight: null, saveStatus: 'saved', lastSavedAt: 0,
   lastVictory: null, lastAchievement: null,
   resumeFlight: flight => set(s => ({ runKey: flight.runKey, activeShip: flight.ship, phase: 'paused', runId: s.runId + 1, maxHp: Number((flight.payload.state.player as Record<string, unknown>).maxHp), runMode: flight.payload.state.runMode as RunMode, difficulty: flight.payload.state.overdrive ? 'overdrive' : 'standard', loadout: flight.payload.state.startingLoadout as WeaponId, savedFlight: null, earned: 0, saveStatus: 'saved' })),
-  ship: 'vector', activeShip: 'vector', adaptiveQuality: true, renderBudget: 0,
+  ship: 'vector', activeShip: 'vector', adaptiveQuality: true, renderBudget: 1, resolutionScale: 1, shadows: true, postProcessing: true,
   selectShip: ship => { if (get().phase === 'menu' || get().phase === 'dead' || get().phase === 'won') set({ ship: shipId(ship) }); },
   droneHull: [],
   droneStatus: [],
@@ -87,7 +90,7 @@ export const useGame = create<GameStore>((set, get) => ({
         adaptiveQuality: typeof settings.adaptiveQuality === 'boolean' ? settings.adaptiveQuality : true,
         runMode: settings.runMode === 'classic' ? 'classic' : 'expedition',
         sound: typeof settings.sound === 'boolean' ? settings.sound : true,
-        quality: settings.quality === 'performance' ? 'performance' : 'high',
+        ...graphicsPreferences(settings),
         difficulty: settings.difficulty === 'overdrive' ? 'overdrive' : 'standard',
         loadout: typeof settings.loadout === 'string' && Object.hasOwn(WEAPONS, settings.loadout) ? settings.loadout as WeaponId : 'pulse',
         aimMode: settings.aimMode === 'precision' ? 'precision' : 'assisted',
@@ -95,6 +98,7 @@ export const useGame = create<GameStore>((set, get) => ({
       });
       else set({ reducedEffects: prefersCalm });
     } catch { set({ reducedEffects: prefersCalm }); /* Corrupt preferences do not affect the flight record. */ }
+    set({ graphicsHydrated: true });
   },
   saveRun: (score, kills, won, bonus = 0) => {
     const s = get(); if (s.phase === 'dead' || s.phase === 'won') return;
@@ -118,13 +122,13 @@ export const useGame = create<GameStore>((set, get) => ({
 }));
 
 useGame.subscribe((s, previous) => {
-  if (s.ship === previous.ship && s.adaptiveQuality === previous.adaptiveQuality && s.runMode === previous.runMode && s.sound === previous.sound && s.quality === previous.quality && s.difficulty === previous.difficulty && s.loadout === previous.loadout && s.aimMode === previous.aimMode && s.reducedEffects === previous.reducedEffects) return;
-  const keys = ['ship', 'adaptiveQuality', 'runMode', 'sound', 'quality', 'difficulty', 'loadout', 'aimMode', 'reducedEffects'] as const;
+  if (s.resolutionScale === previous.resolutionScale && s.shadows === previous.shadows && s.postProcessing === previous.postProcessing && s.ship === previous.ship && s.adaptiveQuality === previous.adaptiveQuality && s.runMode === previous.runMode && s.sound === previous.sound && s.quality === previous.quality && s.difficulty === previous.difficulty && s.loadout === previous.loadout && s.aimMode === previous.aimMode && s.reducedEffects === previous.reducedEffects) return;
+  const keys = ['resolutionScale', 'shadows', 'postProcessing', 'ship', 'adaptiveQuality', 'runMode', 'sound', 'quality', 'difficulty', 'loadout', 'aimMode', 'reducedEffects'] as const;
   const changed = Object.fromEntries(keys.filter(key => s[key] !== previous[key]).map(key => [key, s[key]]));
   try {
     let saved: Record<string, unknown> = {};
     try { const raw = JSON.parse(localStorage.getItem('poly-vortex-settings-v1') || 'null'); if (raw && typeof raw === 'object') saved = raw; } catch { /* Replace corrupt preferences with a valid snapshot. */ }
-    const settings = { ship: s.ship, adaptiveQuality: s.adaptiveQuality, runMode: s.runMode, sound: s.sound, quality: s.quality, difficulty: s.difficulty, loadout: s.loadout, aimMode: s.aimMode, reducedEffects: s.reducedEffects, ...saved, ...(loadSave()?.settings ?? {}), ...changed };
+    const settings = { resolutionScale: s.resolutionScale, shadows: s.shadows, postProcessing: s.postProcessing, ship: s.ship, adaptiveQuality: s.adaptiveQuality, runMode: s.runMode, sound: s.sound, quality: s.quality, difficulty: s.difficulty, loadout: s.loadout, aimMode: s.aimMode, reducedEffects: s.reducedEffects, ...saved, ...(loadSave()?.settings ?? {}), ...changed };
     localStorage.setItem('poly-vortex-settings-v1', JSON.stringify(settings)); saveSettings(settings);
   } catch { /* Preferences are optional when storage is unavailable. */ }
 });

@@ -8,8 +8,9 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { engine, LIMITS } from '@/game/engine';
 import { useGame } from '@/game/store';
-import { renderQuality, renderDpr } from '@/game/render-budget';
+import { renderQuality, renderDpr, renderShadows, renderPostProcessing } from '@/game/render-budget';
 import PerformanceGovernor from './performance-governor';
+import DeviceBenchmark from './device-benchmark';
 import ShipFleet from './ships';
 import ShipLighting from './ship-lighting';
 import CombatEffects from './combat-effects';
@@ -169,8 +170,12 @@ function SceneController() {
       accumulator.current += Math.min(delta, 0.1);
       while (accumulator.current >= 1 / 60) { engine.tick(1 / 60); accumulator.current -= 1 / 60; }
     }
-    frames.current.count++; frames.current.time += delta;
-    if (frames.current.time >= 1) { useGame.setState({ fps: Math.round(frames.current.count / frames.current.time) }); frames.current = { count: 0, time: 0 }; }
+    // Demand frames while paused and the first frame after returning to the tab
+    // are not representative of the continuous game frame rate.
+    if ((s.phase === 'playing' || s.phase === 'menu') && !document.hidden && delta > 0 && delta <= .25) {
+      frames.current.count++; frames.current.time += delta;
+      if (frames.current.time >= 1) { useGame.setState({ fps: Math.round(frames.current.count / frames.current.time) }); frames.current = { count: 0, time: 0 }; }
+    } else frames.current = { count: 0, time: 0 };
     const menu = s.phase === 'menu';
     const px = menu ? 0 : engine.player.x, pz = menu ? 0 : engine.player.z;
     target.set(px + (menu ? 12 : 0), menu ? 13 : 25, pz + (menu ? 17 : 19));
@@ -198,7 +203,7 @@ function SceneController() {
 
 function PostFX() {
   const quality = useGame(renderQuality);
-  const adaptive = useGame(s => s.adaptiveQuality);
+  const adaptive = useGame(s => s.benchmarkTier ? false : s.adaptiveQuality);
   const offset = useMemo(() => new THREE.Vector2(0.0003, 0.0003), []);
   useFrame(() => { const v = useGame.getState().reducedEffects ? 0 : 0.0003 + engine.hitFlash * 0.009; offset.set(v, v); });
   return <EffectComposer multisampling={!adaptive && quality === 'high' ? 4 : 0}>
@@ -210,16 +215,17 @@ function PostFX() {
 }
 
 export default function Arena() {
-  const quality = useGame(renderQuality);
   const phase = useGame(s => s.phase);
   const preference = useGame(s => s.quality), adaptiveQuality = useGame(s => s.adaptiveQuality), renderBudget = useGame(s => s.renderBudget);
-  return <Canvas frameloop={phase === 'paused' ? 'demand' : 'always'} shadows={quality === 'high' ? 'percentage' : false} camera={{ position: [16, 23, 20], fov: 46, near: 0.1, far: 160 }} dpr={renderDpr({quality: preference, adaptiveQuality, renderBudget})} gl={{ antialias: false, powerPreference: 'high-performance', alpha: false }}>
-    <PerformanceGovernor />
+  const benchmarkTier = useGame(s => s.benchmarkTier);
+  const resolutionScale = useGame(s => s.resolutionScale), shadows = useGame(renderShadows), postProcessing = useGame(renderPostProcessing);
+  return <Canvas frameloop={phase === 'paused' ? 'demand' : 'always'} shadows={shadows ? 'percentage' : false} camera={{ position: [16, 23, 20], fov: 46, near: 0.1, far: 160 }} dpr={renderDpr({quality: preference, adaptiveQuality, renderBudget, resolutionScale, benchmarkTier})} gl={{ antialias: false, powerPreference: 'high-performance', alpha: false }}>
+    <PerformanceGovernor /><DeviceBenchmark />
     <color attach="background" args={['#080e15']} />
     <fog attach="fog" args={['#080e15', 28, 72]} />
     <ShipLighting followPlayer />
     <SceneController /><Terrain /><ShipFleet /><BattlefieldActors />
     {phase !== 'menu' && <><MissionActors /><WorldLifeActors /><ServiceBeacon /><TargetMarker /><ProtocolRing /><Projectiles /><EnemyWeaponSignals /><Effects /><CombatEffects /><CinematicEffects /><Stars radius={65} depth={35} count={600} factor={1.3} saturation={0} fade speed={0.1} /></>}
-    <PostFX />
+    {postProcessing && <PostFX />}
   </Canvas>;
 }
